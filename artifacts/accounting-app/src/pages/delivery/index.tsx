@@ -149,7 +149,7 @@ function Deliveries() {
               ))}
         </TableBody>
       </Table>
-      <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
+      <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={updateMutation.isPending} />
     </>
   );
 }
