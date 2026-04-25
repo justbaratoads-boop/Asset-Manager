@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Search, Bell, Menu } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -6,17 +7,19 @@ import { Sidebar } from "./sidebar";
 import { ThemeToggle } from "./theme-toggle";
 
 export function Header() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center gap-4 flex-1">
-        <Sheet>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="md:hidden">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-64">
-            <Sidebar />
+            <Sidebar onNavigate={() => setMobileOpen(false)} />
           </SheetContent>
         </Sheet>
         

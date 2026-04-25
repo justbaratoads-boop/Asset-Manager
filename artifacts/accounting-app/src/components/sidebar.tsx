@@ -12,7 +12,6 @@ import {
   Truck,
   Settings,
   LogOut,
-  Menu,
   ChevronDown
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -101,23 +100,29 @@ const navigation = [
   },
 ];
 
-function NavItem({ item, isActive }: { item: any, isActive: boolean }) {
+function NavItem({ item, isActive, onNavigate }: { item: any; isActive: boolean; onNavigate?: () => void }) {
   if (item.items) {
-    return <NavGroup item={item} />;
+    return <NavGroup item={item} onNavigate={onNavigate} />;
   }
 
   return (
-    <Link href={item.href} className={cn(
-      "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-    )}>
-      <item.icon className="h-4 w-4" />
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      )}
+    >
+      <item.icon className="h-4 w-4 shrink-0" />
       {item.name}
     </Link>
   );
 }
 
-function NavGroup({ item }: { item: any }) {
+function NavGroup({ item, onNavigate }: { item: any; onNavigate?: () => void }) {
   const [location] = useLocation();
   const isActiveGroup = item.items.some((sub: any) => location === sub.href || location.startsWith(sub.href + "/"));
   const [isOpen, setIsOpen] = useState(isActiveGroup);
@@ -128,14 +133,16 @@ function NavGroup({ item }: { item: any }) {
         <button
           className={cn(
             "flex w-full items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors",
-            isActiveGroup ? "text-sidebar-foreground font-semibold" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            isActiveGroup
+              ? "text-sidebar-foreground font-semibold"
+              : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
         >
           <div className="flex items-center gap-3">
-            <item.icon className="h-4 w-4" />
+            <item.icon className="h-4 w-4 shrink-0" />
             {item.name}
           </div>
-          <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 transition-transform shrink-0", isOpen && "rotate-180")} />
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-1 px-3">
@@ -145,9 +152,12 @@ function NavGroup({ item }: { item: any }) {
             <Link
               key={subItem.name}
               href={subItem.href}
+              onClick={onNavigate}
               className={cn(
                 "block px-8 py-2 text-sm rounded-md transition-colors",
-                isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
               {subItem.name}
@@ -159,28 +169,29 @@ function NavGroup({ item }: { item: any }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const [location] = useLocation();
   const { logout, user } = useAuth();
 
   return (
-    <div className="hidden md:flex w-64 flex-col bg-sidebar border-r border-sidebar-border h-screen sticky top-0">
+    <div className="flex w-64 flex-col bg-sidebar border-r border-sidebar-border h-screen sticky top-0">
       <div className="h-14 flex items-center px-4 border-b border-sidebar-border bg-sidebar">
         <div className="flex items-center gap-2 font-bold text-sidebar-foreground text-lg tracking-tight">
-          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center text-primary-foreground">
+          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center text-primary-foreground text-xs">
             Acc
           </div>
           Accounting
         </div>
       </div>
-      
+
       <ScrollArea className="flex-1 py-4 px-3">
         <div className="space-y-1">
           {navigation.map((item) => (
-            <NavItem 
-              key={item.name} 
-              item={item} 
-              isActive={item.href ? location === item.href : false} 
+            <NavItem
+              key={item.name}
+              item={item}
+              isActive={item.href ? location === item.href : false}
+              onNavigate={onNavigate}
             />
           ))}
         </div>
@@ -188,7 +199,7 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-sidebar-border space-y-4 bg-sidebar">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sidebar-accent-foreground font-medium uppercase">
+          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sidebar-accent-foreground font-medium uppercase shrink-0">
             {user?.name?.charAt(0) || "U"}
           </div>
           <div className="flex-1 min-w-0">
@@ -196,7 +207,11 @@ export function Sidebar() {
             <p className="text-xs text-sidebar-foreground/60 truncate capitalize">{user?.role?.replace("_", " ")}</p>
           </div>
         </div>
-        <Button variant="ghost" className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={logout}>
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          onClick={logout}
+        >
           <LogOut className="mr-2 h-4 w-4" />
           Log out
         </Button>
