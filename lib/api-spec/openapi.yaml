@@ -3,20 +3,42 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Accounting & Business Management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: dashboard
+  - name: parties
+  - name: ledgers
+  - name: stockCategories
+  - name: stockItems
+  - name: stockTransactions
+  - name: saleInvoices
+  - name: orders
+  - name: purchaseInvoices
+  - name: purchaseOrders
+  - name: journals
+  - name: payments
+  - name: receipts
+  - name: creditNotes
+  - name: debitNotes
+  - name: deliveries
+  - name: vehicles
+  - name: users
+  - name: roles
+  - name: companySettings
+  - name: gstReports
+  - name: reports
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +46,2049 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out
+
+  # DASHBOARD
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Dashboard summary stats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent activity
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recent activity list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/low-stock-alerts:
+    get:
+      operationId: getLowStockAlerts
+      tags: [dashboard]
+      summary: Low stock items
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Low stock items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockItem"
+
+  # PARTIES
+  /parties:
+    get:
+      operationId: listParties
+      tags: [parties]
+      summary: List all parties
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [customer, supplier, both]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of parties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Party"
+    post:
+      operationId: createParty
+      tags: [parties]
+      summary: Create party
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePartyBody"
+      responses:
+        "201":
+          description: Party created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+
+  /parties/{id}:
+    get:
+      operationId: getParty
+      tags: [parties]
+      summary: Get party by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateParty
+      tags: [parties]
+      summary: Update party
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePartyBody"
+      responses:
+        "200":
+          description: Party updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+    delete:
+      operationId: deleteParty
+      tags: [parties]
+      summary: Delete party
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /parties/{id}/ledger:
+    get:
+      operationId: getPartyLedger
+      tags: [parties]
+      summary: Party ledger transactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Party ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyLedger"
+
+  # LEDGERS
+  /ledgers:
+    get:
+      operationId: listLedgers
+      tags: [ledgers]
+      summary: List ledgers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of ledgers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ledger"
+    post:
+      operationId: createLedger
+      tags: [ledgers]
+      summary: Create ledger
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLedgerBody"
+      responses:
+        "201":
+          description: Ledger created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ledger"
+
+  /ledgers/{id}:
+    get:
+      operationId: getLedger
+      tags: [ledgers]
+      summary: Get ledger
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ledger"
+    patch:
+      operationId: updateLedger
+      tags: [ledgers]
+      summary: Update ledger
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLedgerBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ledger"
+    delete:
+      operationId: deleteLedger
+      tags: [ledgers]
+      summary: Delete ledger
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # STOCK CATEGORIES
+  /stock-categories:
+    get:
+      operationId: listStockCategories
+      tags: [stockCategories]
+      summary: List stock categories
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockCategory"
+    post:
+      operationId: createStockCategory
+      tags: [stockCategories]
+      summary: Create stock category
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStockCategoryBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockCategory"
+
+  /stock-categories/{id}:
+    patch:
+      operationId: updateStockCategory
+      tags: [stockCategories]
+      summary: Update category
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStockCategoryBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockCategory"
+    delete:
+      operationId: deleteStockCategory
+      tags: [stockCategories]
+      summary: Delete category
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # STOCK ITEMS
+  /stock-items:
+    get:
+      operationId: listStockItems
+      tags: [stockItems]
+      summary: List stock items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: lowStock
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockItem"
+    post:
+      operationId: createStockItem
+      tags: [stockItems]
+      summary: Create stock item
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStockItemBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockItem"
+
+  /stock-items/{id}:
+    get:
+      operationId: getStockItem
+      tags: [stockItems]
+      summary: Get stock item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockItem"
+    patch:
+      operationId: updateStockItem
+      tags: [stockItems]
+      summary: Update stock item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStockItemBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockItem"
+    delete:
+      operationId: deleteStockItem
+      tags: [stockItems]
+      summary: Delete stock item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /stock-items/{id}/adjust:
+    post:
+      operationId: adjustStock
+      tags: [stockItems]
+      summary: Manual stock adjustment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockAdjustBody"
+      responses:
+        "200":
+          description: Adjusted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockItem"
+
+  /stock-items/{id}/transactions:
+    get:
+      operationId: getStockItemTransactions
+      tags: [stockItems]
+      summary: Stock ledger for item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockTransaction"
+
+  # SALE INVOICES
+  /sale-invoices:
+    get:
+      operationId: listSaleInvoices
+      tags: [saleInvoices]
+      summary: List sale invoices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: partyId
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sale invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SaleInvoice"
+    post:
+      operationId: createSaleInvoice
+      tags: [saleInvoices]
+      summary: Create sale invoice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSaleInvoiceBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleInvoice"
+
+  /sale-invoices/{id}:
+    get:
+      operationId: getSaleInvoice
+      tags: [saleInvoices]
+      summary: Get sale invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleInvoice"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateSaleInvoice
+      tags: [saleInvoices]
+      summary: Update sale invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSaleInvoiceBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleInvoice"
+    delete:
+      operationId: deleteSaleInvoice
+      tags: [saleInvoices]
+      summary: Delete sale invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ORDERS
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+    patch:
+      operationId: updateOrder
+      tags: [orders]
+      summary: Update order / status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+    delete:
+      operationId: deleteOrder
+      tags: [orders]
+      summary: Delete order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /orders/{id}/convert:
+    post:
+      operationId: convertOrderToInvoice
+      tags: [orders]
+      summary: Convert order to sale invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleInvoice"
+
+  # PURCHASE INVOICES
+  /purchase-invoices:
+    get:
+      operationId: listPurchaseInvoices
+      tags: [purchaseInvoices]
+      summary: List purchase invoices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: partyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Purchase invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PurchaseInvoice"
+    post:
+      operationId: createPurchaseInvoice
+      tags: [purchaseInvoices]
+      summary: Create purchase invoice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePurchaseInvoiceBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseInvoice"
+
+  /purchase-invoices/{id}:
+    get:
+      operationId: getPurchaseInvoice
+      tags: [purchaseInvoices]
+      summary: Get purchase invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseInvoice"
+    patch:
+      operationId: updatePurchaseInvoice
+      tags: [purchaseInvoices]
+      summary: Update purchase invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePurchaseInvoiceBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseInvoice"
+    delete:
+      operationId: deletePurchaseInvoice
+      tags: [purchaseInvoices]
+      summary: Delete purchase invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # PURCHASE ORDERS
+  /purchase-orders:
+    get:
+      operationId: listPurchaseOrders
+      tags: [purchaseOrders]
+      summary: List purchase orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Purchase orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PurchaseOrder"
+    post:
+      operationId: createPurchaseOrder
+      tags: [purchaseOrders]
+      summary: Create purchase order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePurchaseOrderBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+
+  /purchase-orders/{id}:
+    get:
+      operationId: getPurchaseOrder
+      tags: [purchaseOrders]
+      summary: Get purchase order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Purchase order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+    patch:
+      operationId: updatePurchaseOrder
+      tags: [purchaseOrders]
+      summary: Update purchase order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePurchaseOrderBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+    delete:
+      operationId: deletePurchaseOrder
+      tags: [purchaseOrders]
+      summary: Delete purchase order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /purchase-orders/{id}/receive:
+    post:
+      operationId: receivePurchaseOrder
+      tags: [purchaseOrders]
+      summary: Receive goods and update stock
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+
+  # JOURNAL ENTRIES
+  /journals:
+    get:
+      operationId: listJournals
+      tags: [journals]
+      summary: List journal entries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Journal entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JournalEntry"
+    post:
+      operationId: createJournal
+      tags: [journals]
+      summary: Create journal entry
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJournalBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+
+  /journals/{id}:
+    get:
+      operationId: getJournal
+      tags: [journals]
+      summary: Get journal entry
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Journal entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+    delete:
+      operationId: deleteJournal
+      tags: [journals]
+      summary: Delete journal entry
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # PAYMENT VOUCHERS
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List payment vouchers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      operationId: createPayment
+      tags: [payments]
+      summary: Create payment voucher
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments/{id}:
+    get:
+      operationId: getPayment
+      tags: [payments]
+      summary: Get payment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+    delete:
+      operationId: deletePayment
+      tags: [payments]
+      summary: Delete payment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # RECEIPT VOUCHERS
+  /receipts:
+    get:
+      operationId: listReceipts
+      tags: [receipts]
+      summary: List receipt vouchers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Receipts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Receipt"
+    post:
+      operationId: createReceipt
+      tags: [receipts]
+      summary: Create receipt voucher
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReceiptBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+
+  /receipts/{id}:
+    get:
+      operationId: getReceipt
+      tags: [receipts]
+      summary: Get receipt
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+    delete:
+      operationId: deleteReceipt
+      tags: [receipts]
+      summary: Delete receipt
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # CREDIT NOTES
+  /credit-notes:
+    get:
+      operationId: listCreditNotes
+      tags: [creditNotes]
+      summary: List credit notes
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Credit notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CreditNote"
+    post:
+      operationId: createCreditNote
+      tags: [creditNotes]
+      summary: Create credit note
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCreditNoteBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditNote"
+
+  /credit-notes/{id}:
+    get:
+      operationId: getCreditNote
+      tags: [creditNotes]
+      summary: Get credit note
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Credit note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditNote"
+    delete:
+      operationId: deleteCreditNote
+      tags: [creditNotes]
+      summary: Delete credit note
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # DEBIT NOTES
+  /debit-notes:
+    get:
+      operationId: listDebitNotes
+      tags: [debitNotes]
+      summary: List debit notes
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Debit notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DebitNote"
+    post:
+      operationId: createDebitNote
+      tags: [debitNotes]
+      summary: Create debit note
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDebitNoteBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DebitNote"
+
+  /debit-notes/{id}:
+    get:
+      operationId: getDebitNote
+      tags: [debitNotes]
+      summary: Get debit note
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Debit note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DebitNote"
+    delete:
+      operationId: deleteDebitNote
+      tags: [debitNotes]
+      summary: Delete debit note
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # DELIVERY ASSIGNMENTS
+  /deliveries:
+    get:
+      operationId: listDeliveries
+      tags: [deliveries]
+      summary: List delivery assignments
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Deliveries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Delivery"
+    post:
+      operationId: createDelivery
+      tags: [deliveries]
+      summary: Create delivery assignment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeliveryBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+
+  /deliveries/{id}:
+    get:
+      operationId: getDelivery
+      tags: [deliveries]
+      summary: Get delivery
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Delivery
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+    patch:
+      operationId: updateDelivery
+      tags: [deliveries]
+      summary: Update delivery status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeliveryBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+
+  # VEHICLES
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [vehicles]
+      summary: List vehicles
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      summary: Create vehicle
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVehicleBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /vehicles/{id}:
+    patch:
+      operationId: updateVehicle
+      tags: [vehicles]
+      summary: Update vehicle
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVehicleBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      summary: Delete vehicle
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # USERS
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # COMPANY SETTINGS
+  /company-settings:
+    get:
+      operationId: getCompanySettings
+      tags: [companySettings]
+      summary: Get company settings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanySettings"
+    patch:
+      operationId: updateCompanySettings
+      tags: [companySettings]
+      summary: Update company settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCompanySettingsBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanySettings"
+
+  # GST REPORTS
+  /gst/gstr3b:
+    get:
+      operationId: getGstr3b
+      tags: [gstReports]
+      summary: GSTR-3B summary
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: GSTR-3B
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gstr3b"
+
+  /gst/gstr2b:
+    get:
+      operationId: getGstr2b
+      tags: [gstReports]
+      summary: GSTR-2B ITC report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: GSTR-2B
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gstr2b"
+
+  /gst/hsn-summary:
+    get:
+      operationId: getHsnSummary
+      tags: [gstReports]
+      summary: HSN summary report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HSN summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HsnSummaryRow"
+
+  # REPORTS
+  /reports/day-book:
+    get:
+      operationId: getDayBook
+      tags: [reports]
+      summary: Day book report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Day book entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DayBookEntry"
+
+  /reports/trial-balance:
+    get:
+      operationId: getTrialBalance
+      tags: [reports]
+      summary: Trial balance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: asOf
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trial balance
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrialBalanceRow"
+
+  /reports/profit-loss:
+    get:
+      operationId: getProfitLoss
+      tags: [reports]
+      summary: Profit and loss statement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: P&L report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfitLoss"
+
+  /reports/balance-sheet:
+    get:
+      operationId: getBalanceSheet
+      tags: [reports]
+      summary: Balance sheet
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: asOf
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Balance sheet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSheet"
+
+  /reports/sale-register:
+    get:
+      operationId: getSaleRegister
+      tags: [reports]
+      summary: Sale register
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: partyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sale register
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SaleRegisterRow"
+
+  /reports/purchase-register:
+    get:
+      operationId: getPurchaseRegister
+      tags: [reports]
+      summary: Purchase register
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Purchase register
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PurchaseRegisterRow"
+
+  /reports/cash-book:
+    get:
+      operationId: getCashBook
+      tags: [reports]
+      summary: Cash book
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cash book
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CashBookRow"
+
+  /reports/stock-current:
+    get:
+      operationId: getCurrentStock
+      tags: [reports]
+      summary: Current stock report
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current stock
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CurrentStockRow"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +2098,1928 @@ components:
       required:
         - status
 
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        phone:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - role
+        - isActive
+        - createdAt
+
+    CreateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, accountant, sales_staff, driver, view_only]
+        phone:
+          type: ["string", "null"]
+      required:
+        - name
+        - email
+        - password
+        - role
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [admin, manager, accountant, sales_staff, driver, view_only]
+        phone:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+
+    DashboardSummary:
+      type: object
+      properties:
+        todaySales:
+          type: number
+        todayCollections:
+          type: number
+        pendingOrders:
+          type: integer
+        pendingPayments:
+          type: number
+        lowStockCount:
+          type: integer
+        monthSales:
+          type: number
+        monthPurchases:
+          type: number
+      required:
+        - todaySales
+        - todayCollections
+        - pendingOrders
+        - pendingPayments
+        - lowStockCount
+        - monthSales
+        - monthPurchases
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        amount:
+          type: ["number", "null"]
+        partyName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - type
+        - description
+        - createdAt
+
+    Party:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [customer, supplier, both]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        pincode:
+          type: ["string", "null"]
+        gstin:
+          type: ["string", "null"]
+        pan:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        creditLimit:
+          type: ["number", "null"]
+        openingBalance:
+          type: number
+        balanceType:
+          type: string
+          enum: [dr, cr]
+        currentBalance:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - type
+        - openingBalance
+        - balanceType
+        - createdAt
+
+    CreatePartyBody:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [customer, supplier, both]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        pincode:
+          type: ["string", "null"]
+        gstin:
+          type: ["string", "null"]
+        pan:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        creditLimit:
+          type: ["number", "null"]
+        openingBalance:
+          type: number
+        balanceType:
+          type: string
+          enum: [dr, cr]
+      required:
+        - name
+        - type
+        - openingBalance
+        - balanceType
+
+    UpdatePartyBody:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [customer, supplier, both]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        pincode:
+          type: ["string", "null"]
+        gstin:
+          type: ["string", "null"]
+        pan:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        creditLimit:
+          type: ["number", "null"]
+        openingBalance:
+          type: number
+        balanceType:
+          type: string
+          enum: [dr, cr]
+
+    PartyLedger:
+      type: object
+      properties:
+        party:
+          $ref: "#/components/schemas/Party"
+        openingBalance:
+          type: number
+        openingType:
+          type: string
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerTransaction"
+        closingBalance:
+          type: number
+        closingType:
+          type: string
+      required:
+        - party
+        - openingBalance
+        - openingType
+        - transactions
+        - closingBalance
+        - closingType
+
+    LedgerTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        debit:
+          type: ["number", "null"]
+        credit:
+          type: ["number", "null"]
+        balance:
+          type: number
+        balanceType:
+          type: string
+      required:
+        - id
+        - date
+        - type
+        - description
+        - balance
+        - balanceType
+
+    Ledger:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        group:
+          type: string
+          enum: [assets, liabilities, income, expense, capital]
+        nature:
+          type: string
+          enum: [dr, cr]
+        openingBalance:
+          type: number
+        currentBalance:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - group
+        - nature
+        - openingBalance
+        - createdAt
+
+    CreateLedgerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        group:
+          type: string
+          enum: [assets, liabilities, income, expense, capital]
+        nature:
+          type: string
+          enum: [dr, cr]
+        openingBalance:
+          type: number
+      required:
+        - name
+        - group
+        - nature
+        - openingBalance
+
+    UpdateLedgerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        group:
+          type: string
+          enum: [assets, liabilities, income, expense, capital]
+        nature:
+          type: string
+          enum: [dr, cr]
+        openingBalance:
+          type: number
+
+    StockCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        parentId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+
+    CreateStockCategoryBody:
+      type: object
+      properties:
+        name:
+          type: string
+        parentId:
+          type: ["integer", "null"]
+      required:
+        - name
+
+    UpdateStockCategoryBody:
+      type: object
+      properties:
+        name:
+          type: string
+        parentId:
+          type: ["integer", "null"]
+
+    StockItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
+        brand:
+          type: ["string", "null"]
+        hsnCode:
+          type: ["string", "null"]
+        unit:
+          type: string
+        purchaseRate:
+          type: number
+        saleRate:
+          type: number
+        minStockLevel:
+          type: number
+        barcode:
+          type: ["string", "null"]
+        physicalStock:
+          type: number
+        availableStock:
+          type: number
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - unit
+        - purchaseRate
+        - saleRate
+        - minStockLevel
+        - physicalStock
+        - availableStock
+        - createdAt
+
+    CreateStockItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        brand:
+          type: ["string", "null"]
+        hsnCode:
+          type: ["string", "null"]
+        unit:
+          type: string
+        purchaseRate:
+          type: number
+        saleRate:
+          type: number
+        minStockLevel:
+          type: number
+        barcode:
+          type: ["string", "null"]
+        openingStock:
+          type: number
+      required:
+        - name
+        - unit
+        - purchaseRate
+        - saleRate
+        - minStockLevel
+        - openingStock
+
+    UpdateStockItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        brand:
+          type: ["string", "null"]
+        hsnCode:
+          type: ["string", "null"]
+        unit:
+          type: string
+        purchaseRate:
+          type: number
+        saleRate:
+          type: number
+        minStockLevel:
+          type: number
+        barcode:
+          type: ["string", "null"]
+
+    StockAdjustBody:
+      type: object
+      properties:
+        quantity:
+          type: number
+        type:
+          type: string
+          enum: [increase, decrease]
+        reason:
+          type: string
+      required:
+        - quantity
+        - type
+        - reason
+
+    StockTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        itemId:
+          type: integer
+        type:
+          type: string
+        quantity:
+          type: number
+        balanceAfter:
+          type: number
+        reference:
+          type: ["string", "null"]
+        reason:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - itemId
+        - type
+        - quantity
+        - balanceAfter
+        - createdAt
+
+    InvoiceItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        stockItemId:
+          type: ["integer", "null"]
+        itemName:
+          type: string
+        hsnCode:
+          type: ["string", "null"]
+        quantity:
+          type: number
+        unit:
+          type: string
+        rate:
+          type: number
+        discountPct:
+          type: number
+        gstPct:
+          type: number
+        taxableAmount:
+          type: number
+        cgst:
+          type: number
+        sgst:
+          type: number
+        igst:
+          type: number
+        total:
+          type: number
+      required:
+        - id
+        - itemName
+        - quantity
+        - unit
+        - rate
+        - discountPct
+        - gstPct
+        - taxableAmount
+        - cgst
+        - sgst
+        - igst
+        - total
+
+    InvoiceItemInput:
+      type: object
+      properties:
+        stockItemId:
+          type: ["integer", "null"]
+        itemName:
+          type: string
+        hsnCode:
+          type: ["string", "null"]
+        quantity:
+          type: number
+        unit:
+          type: string
+        rate:
+          type: number
+        discountPct:
+          type: number
+        gstPct:
+          type: number
+      required:
+        - itemName
+        - quantity
+        - unit
+        - rate
+        - discountPct
+        - gstPct
+
+    PaymentMode:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [cash, upi, cheque, bank_transfer, credit]
+        amount:
+          type: number
+        reference:
+          type: ["string", "null"]
+      required:
+        - mode
+        - amount
+
+    SaleInvoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceNumber:
+          type: string
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        partyGstin:
+          type: ["string", "null"]
+        billingAddress:
+          type: ["string", "null"]
+        isGst:
+          type: boolean
+        isInterstate:
+          type: boolean
+        subtotal:
+          type: number
+        totalDiscount:
+          type: number
+        totalTaxable:
+          type: number
+        totalCgst:
+          type: number
+        totalSgst:
+          type: number
+        totalIgst:
+          type: number
+        totalGst:
+          type: number
+        grandTotal:
+          type: number
+        amountPaid:
+          type: number
+        balanceDue:
+          type: number
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, confirmed, cancelled]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItem"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMode"
+        createdAt:
+          type: string
+      required:
+        - id
+        - invoiceNumber
+        - date
+        - partyName
+        - isGst
+        - isInterstate
+        - subtotal
+        - totalDiscount
+        - totalTaxable
+        - totalCgst
+        - totalSgst
+        - totalIgst
+        - totalGst
+        - grandTotal
+        - amountPaid
+        - balanceDue
+        - status
+        - items
+        - payments
+        - createdAt
+
+    CreateSaleInvoiceBody:
+      type: object
+      properties:
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        partyGstin:
+          type: ["string", "null"]
+        billingAddress:
+          type: ["string", "null"]
+        isGst:
+          type: boolean
+        isInterstate:
+          type: boolean
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMode"
+      required:
+        - date
+        - partyName
+        - isGst
+        - isInterstate
+        - items
+        - payments
+
+    UpdateSaleInvoiceBody:
+      type: object
+      properties:
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        partyGstin:
+          type: ["string", "null"]
+        billingAddress:
+          type: ["string", "null"]
+        isGst:
+          type: boolean
+        isInterstate:
+          type: boolean
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMode"
+        status:
+          type: string
+          enum: [draft, confirmed, cancelled]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderNumber:
+          type: string
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        partyPhone:
+          type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, confirmed, dispatched, delivered, cancelled]
+        grandTotal:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItem"
+        convertedInvoiceId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - orderNumber
+        - date
+        - partyName
+        - status
+        - grandTotal
+        - items
+        - createdAt
+
+    CreateOrderBody:
+      type: object
+      properties:
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        partyPhone:
+          type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+      required:
+        - date
+        - partyName
+        - items
+
+    UpdateOrderBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, dispatched, delivered, cancelled]
+        notes:
+          type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+
+    PurchaseInvoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceNumber:
+          type: string
+        supplierInvoiceNumber:
+          type: ["string", "null"]
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        isGst:
+          type: boolean
+        isInterstate:
+          type: boolean
+        isReverseCharge:
+          type: boolean
+        subtotal:
+          type: number
+        totalTaxable:
+          type: number
+        totalCgst:
+          type: number
+        totalSgst:
+          type: number
+        totalIgst:
+          type: number
+        grandTotal:
+          type: number
+        amountPaid:
+          type: number
+        balanceDue:
+          type: number
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItem"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMode"
+        createdAt:
+          type: string
+      required:
+        - id
+        - invoiceNumber
+        - date
+        - partyName
+        - isGst
+        - isInterstate
+        - isReverseCharge
+        - subtotal
+        - totalTaxable
+        - totalCgst
+        - totalSgst
+        - totalIgst
+        - grandTotal
+        - amountPaid
+        - balanceDue
+        - items
+        - payments
+        - createdAt
+
+    CreatePurchaseInvoiceBody:
+      type: object
+      properties:
+        supplierInvoiceNumber:
+          type: ["string", "null"]
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        isGst:
+          type: boolean
+        isInterstate:
+          type: boolean
+        isReverseCharge:
+          type: boolean
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMode"
+      required:
+        - date
+        - partyName
+        - isGst
+        - isInterstate
+        - isReverseCharge
+        - items
+        - payments
+
+    UpdatePurchaseInvoiceBody:
+      type: object
+      properties:
+        supplierInvoiceNumber:
+          type: ["string", "null"]
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        isGst:
+          type: boolean
+        isInterstate:
+          type: boolean
+        isReverseCharge:
+          type: boolean
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMode"
+
+    PurchaseOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        poNumber:
+          type: string
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        status:
+          type: string
+          enum: [open, received, cancelled]
+        grandTotal:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItem"
+        createdAt:
+          type: string
+      required:
+        - id
+        - poNumber
+        - date
+        - partyName
+        - status
+        - grandTotal
+        - items
+        - createdAt
+
+    CreatePurchaseOrderBody:
+      type: object
+      properties:
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+      required:
+        - date
+        - partyName
+        - items
+
+    UpdatePurchaseOrderBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, received, cancelled]
+        notes:
+          type: ["string", "null"]
+
+    JournalLine:
+      type: object
+      properties:
+        id:
+          type: integer
+        ledgerId:
+          type: integer
+        ledgerName:
+          type: string
+        type:
+          type: string
+          enum: [dr, cr]
+        amount:
+          type: number
+      required:
+        - id
+        - ledgerId
+        - ledgerName
+        - type
+        - amount
+
+    JournalLineInput:
+      type: object
+      properties:
+        ledgerId:
+          type: integer
+        type:
+          type: string
+          enum: [dr, cr]
+        amount:
+          type: number
+      required:
+        - ledgerId
+        - type
+        - amount
+
+    JournalEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        voucherNumber:
+          type: string
+        voucherType:
+          type: string
+          enum: [journal, payment, receipt, contra]
+        narration:
+          type: string
+        totalDebit:
+          type: number
+        totalCredit:
+          type: number
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalLine"
+        createdAt:
+          type: string
+      required:
+        - id
+        - date
+        - voucherNumber
+        - voucherType
+        - narration
+        - totalDebit
+        - totalCredit
+        - lines
+        - createdAt
+
+    CreateJournalBody:
+      type: object
+      properties:
+        date:
+          type: string
+        voucherType:
+          type: string
+          enum: [journal, payment, receipt, contra]
+        narration:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalLineInput"
+      required:
+        - date
+        - voucherType
+        - narration
+        - lines
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        voucherNumber:
+          type: string
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: ["string", "null"]
+        ledgerId:
+          type: integer
+        ledgerName:
+          type: string
+        paymentMode:
+          type: string
+        amount:
+          type: number
+        narration:
+          type: ["string", "null"]
+        reference:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - voucherNumber
+        - date
+        - ledgerId
+        - ledgerName
+        - paymentMode
+        - amount
+        - createdAt
+
+    CreatePaymentBody:
+      type: object
+      properties:
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: ["string", "null"]
+        ledgerId:
+          type: integer
+        paymentMode:
+          type: string
+        amount:
+          type: number
+        narration:
+          type: ["string", "null"]
+        reference:
+          type: ["string", "null"]
+      required:
+        - date
+        - ledgerId
+        - paymentMode
+        - amount
+
+    Receipt:
+      type: object
+      properties:
+        id:
+          type: integer
+        voucherNumber:
+          type: string
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: ["string", "null"]
+        ledgerId:
+          type: integer
+        ledgerName:
+          type: string
+        paymentMode:
+          type: string
+        amount:
+          type: number
+        narration:
+          type: ["string", "null"]
+        reference:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - voucherNumber
+        - date
+        - ledgerId
+        - ledgerName
+        - paymentMode
+        - amount
+        - createdAt
+
+    CreateReceiptBody:
+      type: object
+      properties:
+        date:
+          type: string
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: ["string", "null"]
+        ledgerId:
+          type: integer
+        paymentMode:
+          type: string
+        amount:
+          type: number
+        narration:
+          type: ["string", "null"]
+        reference:
+          type: ["string", "null"]
+      required:
+        - date
+        - ledgerId
+        - paymentMode
+        - amount
+
+    CreditNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        noteNumber:
+          type: string
+        date:
+          type: string
+        saleInvoiceId:
+          type: ["integer", "null"]
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        reason:
+          type: string
+        amount:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItem"
+        createdAt:
+          type: string
+      required:
+        - id
+        - noteNumber
+        - date
+        - partyName
+        - reason
+        - amount
+        - items
+        - createdAt
+
+    CreateCreditNoteBody:
+      type: object
+      properties:
+        date:
+          type: string
+        saleInvoiceId:
+          type: ["integer", "null"]
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        reason:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+      required:
+        - date
+        - partyName
+        - reason
+        - items
+
+    DebitNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        noteNumber:
+          type: string
+        date:
+          type: string
+        purchaseInvoiceId:
+          type: ["integer", "null"]
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        reason:
+          type: string
+        amount:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItem"
+        createdAt:
+          type: string
+      required:
+        - id
+        - noteNumber
+        - date
+        - partyName
+        - reason
+        - amount
+        - items
+        - createdAt
+
+    CreateDebitNoteBody:
+      type: object
+      properties:
+        date:
+          type: string
+        purchaseInvoiceId:
+          type: ["integer", "null"]
+        partyId:
+          type: ["integer", "null"]
+        partyName:
+          type: string
+        reason:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItemInput"
+      required:
+        - date
+        - partyName
+        - reason
+        - items
+
+    Delivery:
+      type: object
+      properties:
+        id:
+          type: integer
+        tripNumber:
+          type: string
+        driverId:
+          type: ["integer", "null"]
+        driverName:
+          type: ["string", "null"]
+        vehicleId:
+          type: ["integer", "null"]
+        vehicleNumber:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, in_transit, delivered]
+        totalAmount:
+          type: number
+        invoiceIds:
+          type: array
+          items:
+            type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - tripNumber
+        - status
+        - totalAmount
+        - invoiceIds
+        - createdAt
+
+    CreateDeliveryBody:
+      type: object
+      properties:
+        driverId:
+          type: ["integer", "null"]
+        vehicleId:
+          type: ["integer", "null"]
+        invoiceIds:
+          type: array
+          items:
+            type: integer
+        notes:
+          type: ["string", "null"]
+      required:
+        - invoiceIds
+
+    UpdateDeliveryBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, in_transit, delivered]
+        notes:
+          type: ["string", "null"]
+
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: integer
+        vehicleNumber:
+          type: string
+        name:
+          type: string
+        driverUserId:
+          type: ["integer", "null"]
+        driverName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - vehicleNumber
+        - name
+        - createdAt
+
+    CreateVehicleBody:
+      type: object
+      properties:
+        vehicleNumber:
+          type: string
+        name:
+          type: string
+        driverUserId:
+          type: ["integer", "null"]
+      required:
+        - vehicleNumber
+        - name
+
+    UpdateVehicleBody:
+      type: object
+      properties:
+        vehicleNumber:
+          type: string
+        name:
+          type: string
+        driverUserId:
+          type: ["integer", "null"]
+
+    CompanySettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        pincode:
+          type: ["string", "null"]
+        gstin:
+          type: ["string", "null"]
+        pan:
+          type: ["string", "null"]
+        cin:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        financialYearStart:
+          type: integer
+        invoicePrefix:
+          type: string
+        enableGst:
+          type: boolean
+        isComposition:
+          type: boolean
+        defaultState:
+          type: ["string", "null"]
+        bankName:
+          type: ["string", "null"]
+        bankAccount:
+          type: ["string", "null"]
+        bankIfsc:
+          type: ["string", "null"]
+        upiId:
+          type: ["string", "null"]
+        billFooter:
+          type: ["string", "null"]
+        defaultPrintFormat:
+          type: string
+          enum: [a4, thermal]
+      required:
+        - id
+        - companyName
+        - financialYearStart
+        - invoicePrefix
+        - enableGst
+        - isComposition
+        - defaultPrintFormat
+
+    UpdateCompanySettingsBody:
+      type: object
+      properties:
+        companyName:
+          type: string
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        pincode:
+          type: ["string", "null"]
+        gstin:
+          type: ["string", "null"]
+        pan:
+          type: ["string", "null"]
+        cin:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        financialYearStart:
+          type: integer
+        invoicePrefix:
+          type: string
+        enableGst:
+          type: boolean
+        isComposition:
+          type: boolean
+        defaultState:
+          type: ["string", "null"]
+        bankName:
+          type: ["string", "null"]
+        bankAccount:
+          type: ["string", "null"]
+        bankIfsc:
+          type: ["string", "null"]
+        upiId:
+          type: ["string", "null"]
+        billFooter:
+          type: ["string", "null"]
+        defaultPrintFormat:
+          type: string
+          enum: [a4, thermal]
+
+    Gstr3b:
+      type: object
+      properties:
+        outwardTaxableSupplies:
+          type: number
+        outwardTaxable:
+          type: number
+        zeroRatedSupplies:
+          type: number
+        exemptSupplies:
+          type: number
+        totalCgst:
+          type: number
+        totalSgst:
+          type: number
+        totalIgst:
+          type: number
+        itcCgst:
+          type: number
+        itcSgst:
+          type: number
+        itcIgst:
+          type: number
+        netCgst:
+          type: number
+        netSgst:
+          type: number
+        netIgst:
+          type: number
+      required:
+        - outwardTaxableSupplies
+        - outwardTaxable
+        - zeroRatedSupplies
+        - exemptSupplies
+        - totalCgst
+        - totalSgst
+        - totalIgst
+        - itcCgst
+        - itcSgst
+        - itcIgst
+        - netCgst
+        - netSgst
+        - netIgst
+
+    Gstr2b:
+      type: object
+      properties:
+        totalInward:
+          type: number
+        itcCgst:
+          type: number
+        itcSgst:
+          type: number
+        itcIgst:
+          type: number
+        eligibleItc:
+          type: number
+        invoices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseRegisterRow"
+      required:
+        - totalInward
+        - itcCgst
+        - itcSgst
+        - itcIgst
+        - eligibleItc
+        - invoices
+
+    HsnSummaryRow:
+      type: object
+      properties:
+        hsnCode:
+          type: string
+        description:
+          type: ["string", "null"]
+        uom:
+          type: string
+        quantity:
+          type: number
+        taxableValue:
+          type: number
+        cgst:
+          type: number
+        sgst:
+          type: number
+        igst:
+          type: number
+        totalGst:
+          type: number
+      required:
+        - hsnCode
+        - uom
+        - quantity
+        - taxableValue
+        - cgst
+        - sgst
+        - igst
+        - totalGst
+
+    DayBookEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        time:
+          type: string
+        voucherType:
+          type: string
+        voucherNumber:
+          type: string
+        partyName:
+          type: ["string", "null"]
+        narration:
+          type: string
+        debit:
+          type: ["number", "null"]
+        credit:
+          type: ["number", "null"]
+        amount:
+          type: number
+      required:
+        - id
+        - time
+        - voucherType
+        - voucherNumber
+        - narration
+        - amount
+
+    TrialBalanceRow:
+      type: object
+      properties:
+        ledgerId:
+          type: integer
+        ledgerName:
+          type: string
+        group:
+          type: string
+        openingDr:
+          type: number
+        openingCr:
+          type: number
+        transactionDr:
+          type: number
+        transactionCr:
+          type: number
+        closingDr:
+          type: number
+        closingCr:
+          type: number
+      required:
+        - ledgerId
+        - ledgerName
+        - group
+        - openingDr
+        - openingCr
+        - transactionDr
+        - transactionCr
+        - closingDr
+        - closingCr
+
+    ProfitLoss:
+      type: object
+      properties:
+        grossIncome:
+          type: number
+        grossExpense:
+          type: number
+        grossProfit:
+          type: number
+        netProfit:
+          type: number
+        incomeGroups:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrialBalanceRow"
+        expenseGroups:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrialBalanceRow"
+      required:
+        - grossIncome
+        - grossExpense
+        - grossProfit
+        - netProfit
+        - incomeGroups
+        - expenseGroups
+
+    BalanceSheet:
+      type: object
+      properties:
+        totalAssets:
+          type: number
+        totalLiabilities:
+          type: number
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrialBalanceRow"
+        liabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrialBalanceRow"
+      required:
+        - totalAssets
+        - totalLiabilities
+        - assets
+        - liabilities
+
+    SaleRegisterRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceNumber:
+          type: string
+        date:
+          type: string
+        partyName:
+          type: string
+        taxableAmount:
+          type: number
+        cgst:
+          type: number
+        sgst:
+          type: number
+        igst:
+          type: number
+        totalGst:
+          type: number
+        grandTotal:
+          type: number
+        balanceDue:
+          type: number
+      required:
+        - id
+        - invoiceNumber
+        - date
+        - partyName
+        - taxableAmount
+        - cgst
+        - sgst
+        - igst
+        - totalGst
+        - grandTotal
+        - balanceDue
+
+    PurchaseRegisterRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceNumber:
+          type: string
+        date:
+          type: string
+        partyName:
+          type: string
+        taxableAmount:
+          type: number
+        cgst:
+          type: number
+        sgst:
+          type: number
+        igst:
+          type: number
+        totalGst:
+          type: number
+        grandTotal:
+          type: number
+      required:
+        - id
+        - invoiceNumber
+        - date
+        - partyName
+        - taxableAmount
+        - cgst
+        - sgst
+        - igst
+        - totalGst
+        - grandTotal
+
+    CashBookRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        voucherType:
+          type: string
+        voucherNumber:
+          type: string
+        narration:
+          type: string
+        debit:
+          type: ["number", "null"]
+        credit:
+          type: ["number", "null"]
+        balance:
+          type: number
+      required:
+        - id
+        - date
+        - voucherType
+        - voucherNumber
+        - narration
+        - balance
+
+    CurrentStockRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        itemName:
+          type: string
+        categoryName:
+          type: ["string", "null"]
+        unit:
+          type: string
+        physicalStock:
+          type: number
+        availableStock:
+          type: number
+        reservedStock:
+          type: number
+        minStockLevel:
+          type: number
+        purchaseRate:
+          type: number
+        saleRate:
+          type: number
+        stockValue:
+          type: number
+        isLow:
+          type: boolean
+      required:
+        - id
+        - itemName
+        - unit
+        - physicalStock
+        - availableStock
+        - reservedStock
+        - minStockLevel
+        - purchaseRate
+        - saleRate
+        - stockValue
+        - isLow

@@ -1,0 +1,222 @@
+Build a complete, production-ready, full-stack web-based Accounting & Business Management application. The app must be deployable to any cloud server (Railway, Render, AWS, GCP, etc.).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Backend: Node.js + Express.js (REST API)
+- Database: PostgreSQL with Prisma ORM (schema migrations included)
+- Frontend: React.js + Tailwind CSS (single-page app, responsive)
+- Auth: JWT-based login with role-based access (Admin, Manager, Staff, Driver)
+- PDF generation: Puppeteer or pdfkit (for bills, reports)
+- Thermal print: ESC/POS-compatible HTML template (80mm)
+- File export: xlsx and CSV export for reports
+- Deployment: Dockerfile + docker-compose.yml included
+- Environment: .env file with all config (DB URL, JWT secret, port, company info)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 1 — SALES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Sale Invoice
+   - Auto invoice number (prefix + date + sequence)
+   - Party name (from party master), billing address, GST number
+   - Line items: item, HSN/SAC, qty, unit, rate, discount %, GST %,  taxable amount, CGST, SGST, IGST, total
+   - Supports both GST and non-GST mode
+   - Multiple payment modes on a single invoice: UPI, Cash, Cheque, Bank Transfer, Credit
+   - Balance due = total - amount paid
+   - Bill format options: A4 and 80mm thermal (toggle before print)
+   - Print button (opens print preview)
+   - Print with acknowledgement copy (duplicate slip at bottom)
+   - Share bill via WhatsApp link (generate shareable HTML/PDF link)
+
+2. Order Booking (phone orders)
+   - Create an order with party details, items, delivery address, notes
+   - Status: Pending → Confirmed → Dispatched → Delivered
+   - Convert order to Sale Invoice in one click
+   - After conversion, go directly to Payment page
+
+3. Walk-in Sale
+   - Quick sale bill creation (no order step)
+   - Directly opens Payment page after saving
+   - Payment page supports: Cash, UPI (show QR), Cheque, Multiple modes split
+
+4. Delivery Assignment
+   - After creating any sale bill, assign it to one or more drivers
+   - Select pickup van/vehicle from vehicle master
+   - Multiple bills can be assigned to one driver in one trip
+   - Driver assignment screen shows: driver name, vehicle, list of bills, total amount, delivery status
+   - Print a delivery manifest (list of all bills for a driver trip)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 2 — PURCHASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Purchase Invoice: supplier, date, invoice no, items with HSN, qty, rate, GST
+- Purchase Order: create PO → receive goods → auto-update stock on receive
+- Debit Note: raise debit note against a purchase (returns or adjustments)
+- Credit Note: issue credit note against a sale (returns)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 3 — ACCOUNTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Journal Entry: date, narration, multiple debit/credit ledger lines, auto-balance check
+- Payment Voucher: pay to party/vendor, select ledger, payment mode
+- Receipt Voucher: receive from party, select ledger, payment mode
+- Contra Entry: cash-to-bank or bank-to-cash transfers
+
+Party Master:
+  - Name, address, GSTIN, PAN, phone, email, credit limit, opening balance
+  - Type: Customer / Supplier / Both
+
+Ledger Master:
+  - Name, group (Assets, Liabilities, Income, Expense, Capital)
+  - Opening balance, nature (Dr/Cr)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 4 — REPORTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All reports must have: date range filter, search, export to PDF and Excel.
+
+1. Balance Sheet — assets vs liabilities as of any date
+2. Profit & Loss Statement — income vs expense for any period, gross profit, net profit
+3. Day Book — all vouchers of a day chronologically
+4. Sale Register — all sale invoices, party-wise or date-wise, with GST breakup
+5. Purchase Register — all purchase invoices with GST breakup
+6. Party-wise Ledger:
+   - Full transaction history for any party
+   - Opening balance → all Dr/Cr entries → closing balance
+   - "Share with Party" button: generates a PDF/link and opens WhatsApp with party's number pre-filled
+7. Cash Book & Bank Book
+8. Trial Balance
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 5 — GST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- GSTR-3B Report: summary of outward/inward supplies, ITC, net tax payable
+- GSTR-2B Report: ITC available from purchase invoices
+- HSN Summary Report: HSN-wise taxable value and GST
+- GST Export: export all reports in JSON format (for offline GSTN upload) and Excel
+- Reverse Charge toggle on purchase vouchers
+- Composition scheme toggle in settings
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 6 — INVENTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Stock Category Master:
+  - Category → Sub-category → Brand hierarchy
+
+Stock Item Master:
+  - Name, category, brand, HSN code, unit (pcs/kg/ltr/box), purchase rate, sale rate
+  - Min stock level (low stock alert)
+  - Barcode/SKU field
+
+Stock Transactions:
+  - Auto-deduct on sale invoice creation
+  - Auto-add on purchase invoice creation
+  - Manual stock adjustment entry
+
+Stock Reports:
+  - Current Stock: shows Physical Stock and Available Stock separately
+    * Physical Stock = actual stock on hand
+    * Available Stock = Physical Stock minus stock reserved for pending/confirmed orders
+  - Stock Ledger: item-wise in/out history
+  - Low Stock Alert report
+  - Sale-wise stock movement
+  - Purchase-wise stock movement
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 7 — STAFF & ACCESS CONTROL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Roles: Admin, Manager, Accountant, Sales Staff, Driver, View Only
+
+Per-role permissions (toggle on/off):
+  - View / Create / Edit / Delete for each module
+  - Can access Reports: yes/no
+  - Can export data: yes/no
+  - Can change settings: yes/no
+
+Staff Master:
+  - Name, phone, email, role, password (hashed), active/inactive
+
+Login page:
+  - Company logo + name shown
+  - Email + password auth
+  - "Remember me" option
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 8 — SETTINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Company Settings:
+  - Company name, address, city, state, pincode
+  - GSTIN, PAN, CIN
+  - Phone, email, website
+  - Logo upload (shown on bills and reports)
+  - Financial year start month
+
+Bill Customization:
+  - Custom prefix for invoice numbers (e.g. INV, SALE, ORD)
+  - Show/hide columns on bill (e.g. hide discount, hide HSN)
+  - Custom footer text on bills
+  - Thermal or A4 as default print format
+  - Bank account details on bill (for payment QR / NEFT)
+
+Tax Settings:
+  - Enable/disable GST
+  - State (for CGST/SGST vs IGST logic)
+  - Composition scheme toggle
+
+Vehicle Master:
+  - Vehicle number, name, driver assigned
+
+Payment Mode Settings:
+  - Enable/disable specific modes (Cash, UPI, Cheque, Credit, etc.)
+  - UPI ID and QR code upload
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+UI/UX REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Sidebar navigation with collapsible modules
+- Dashboard home: today's sales total, pending orders, low stock alerts, pending payments
+- Mobile-responsive (tablet and phone friendly)
+- Dark mode toggle
+- Toasts/alerts for all success and error actions
+- Confirmation dialog before deleting any record
+- Keyboard shortcut: F2 = new sale bill, F3 = new receipt, F4 = new payment
+- Auto-save drafts for bills being created
+- Global search bar (search party, item, invoice number)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEPLOYMENT & INFRASTRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Dockerfile for the Node.js backend
+- docker-compose.yml with app + PostgreSQL service
+- .env.example file with all required variables
+- npm run build script (builds React frontend into /dist)
+- Backend serves the built frontend as static files in production
+- Health check endpoint: GET /api/health
+- Database seed script: creates default Admin user, sample ledgers, sample GST tax rates
+- README.md with full setup, env variables, and deployment instructions for Railway/Render/VPS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATABASE SCHEMA REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Include Prisma schema with all tables:
+users, roles, permissions, parties, ledgers, stock_categories, stock_items, stock_transactions,
+sale_invoices, sale_invoice_items, purchase_invoices, purchase_invoice_items,
+journal_entries, journal_lines, payments, receipts, orders, order_items,
+delivery_assignments, delivery_items, vehicles, drivers,
+credit_notes, debit_notes, company_settings, gst_settings
+
+All tables must have: id (UUID), created_at, updated_at, created_by (FK to users), is_deleted (soft delete)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+START BY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Set up folder structure (backend/ and frontend/)
+2. Create Prisma schema and run migrations
+3. Scaffold all API routes with proper controllers
+4. Build React frontend with all pages and forms
+5. Implement auth middleware and role checks on every route
+6. Add PDF generation for bills and reports
+7. Write Dockerfile and docker-compose.yml
+8. Write README.md
+
+Do not use placeholder data or mock APIs — all data must read from and write to the PostgreSQL database. Every feature listed above must be fully functional, not just UI shells.
