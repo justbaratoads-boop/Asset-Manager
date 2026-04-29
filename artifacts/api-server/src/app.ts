@@ -1,3 +1,4 @@
+import path from "path";
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -29,6 +30,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// API routes
 app.use("/api", router);
+
+// Serve built React frontend in production
+if (process.env.NODE_ENV === "production") {
+  const frontendDist = path.join(process.cwd(), "artifacts/accounting-app/dist/public");
+  app.use(express.static(frontendDist));
+
+  // SPA fallback — serve index.html for any non-API route
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 export default app;

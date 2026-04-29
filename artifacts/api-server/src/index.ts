@@ -1,13 +1,8 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
+// Default to 3000 if PORT is not set (Hostinger compatibility)
+const rawPort = process.env["PORT"] ?? "3000";
 
 const port = Number(rawPort);
 
