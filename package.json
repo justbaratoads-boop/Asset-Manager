@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "build": "pnpm install --no-frozen-lockfile && NODE_ENV=production pnpm --filter @workspace/accounting-app run build && pnpm --filter @workspace/api-server run build",
+    "build": "npx pnpm install --no-frozen-lockfile && NODE_ENV=production npx pnpm --filter @workspace/accounting-app run build && npx pnpm --filter @workspace/api-server run build",
     "start": "NODE_ENV=production node artifacts/api-server/dist/index.mjs",
     "typecheck:libs": "pnpm tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
