@@ -1,0 +1,35 @@
+file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:19930
+          throw new PathError(`Missing parameter name at index ${index}`, str);
+                ^
+
+PathError [TypeError]: Missing parameter name at index 3: (.*); visit https://git.new/pathToRegexpError for info
+    at name (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:19930:17)
+    at parse3 (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:19944:66)
+    at pathToRegexp (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20086:58)
+    at Object.match (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20056:32)
+    at matcher (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20258:27)
+    at new Layer (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20265:68)
+    at Function.route (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20690:21)
+    at Function.route (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20999:26)
+    at app2.<computed> [as get] (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:21062:26)
+    at file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:65266:7 {
+  originalPath: '(.*)'
+}
+
+Node.js v22.18.0
+file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:19930
+          throw new PathError(`Missing parameter name at index ${index}`, str);
+                ^
+
+PathError [TypeError]: Missing parameter name at index 3: (.*); visit https://git.new/pathToRegexpError for info
+    at name (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:19930:17)
+    at parse3 (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:19944:66)
+    at pathToRegexp (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20086:58)
+    at Object.match (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20056:32)
+    at matcher (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20258:27)
+    at new Layer (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20265:68)
+    at Function.route (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20690:21)
+    at Function.route (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:20999:26)
+    at app2.<computed> [as get] (file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:21062:26)
+    at file:///home/u822878373/domains/lightgrey-seal-188032.hostingersite.com/nodejs/artifacts/api-server/dist/index.mjs:65266:7 {
+  originalPath: '(.*)'
