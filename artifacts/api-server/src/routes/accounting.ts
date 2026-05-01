@@ -2,8 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable,
-  creditNotesTable, creditNoteItemsTable, debitNotesTable, debitNoteItemsTable,
-  ledgersTable
+  creditNotesTable, creditNoteItemsTable, debitNotesTable, debitNoteItemsTable
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -81,7 +80,7 @@ router.post("/payments", authMiddleware, async (req, res) => {
     date: data.date,
     partyId: data.partyId,
     partyName: data.partyName,
-    ledgerId: data.ledgerId,
+    ledgerId: data.ledgerId || 1,
     paymentMode: data.paymentMode || "cash",
     amount: String(data.amount),
     narration: data.narration,
@@ -119,7 +118,7 @@ router.post("/receipts", authMiddleware, async (req, res) => {
     date: data.date,
     partyId: data.partyId,
     partyName: data.partyName,
-    ledgerId: data.ledgerId,
+    ledgerId: data.ledgerId || 1,
     paymentMode: data.paymentMode || "cash",
     amount: String(data.amount),
     narration: data.narration,
@@ -177,9 +176,17 @@ router.post("/credit-notes", authMiddleware, async (req, res) => {
         igst: String(item.igst || 0),
         total: String(item.total),
       });
+
+      // Credit note = sale return → add stock back (increase openingStock)
+      if (item.stockItemId) {
+        await db.execute(
+          sql`UPDATE stock_items SET opening_stock = opening_stock + ${item.quantity} WHERE id = ${item.stockItemId}`
+        );
+      }
     }
   }
-  res.status(201).json(note);
+
+  res.status(201).json({ ...note, amount: Number(note.amount) });
 });
 
 router.get("/credit-notes/:id", authMiddleware, async (req, res) => {
@@ -212,7 +219,36 @@ router.post("/debit-notes", authMiddleware, async (req, res) => {
     reason: data.reason,
     amount: String(data.amount || 0),
   }).returning();
-  res.status(201).json(note);
+
+  if (data.items?.length) {
+    for (const item of data.items) {
+      await db.insert(debitNoteItemsTable).values({
+        noteId: note.id,
+        stockItemId: item.stockItemId,
+        itemName: item.itemName,
+        hsnCode: item.hsnCode,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        rate: String(item.rate),
+        discountPct: String(item.discountPct || 0),
+        gstPct: String(item.gstPct || 0),
+        taxableAmount: String(item.taxableAmount),
+        cgst: String(item.cgst || 0),
+        sgst: String(item.sgst || 0),
+        igst: String(item.igst || 0),
+        total: String(item.total),
+      });
+
+      // Debit note = purchase return → remove stock (decrease openingStock)
+      if (item.stockItemId) {
+        await db.execute(
+          sql`UPDATE stock_items SET opening_stock = GREATEST(0, opening_stock - ${item.quantity}) WHERE id = ${item.stockItemId}`
+        );
+      }
+    }
+  }
+
+  res.status(201).json({ ...note, amount: Number(note.amount) });
 });
 
 router.get("/debit-notes/:id", authMiddleware, async (req, res) => {

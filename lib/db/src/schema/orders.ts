@@ -18,6 +18,7 @@ export const ordersTable = pgTable("orders", {
   vehicleName: text("vehicle_name"),
   vehicleNo: text("vehicle_no"),
   dispatchNotes: text("dispatch_notes"),
+  deliveryDate: text("delivery_date"),
   isDeleted: text("is_deleted").notNull().default("false"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

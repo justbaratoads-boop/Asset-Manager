@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,12 +19,12 @@ import SaleInvoiceView from "@/pages/sales/invoice-view";
 import SaleInvoiceForm from "@/pages/sales/invoice-form";
 import OrderList from "@/pages/sales/orders";
 import OrderForm from "@/pages/sales/order-form";
-import WalkinSale from "@/pages/sales/walkin";
 
 // Purchase
 import PurchaseInvoiceList from "@/pages/purchase/invoice-list";
 import PurchaseInvoiceForm from "@/pages/purchase/invoice-form";
 import PurchaseOrderList from "@/pages/purchase/orders";
+import PurchaseOrderForm from "@/pages/purchase/order-form";
 
 // Accounts
 import PartiesList from "@/pages/accounts/parties";
@@ -38,7 +38,9 @@ import PaymentForm from "@/pages/accounts/payment-form";
 import ReceiptList from "@/pages/accounts/receipts";
 import ReceiptForm from "@/pages/accounts/receipt-form";
 import CreditNotesList from "@/pages/accounts/credit-notes";
+import CreditNoteForm from "@/pages/accounts/credit-note-form";
 import DebitNotesList from "@/pages/accounts/debit-notes";
+import DebitNoteForm from "@/pages/accounts/debit-note-form";
 
 // Inventory
 import StockItemList from "@/pages/inventory/items";
@@ -117,13 +119,12 @@ function Router() {
       <PR path="/sales/orders" component={OrderList} />
       <PR path="/sales/orders/new" component={OrderForm} />
       <PR path="/sales/orders/:id" component={OrderForm} />
-      <PR path="/sales/walkin" component={WalkinSale} />
 
       {/* Purchase */}
       <PR path="/purchase/invoices" component={PurchaseInvoiceList} />
       <PR path="/purchase/invoices/new" component={PurchaseInvoiceForm} />
       <PR path="/purchase/orders" component={PurchaseOrderList} />
-      <PR path="/purchase/orders/new" component={PurchaseInvoiceForm} />
+      <PR path="/purchase/orders/new" component={PurchaseOrderForm} />
 
       {/* Accounts */}
       <PR path="/accounts/parties" component={PartiesList} />
@@ -137,7 +138,9 @@ function Router() {
       <PR path="/accounts/receipts" component={ReceiptList} />
       <PR path="/accounts/receipts/new" component={ReceiptForm} />
       <PR path="/accounts/credit-notes" component={CreditNotesList} />
+      <PR path="/accounts/credit-notes/new" component={CreditNoteForm} />
       <PR path="/accounts/debit-notes" component={DebitNotesList} />
+      <PR path="/accounts/debit-notes/new" component={DebitNoteForm} />
 
       {/* Inventory */}
       <PR path="/inventory/items" component={StockItemList} />

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { useListOrders, useDeleteOrder, useConvertOrderToInvoice, getListOrdersQueryKey } from "@workspace/api-client-react";
+import { Link, useLocation } from "wouter";
+import { useListOrders, useDeleteOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,9 @@ const statusColors: Record<string, string> = {
 export default function OrderList() {
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [, setLocation] = useLocation();
   const { data: orders = [], isLoading } = useListOrders({ search: search || undefined });
   const deleteMutation = useDeleteOrder();
-  const convertMutation = useConvertOrderToInvoice();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -36,10 +36,8 @@ export default function OrderList() {
     setDeleteId(null);
   };
 
-  const handleConvert = async (id: number) => {
-    const result = await convertMutation.mutateAsync({ id });
-    toast({ title: "Order converted to invoice", description: `Invoice #${(result as any).invoiceNumber} created` });
-    queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+  const handleConvertToInvoice = (orderId: number) => {
+    setLocation(`/sales/invoices/new?fromOrder=${orderId}`);
   };
 
   return (
@@ -80,10 +78,16 @@ export default function OrderList() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Link href={`/sales/orders/${order.id}`}>
-                        <Button size="icon" variant="ghost" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="View / Edit"><Eye className="h-3.5 w-3.5" /></Button>
                       </Link>
                       {order.status === "pending" && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-600" title="Convert to Invoice" onClick={() => handleConvert(order.id)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-blue-600"
+                          title="Create Invoice from Order"
+                          onClick={() => handleConvertToInvoice(order.id)}
+                        >
                           <FileText className="h-3.5 w-3.5" />
                         </Button>
                       )}

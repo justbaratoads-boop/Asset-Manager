@@ -43,6 +43,7 @@ router.post("/orders", authMiddleware, async (req, res) => {
     vehicleName: data.vehicleName,
     vehicleNo: data.vehicleNo,
     dispatchNotes: data.dispatchNotes,
+    deliveryDate: data.deliveryDate,
     status: "pending",
     grandTotal: String(data.grandTotal || 0),
   }).returning();
@@ -88,6 +89,7 @@ router.put("/orders/:id", authMiddleware, async (req, res) => {
     vehicleName: data.vehicleName,
     vehicleNo: data.vehicleNo,
     dispatchNotes: data.dispatchNotes,
+    deliveryDate: data.deliveryDate,
   }).where(eq(ordersTable.id, Number(req.params.id))).returning();
   if (!order) return res.status(404).json({ error: "Not found" });
   res.json(order);

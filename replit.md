@@ -32,15 +32,32 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 React + Vite + Tailwind SPA. Full-featured Indian SMB accounting suite.
 
 **Features:**
-- Dashboard, Sales (Invoices, Order Booking, Walk-in), Purchase (Invoices, Orders)
-- Accounts: Parties (with GST type, interstate flag, GSTIN/phone validation), Journal, Payments, Receipts, Credit/Debit Notes
-- Inventory: Stock Items (with GST applicable/rate, batch assignment), Categories, Current Stock, **Batches** (CRUD)
+- Dashboard, Sales (Invoices, Order Booking), Purchase (Invoices, Orders)
+- Accounts: Parties (GST type, interstate flag, GSTIN/phone validation), Journal, Payments, Receipts, Credit/Debit Notes
+- Inventory: Stock Items (GST applicable/rate, batch assignment), Categories, Current Stock, Batches (CRUD)
 - Reports: Day Book, Trial Balance, P&L, Balance Sheet, Registers, Cash Book
 - GST Reports: GSTR-3B, GSTR-2B, HSN Summary
 - Delivery management, Company Settings, Users & Roles
-- Orders: Dispatch Details section (driver, vehicle, dispatch notes), party auto-fill (phone + address)
 
-**Auth:** JWT stored in localStorage. Login: admin@example.com / password
+**Sale Invoice form:**
+- Cash/Credit toggle: Credit = party required; Cash = optional customer name, no party
+- Interstate auto-detected from party's `isOutOfState` flag (no manual toggle)
+- GST% auto-filled from item's `gstRate` on item selection
+- HSN hidden (stored internally, not shown in UI)
+- Items: name, qty, rate are mandatory before save
+- Cash invoice: payment locked to billed total
+- 4 save buttons at bottom: Save Invoice, Save & Print, Save & Send, Print Only
+- Supports pre-fill from order via `?fromOrder={id}` query param
+
+**Order form:** Delivery Date field added; Convert-to-invoice button redirects to `/sales/invoices/new?fromOrder={id}`
+
+**Purchase Invoice:** No interstate/reverse-charge toggles; interstate auto-detected from supplier's `isOutOfState`
+
+**Credit Notes:** Full page form with line items + inventory adjustment (stock increases on sale return)
+
+**Debit Notes:** Full page form with line items + inventory adjustment (stock decreases on purchase return)
+
+**Auth:** JWT (30-day expiry) stored in localStorage. staleTime=10min prevents spurious re-fetches. Login: admin@example.com / password
 
 ### API Server (`artifacts/api-server`)
 Express 5 + Drizzle ORM. Handles all CRUD + business logic.
@@ -49,7 +66,9 @@ Express 5 + Drizzle ORM. Handles all CRUD + business logic.
 - `/api/parties` — CRUD, unique name check, GST type, interstate flag; `/:id/orders`, `/:id/ledger`
 - `/api/stock-batches` — CRUD
 - `/api/stock-items` — CRUD with GST applicable/rate and batchId fields
-- `/api/orders` — CRUD with dispatch fields; required validation (party, date, items)
+- `/api/orders` — CRUD with dispatch fields (driver, vehicle, deliveryDate); required validation
+- `/api/credit-notes` — CRUD; on create, items inserted + `opening_stock` increased per item
+- `/api/debit-notes` — CRUD; on create, items inserted + `opening_stock` decreased per item (GREATEST 0)
 
 **DB:** PostgreSQL (Supabase, transaction pooler). Schema in `lib/db/src/schema/`.
 

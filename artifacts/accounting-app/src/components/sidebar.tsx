@@ -28,7 +28,6 @@ const navigation = [
     items: [
       { name: "Sale Invoices", href: "/sales/invoices" },
       { name: "Order Booking", href: "/sales/orders" },
-      { name: "Walk-in Sale", href: "/sales/walkin" },
     ],
   },
   {
