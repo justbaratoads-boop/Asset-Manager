@@ -1352,3 +1352,58 @@ export type GetCashBookParams = {
   from: string;
   to: string;
 };
+
+export type GetAllTransactionsParams = {
+  from?: string;
+  to?: string;
+};
+
+export type GetAllTransactions200TransactionsItem = { [key: string]: unknown };
+
+export type GetAllTransactions200 = {
+  transactions?: GetAllTransactions200TransactionsItem[];
+  count?: number;
+};
+
+export type GetPartyStatementParams = {
+  partyId?: number;
+  from?: string;
+  to?: string;
+};
+
+export type GetPartyStatement200TransactionsItem = { [key: string]: unknown };
+
+export type GetPartyStatement200 = {
+  transactions?: GetPartyStatement200TransactionsItem[];
+  closingBalance?: number;
+};
+
+export type GetStockSummaryParams = {
+  from?: string;
+  to?: string;
+};
+
+export type GetStockSummary200SummaryItem = { [key: string]: unknown };
+
+export type GetStockSummary200Period = { [key: string]: unknown };
+
+export type GetStockSummary200 = {
+  summary?: GetStockSummary200SummaryItem[];
+  period?: GetStockSummary200Period;
+};
+
+export type GetDeliveryReportParams = {
+  from?: string;
+  to?: string;
+};
+
+export type GetDeliveryReport200OrdersItem = { [key: string]: unknown };
+
+export type GetDeliveryReport200VehicleSummaryItem = { [key: string]: unknown };
+
+export type GetDeliveryReport200 = {
+  orders?: GetDeliveryReport200OrdersItem[];
+  vehicleSummary?: GetDeliveryReport200VehicleSummaryItem[];
+  totalOrders?: number;
+  totalAmount?: number;
+};

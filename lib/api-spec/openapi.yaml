@@ -2082,6 +2082,140 @@ paths:
                 items:
                   $ref: "#/components/schemas/CurrentStockRow"
 
+  /reports/all-transactions:
+    get:
+      operationId: getAllTransactions
+      tags: [reports]
+      summary: All transactions report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: All transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+
+  /reports/party-statement:
+    get:
+      operationId: getPartyStatement
+      tags: [reports]
+      summary: Party statement report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: partyId
+          in: query
+          schema:
+            type: integer
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Party statement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                  closingBalance:
+                    type: number
+
+  /reports/stock-summary:
+    get:
+      operationId: getStockSummary
+      tags: [reports]
+      summary: Stock movement summary
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stock summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: array
+                    items:
+                      type: object
+                  period:
+                    type: object
+
+  /reports/delivery-report:
+    get:
+      operationId: getDeliveryReport
+      tags: [reports]
+      summary: Delivery / dispatch report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Delivery report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      type: object
+                  vehicleSummary:
+                    type: array
+                    items:
+                      type: object
+                  totalOrders:
+                    type: integer
+                  totalAmount:
+                    type: number
+
 components:
   securitySchemes:
     bearerAuth:

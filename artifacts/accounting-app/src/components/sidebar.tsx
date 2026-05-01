@@ -1,18 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  Receipt,
-  ShoppingCart,
-  Users,
-  BookOpen,
-  Package,
-  FileText,
-  Percent,
-  Truck,
-  Settings,
-  LogOut,
-  ChevronDown
+  LayoutDashboard, Receipt, ShoppingCart, Users, BookOpen, Package,
+  FileText, Percent, Truck, Settings, LogOut, ChevronDown, Printer
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "./ui/button";
@@ -72,6 +62,10 @@ const navigation = [
       { name: "Sale Register", href: "/reports/sale-register" },
       { name: "Purchase Register", href: "/reports/purchase-register" },
       { name: "Cash Book", href: "/reports/cash-book" },
+      { name: "All Transactions", href: "/reports/all-transactions" },
+      { name: "Party Statement", href: "/reports/party-statement" },
+      { name: "Stock Summary", href: "/reports/stock-summary" },
+      { name: "Delivery Report", href: "/reports/delivery-report" },
     ],
   },
   {
@@ -83,16 +77,13 @@ const navigation = [
       { name: "HSN Summary", href: "/gst/hsn-summary" },
     ],
   },
-  {
-    name: "Delivery",
-    icon: Truck,
-    href: "/delivery"
-  },
+  { name: "Delivery", icon: Truck, href: "/delivery" },
   {
     name: "Settings",
     icon: Settings,
     items: [
       { name: "Company Settings", href: "/settings" },
+      { name: "Print Settings", href: "/settings/print" },
       { name: "Users & Roles", href: "/settings/users" },
       { name: "Vehicles", href: "/settings/vehicles" },
     ],
@@ -100,10 +91,7 @@ const navigation = [
 ];
 
 function NavItem({ item, isActive, onNavigate }: { item: any; isActive: boolean; onNavigate?: () => void }) {
-  if (item.items) {
-    return <NavGroup item={item} onNavigate={onNavigate} />;
-  }
-
+  if (item.items) return <NavGroup item={item} onNavigate={onNavigate} />;
   return (
     <Link
       href={item.href}
@@ -153,7 +141,7 @@ function NavGroup({ item, onNavigate }: { item: any; onNavigate?: () => void }) 
               href={subItem.href}
               onClick={onNavigate}
               className={cn(
-                "block px-8 py-2 text-sm rounded-md transition-colors",
+                "block px-8 py-1.5 text-sm rounded-md transition-colors",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -176,7 +164,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
     <div className="flex w-64 flex-col bg-sidebar border-r border-sidebar-border h-screen sticky top-0">
       <div className="h-14 flex items-center px-4 border-b border-sidebar-border bg-sidebar">
         <div className="flex items-center gap-2 font-bold text-sidebar-foreground text-lg tracking-tight">
-          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center text-primary-foreground text-xs">
+          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center text-primary-foreground text-xs font-bold">
             Acc
           </div>
           Accounting

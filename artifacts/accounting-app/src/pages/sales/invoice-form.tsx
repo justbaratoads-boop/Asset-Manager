@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCreateSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey } from "@workspace/api-client-react";
+import { useCreateSaleInvoice, useListParties, useListStockItems, useCreateStockItem, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Send, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Switch } from "@/components/ui/switch";
 import { customFetch } from "@workspace/api-client-react";
 
 interface InvoiceItem {
@@ -58,6 +58,59 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
   };
 }
 
+function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (item: any) => void }) {
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState("pcs");
+  const [saleRate, setSaleRate] = useState("");
+  const [purchaseRate, setPurchaseRate] = useState("");
+  const [gstRate, setGstRate] = useState("18");
+  const createItem = useCreateStockItem();
+  const { toast } = useToast();
+
+  const handleSave = async () => {
+    if (!name.trim()) { toast({ title: "Item name is required", variant: "destructive" }); return; }
+    try {
+      const item = await createItem.mutateAsync({
+        data: { name: name.trim(), unit, saleRate: saleRate || "0", purchaseRate: purchaseRate || "0", gstApplicable: "true", gstRate, openingStock: "0", minStockLevel: "0" } as any,
+      });
+      toast({ title: `Item "${name}" added` });
+      onAdded(item);
+      setName(""); setUnit("pcs"); setSaleRate(""); setPurchaseRate(""); setGstRate("18");
+      onClose();
+    } catch {
+      toast({ title: "Failed to add item", variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Quick Add Item</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1"><Label>Item Name *</Label><Input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="e.g. Cement 50kg" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={e => setUnit(e.target.value)} placeholder="pcs" /></div>
+            <div className="space-y-1"><Label>GST %</Label>
+              <Select value={gstRate} onValueChange={setGstRate}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Sale Rate</Label><Input type="number" value={saleRate} onChange={e => setSaleRate(e.target.value)} placeholder="0.00" /></div>
+            <div className="space-y-1"><Label>Purchase Rate</Label><Input type="number" value={purchaseRate} onChange={e => setPurchaseRate(e.target.value)} placeholder="0.00" /></div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={createItem.isPending}>{createItem.isPending ? "Adding..." : "Add Item"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SaleInvoiceForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -66,7 +119,6 @@ export default function SaleInvoiceForm() {
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
 
-  // Read fromOrder param from URL
   const fromOrderId = new URLSearchParams(window.location.search).get("fromOrder");
 
   const [paymentMode, setPaymentMode] = useState<"cash" | "credit">("credit");
@@ -78,10 +130,11 @@ export default function SaleInvoiceForm() {
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
 
-  // When party selected, auto-set interstate from party.isOutOfState
   useEffect(() => {
     if (selectedParty) {
       const interstate = selectedParty.isOutOfState === "true" || selectedParty.isOutOfState === true;
@@ -90,7 +143,6 @@ export default function SaleInvoiceForm() {
     }
   }, [partyId]);
 
-  // Pre-fill from order
   useEffect(() => {
     if (!fromOrderId) return;
     customFetch<any>(`/api/orders/${fromOrderId}`).then(order => {
@@ -139,15 +191,19 @@ export default function SaleInvoiceForm() {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = calcItem({
-          ...updated[index],
-          stockItemId: si.id,
-          itemName: si.name,
-          hsnCode: si.hsnCode || "",
-          unit: si.unit,
-          rate: si.saleRate,
-          gstPct,
-        }, isInterstate);
+        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct }, isInterstate);
+        return updated;
+      });
+    }
+  };
+
+  const handleQuickAdded = (newItem: any) => {
+    queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
+    if (quickAddForIndex !== null) {
+      const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
+      setItems(prev => {
+        const updated = [...prev];
+        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct }, isInterstate);
         return updated;
       });
     }
@@ -167,14 +223,9 @@ export default function SaleInvoiceForm() {
   };
 
   const buildPayload = () => {
-    const partyName = paymentMode === "credit"
-      ? (selectedParty?.name || "")
-      : (manualName || "Cash Sale");
-
+    const partyName = paymentMode === "credit" ? (selectedParty?.name || "") : (manualName || "Cash Sale");
     return {
-      date,
-      partyId: paymentMode === "credit" ? partyId : undefined,
-      partyName,
+      date, partyId: paymentMode === "credit" ? partyId : undefined, partyName,
       partyGstin: selectedParty?.gstin,
       billingAddress: selectedParty ? [selectedParty.city, selectedParty.state].filter(Boolean).join(", ") : "",
       isGst: items.some(i => i.gstPct > 0),
@@ -211,56 +262,26 @@ export default function SaleInvoiceForm() {
     } finally { setIsSaving(false); }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleSave();
-  };
-
-  const handleSaveAndPrint = () => {
-    handleSave((inv: any) => {
-      const id = inv?.id || inv?.invoiceId;
-      if (id) setLocation(`/sales/invoices/${id}?print=1`);
-      else setLocation("/sales/invoices");
-    });
-  };
-
-  const handleSaveAndSend = () => {
-    toast({ title: "WhatsApp sharing coming soon", description: "Invoice will be saved first" });
-    handleSave();
-  };
-
-  const handlePrintOnly = () => {
-    const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    toast({ title: "Save the invoice first before printing" });
-  };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); handleSave(); };
+  const handleSaveAndPrint = () => handleSave((inv: any) => { const id = inv?.id || inv?.invoiceId; if (id) setLocation(`/sales/invoices/${id}?print=1`); else setLocation("/sales/invoices"); });
+  const handleSaveAndSend = () => { toast({ title: "WhatsApp sharing coming soon" }); handleSave(); };
+  const handlePrintOnly = () => { const errs = validate(); if (Object.keys(errs).length > 0) { setErrors(errs); return; } toast({ title: "Save the invoice first before printing" }); };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center gap-3">
         <Link href="/sales/invoices"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
-        <h1 className="text-xl font-bold">
-          {fromOrderId ? "New Invoice (from Order)" : "New Sale Invoice"}
-        </h1>
+        <h1 className="text-xl font-bold">{fromOrderId ? "New Invoice (from Order)" : "New Sale Invoice"}</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardContent className="p-4 space-y-4">
-            {/* Payment Mode toggle */}
             <div className="flex items-center gap-4 p-3 bg-muted/40 rounded-lg">
               <span className="text-sm font-medium">Bill Type:</span>
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode("credit")}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${paymentMode === "credit" ? "bg-primary text-primary-foreground" : "bg-background border"}`}
-                >Credit</button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode("cash")}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${paymentMode === "cash" ? "bg-primary text-primary-foreground" : "bg-background border"}`}
-                >Cash</button>
+                <button type="button" onClick={() => setPaymentMode("credit")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${paymentMode === "credit" ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Credit</button>
+                <button type="button" onClick={() => setPaymentMode("cash")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${paymentMode === "cash" ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Cash</button>
               </div>
             </div>
 
@@ -294,19 +315,18 @@ export default function SaleInvoiceForm() {
               </div>
             )}
 
-            {/* Items table */}
             {errors.items && <p className="text-xs text-destructive">{errors.items}</p>}
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-48">Item</TableHead>
-                    <TableHead className="w-20">Qty *</TableHead>
-                    <TableHead className="w-16">Unit</TableHead>
-                    <TableHead className="w-24">Rate *</TableHead>
-                    <TableHead className="w-16">Disc%</TableHead>
-                    <TableHead className="w-20">GST%</TableHead>
-                    <TableHead className="w-24 text-right">Total</TableHead>
+                    <TableHead className="min-w-[200px]">Item</TableHead>
+                    <TableHead className="w-24">Qty *</TableHead>
+                    <TableHead className="w-20">Unit</TableHead>
+                    <TableHead className="w-28">Rate *</TableHead>
+                    <TableHead className="w-20">Disc%</TableHead>
+                    <TableHead className="w-24">GST%</TableHead>
+                    <TableHead className="w-28 text-right">Total</TableHead>
                     <TableHead className="w-8"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -314,36 +334,34 @@ export default function SaleInvoiceForm() {
                   {items.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <Select onValueChange={v => selectStockItem(index, v)}>
-                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select item" /></SelectTrigger>
-                          <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                        </Select>
+                        <div className="flex gap-1 items-center">
+                          <Select onValueChange={v => selectStockItem(index, v)}>
+                            <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
+                            <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" title="Quick add new item" onClick={() => { setQuickAddForIndex(index); setQuickAddOpen(true); }}>
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                         {!item.stockItemId && (
-                          <Input
-                            className="h-7 mt-1 text-xs"
-                            placeholder="Item name *"
-                            value={item.itemName}
-                            onChange={e => updateItem(index, "itemName", e.target.value)}
-                          />
+                          <Input className="h-9 mt-1 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(index, "itemName", e.target.value)} />
                         )}
-                        {item.stockItemId && (
-                          <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>
-                        )}
+                        {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
                       </TableCell>
-                      <TableCell><Input className="h-7 text-xs" type="number" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
-                      <TableCell><Input className="h-7 text-xs" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} /></TableCell>
-                      <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="Rate" /></TableCell>
-                      <TableCell><Input className="h-7 text-xs" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></TableCell>
+                      <TableCell><Input className="h-9 text-sm" type="number" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
+                      <TableCell><Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} /></TableCell>
+                      <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="Rate" /></TableCell>
+                      <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></TableCell>
                       <TableCell>
                         <Select value={String(item.gstPct)} onValueChange={v => updateItem(index, "gstPct", v)}>
-                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                           <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
                         </Select>
                       </TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
                       <TableCell>
-                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setItems(prev => prev.filter((_, i) => i !== index))}>
-                          <Trash2 className="h-3.5 w-3.5" />
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, i) => i !== index))}>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -383,38 +401,25 @@ export default function SaleInvoiceForm() {
             <CardContent className="space-y-2 text-sm">
               {paymentMode === "cash" ? (
                 <div className="space-y-1">
-                  <div className="flex justify-between font-medium text-green-700">
-                    <span>Amount Received</span>
-                    <span>{formatCurrency(totals.grand)}</span>
-                  </div>
+                  <div className="flex justify-between font-medium text-green-700"><span>Amount Received</span><span>{formatCurrency(totals.grand)}</span></div>
                   <p className="text-xs text-muted-foreground">Cash sale: amount equals bill total</p>
                 </div>
               ) : (
-                <div className="flex justify-between font-semibold">
-                  <span>Balance Due</span>
-                  <span className="text-red-600">{formatCurrency(balance)}</span>
-                </div>
+                <div className="flex justify-between font-semibold"><span>Balance Due</span><span className="text-red-600">{formatCurrency(balance)}</span></div>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Action buttons at bottom */}
       <div className="flex flex-wrap gap-3 pt-2 border-t">
-        <Button type="submit" disabled={isSaving} className="gap-2">
-          <Save className="h-4 w-4" />{isSaving ? "Saving..." : "Save Invoice"}
-        </Button>
-        <Button type="button" variant="outline" disabled={isSaving} onClick={handleSaveAndPrint} className="gap-2">
-          <Printer className="h-4 w-4" />Save &amp; Print
-        </Button>
-        <Button type="button" variant="outline" disabled={isSaving} onClick={handleSaveAndSend} className="gap-2">
-          <Send className="h-4 w-4" />Save &amp; Send
-        </Button>
-        <Button type="button" variant="ghost" onClick={handlePrintOnly} className="gap-2">
-          <Printer className="h-4 w-4" />Print Only
-        </Button>
+        <Button type="submit" disabled={isSaving} className="gap-2"><Save className="h-4 w-4" />{isSaving ? "Saving..." : "Save Invoice"}</Button>
+        <Button type="button" variant="outline" disabled={isSaving} onClick={handleSaveAndPrint} className="gap-2"><Printer className="h-4 w-4" />Save &amp; Print</Button>
+        <Button type="button" variant="outline" disabled={isSaving} onClick={handleSaveAndSend} className="gap-2"><Send className="h-4 w-4" />Save &amp; Send</Button>
+        <Button type="button" variant="ghost" onClick={handlePrintOnly} className="gap-2"><Printer className="h-4 w-4" />Print Only</Button>
       </div>
+
+      <QuickAddItemDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={handleQuickAdded} />
     </form>
   );
 }

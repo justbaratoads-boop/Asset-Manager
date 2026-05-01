@@ -2411,3 +2411,58 @@ export const GetCurrentStockResponseItem = zod.object({
   isLow: zod.boolean(),
 });
 export const GetCurrentStockResponse = zod.array(GetCurrentStockResponseItem);
+
+/**
+ * @summary All transactions report
+ */
+export const GetAllTransactionsQueryParams = zod.object({
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const GetAllTransactionsResponse = zod.object({
+  transactions: zod.array(zod.object({}).passthrough()).optional(),
+  count: zod.number().optional(),
+});
+
+/**
+ * @summary Party statement report
+ */
+export const GetPartyStatementQueryParams = zod.object({
+  partyId: zod.coerce.number().optional(),
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const GetPartyStatementResponse = zod.object({
+  transactions: zod.array(zod.object({}).passthrough()).optional(),
+  closingBalance: zod.number().optional(),
+});
+
+/**
+ * @summary Stock movement summary
+ */
+export const GetStockSummaryQueryParams = zod.object({
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const GetStockSummaryResponse = zod.object({
+  summary: zod.array(zod.object({}).passthrough()).optional(),
+  period: zod.object({}).passthrough().optional(),
+});
+
+/**
+ * @summary Delivery / dispatch report
+ */
+export const GetDeliveryReportQueryParams = zod.object({
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const GetDeliveryReportResponse = zod.object({
+  orders: zod.array(zod.object({}).passthrough()).optional(),
+  vehicleSummary: zod.array(zod.object({}).passthrough()).optional(),
+  totalOrders: zod.number().optional(),
+  totalAmount: zod.number().optional(),
+});

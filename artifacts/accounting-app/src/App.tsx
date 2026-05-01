@@ -7,6 +7,7 @@ import { setupApi } from "./lib/api-setup";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ThemeProvider } from "./components/theme-provider";
 import { Layout } from "./components/layout";
+import { FYProvider } from "./lib/financial-year";
 
 // Eagerly loaded
 import Login from "./pages/login";
@@ -58,6 +59,10 @@ import ProfitLoss from "@/pages/reports/profit-loss";
 import BalanceSheet from "@/pages/reports/balance-sheet";
 import Registers from "@/pages/reports/registers";
 import CashBook from "@/pages/reports/cash-book";
+import AllTransactions from "@/pages/reports/all-transactions";
+import PartyStatement from "@/pages/reports/party-statement";
+import StockSummary from "@/pages/reports/stock-summary";
+import DeliveryReport from "@/pages/reports/delivery-report";
 
 // GST
 import GSTDashboard from "@/pages/gst/index";
@@ -68,6 +73,7 @@ import DeliveryPage from "@/pages/delivery/index";
 // Settings
 import CompanySettings from "@/pages/settings/company";
 import UsersSettings from "@/pages/settings/users";
+import PrintSettings from "@/pages/settings/print";
 
 setupApi();
 
@@ -159,6 +165,10 @@ function Router() {
       <PR path="/reports/sale-register" component={Registers} />
       <PR path="/reports/purchase-register" component={Registers} />
       <PR path="/reports/cash-book" component={CashBook} />
+      <PR path="/reports/all-transactions" component={AllTransactions} />
+      <PR path="/reports/party-statement" component={PartyStatement} />
+      <PR path="/reports/stock-summary" component={StockSummary} />
+      <PR path="/reports/delivery-report" component={DeliveryReport} />
 
       {/* GST */}
       <PR path="/gst" component={GSTDashboard} />
@@ -172,6 +182,7 @@ function Router() {
       {/* Settings */}
       <PR path="/settings" component={CompanySettings} />
       <PR path="/settings/company" component={CompanySettings} />
+      <PR path="/settings/print" component={PrintSettings} />
       <PR path="/settings/users" component={UsersSettings} />
       <PR path="/settings/vehicles" component={DeliveryPage} />
 
@@ -187,7 +198,9 @@ function App() {
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <AuthProvider>
-              <Router />
+              <FYProvider startMonth={4}>
+                <Router />
+              </FYProvider>
             </AuthProvider>
           </WouterRouter>
           <Toaster />

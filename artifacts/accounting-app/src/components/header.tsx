@@ -5,9 +5,12 @@ import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Sidebar } from "./sidebar";
 import { ThemeToggle } from "./theme-toggle";
+import { useFY } from "@/lib/financial-year";
+import { Badge } from "./ui/badge";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { fy } = useFY();
 
   return (
     <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-10">
@@ -33,7 +36,10 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="hidden lg:flex items-center gap-2 mr-4 text-xs font-medium text-muted-foreground">
+        <Badge variant="outline" className="hidden sm:flex text-xs font-medium text-muted-foreground border-dashed">
+          FY {fy.label}
+        </Badge>
+        <div className="hidden lg:flex items-center gap-2 mr-2 text-xs font-medium text-muted-foreground">
           <kbd className="px-1.5 py-0.5 bg-muted rounded border shadow-sm">F2</kbd> Sale
           <kbd className="px-1.5 py-0.5 bg-muted rounded border shadow-sm ml-2">F3</kbd> Receipt
         </div>

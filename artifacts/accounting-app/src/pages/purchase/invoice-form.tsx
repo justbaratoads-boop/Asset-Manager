@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCreatePurchaseInvoice, useListParties, useListStockItems, getListPurchaseInvoicesQueryKey } from "@workspace/api-client-react";
+import { useCreatePurchaseInvoice, useListParties, useListStockItems, useCreateStockItem, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +21,46 @@ function calc(item: Partial<Item>, isInterstate: boolean): Item {
   const taxable = qty * rate * (1 - discPct / 100);
   const gst = taxable * (gstPct / 100);
   return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId };
+}
+
+function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (item: any) => void }) {
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState("pcs");
+  const [purchaseRate, setPurchaseRate] = useState("");
+  const [gstRate, setGstRate] = useState("18");
+  const createItem = useCreateStockItem();
+  const { toast } = useToast();
+
+  const handleSave = async () => {
+    if (!name.trim()) { toast({ title: "Item name is required", variant: "destructive" }); return; }
+    try {
+      const item = await createItem.mutateAsync({ data: { name: name.trim(), unit, saleRate: "0", purchaseRate: purchaseRate || "0", gstApplicable: "true", gstRate, openingStock: "0", minStockLevel: "0" } as any });
+      toast({ title: `Item "${name}" added` });
+      onAdded(item);
+      setName(""); setUnit("pcs"); setPurchaseRate(""); setGstRate("18");
+      onClose();
+    } catch { toast({ title: "Failed to add item", variant: "destructive" }); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Quick Add Item</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1"><Label>Item Name *</Label><Input value={name} onChange={e => setName(e.target.value)} autoFocus /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={e => setUnit(e.target.value)} /></div>
+            <div className="space-y-1"><Label>GST %</Label><Select value={gstRate} onValueChange={setGstRate}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select></div>
+          </div>
+          <div className="space-y-1"><Label>Purchase Rate</Label><Input type="number" value={purchaseRate} onChange={e => setPurchaseRate(e.target.value)} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={createItem.isPending}>{createItem.isPending ? "Adding..." : "Add Item"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function PurchaseInvoiceForm() {
@@ -36,6 +77,8 @@ export default function PurchaseInvoiceForm() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState("cash");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
   const isInterstate = selectedParty?.isOutOfState === "true" || selectedParty?.isOutOfState === true;
@@ -57,6 +100,14 @@ export default function PurchaseInvoiceForm() {
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
       setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct }, isInterstate); return u; });
+    }
+  };
+
+  const handleQuickAdded = (newItem: any) => {
+    queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
+    if (quickAddForIndex !== null) {
+      const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct }, isInterstate); return u; });
     }
   };
 
@@ -118,36 +169,39 @@ export default function PurchaseInvoiceForm() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item *</TableHead>
-                <TableHead>Qty *</TableHead>
-                <TableHead>Unit</TableHead>
-                <TableHead>Rate *</TableHead>
-                <TableHead>Disc%</TableHead>
-                <TableHead>GST%</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead></TableHead>
+                <TableHead className="min-w-[200px]">Item *</TableHead>
+                <TableHead className="w-24">Qty *</TableHead>
+                <TableHead className="w-20">Unit</TableHead>
+                <TableHead className="w-28">Rate *</TableHead>
+                <TableHead className="w-20">Disc%</TableHead>
+                <TableHead className="w-24">GST%</TableHead>
+                <TableHead className="w-28 text-right">Total</TableHead>
+                <TableHead className="w-8"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.map((item, i) => (
                 <TableRow key={i}>
                   <TableCell>
-                    <Select onValueChange={v => selectStock(i, v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select item" /></SelectTrigger>
-                      <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                    {!item.stockItemId && (
-                      <Input className="h-7 mt-1 text-xs" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />
-                    )}
+                    <div className="flex gap-1 items-center">
+                      <Select onValueChange={v => selectStock(i, v)}>
+                        <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
+                        <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" title="Quick add item" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}>
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
                     {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
                   </TableCell>
-                  <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                  <TableCell><Input className="h-7 text-xs" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} /></TableCell>
-                  <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
-                  <TableCell><Input className="h-7 text-xs" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>
-                  <TableCell><Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select></TableCell>
+                  <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
+                  <TableCell><Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} /></TableCell>
+                  <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
+                  <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>
+                  <TableCell><Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select></TableCell>
                   <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>
-                  <TableCell><Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                  <TableCell><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -172,6 +226,7 @@ export default function PurchaseInvoiceForm() {
         </CardContent>
       </Card>
       <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save Invoice"}</Button>
+      <QuickAddItemDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={handleQuickAdded} />
     </form>
   );
 }
