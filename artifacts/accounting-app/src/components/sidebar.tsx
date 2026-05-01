@@ -47,7 +47,6 @@ const navigation = [
       { name: "Payments", href: "/accounts/payments" },
       { name: "Receipts", href: "/accounts/receipts" },
       { name: "Parties", href: "/accounts/parties" },
-      { name: "Ledgers", href: "/accounts/ledgers" },
       { name: "Credit Notes", href: "/accounts/credit-notes" },
       { name: "Debit Notes", href: "/accounts/debit-notes" },
     ],
@@ -59,6 +58,7 @@ const navigation = [
       { name: "Stock Items", href: "/inventory/items" },
       { name: "Categories", href: "/inventory/categories" },
       { name: "Current Stock", href: "/inventory/current-stock" },
+      { name: "Batches", href: "/inventory/batches" },
     ],
   },
   {

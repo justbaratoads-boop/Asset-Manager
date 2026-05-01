@@ -25,6 +25,10 @@ router.get("/orders", authMiddleware, async (req, res) => {
 
 router.post("/orders", authMiddleware, async (req, res) => {
   const data = req.body;
+  if (!data.partyId) return res.status(400).json({ error: "Party is required" });
+  if (!data.partyName) return res.status(400).json({ error: "Party name is required" });
+  if (!data.items || data.items.length === 0) return res.status(400).json({ error: "At least one item is required" });
+  if (!data.date) return res.status(400).json({ error: "Date is required" });
   const orderNumber = await makeVoucherNumber("ORD");
 
   const [order] = await db.insert(ordersTable).values({
@@ -35,6 +39,10 @@ router.post("/orders", authMiddleware, async (req, res) => {
     partyPhone: data.partyPhone,
     deliveryAddress: data.deliveryAddress,
     notes: data.notes,
+    driverName: data.driverName,
+    vehicleName: data.vehicleName,
+    vehicleNo: data.vehicleNo,
+    dispatchNotes: data.dispatchNotes,
     status: "pending",
     grandTotal: String(data.grandTotal || 0),
   }).returning();
@@ -76,6 +84,10 @@ router.put("/orders/:id", authMiddleware, async (req, res) => {
     status: data.status,
     notes: data.notes,
     deliveryAddress: data.deliveryAddress,
+    driverName: data.driverName,
+    vehicleName: data.vehicleName,
+    vehicleNo: data.vehicleNo,
+    dispatchNotes: data.dispatchNotes,
   }).where(eq(ordersTable.id, Number(req.params.id))).returning();
   if (!order) return res.status(404).json({ error: "Not found" });
   res.json(order);

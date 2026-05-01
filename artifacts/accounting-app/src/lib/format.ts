@@ -23,7 +23,7 @@ export function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export const GST_RATES = [0, 3, 5, 12, 18, 28];
+export const GST_RATES = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 7.5, 12, 18, 28];
 
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",

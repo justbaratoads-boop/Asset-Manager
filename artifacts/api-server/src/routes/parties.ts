@@ -3,9 +3,9 @@ import { db } from "@workspace/db";
 import {
   partiesTable, saleInvoicesTable, purchaseInvoicesTable,
   paymentsTable, receiptsTable, journalLinesTable, journalEntriesTable,
-  ledgersTable
+  ledgersTable, ordersTable
 } from "@workspace/db/schema";
-import { eq, and, like, sql, or } from "drizzle-orm";
+import { eq, and, like, sql, or, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -35,9 +35,14 @@ router.get("/parties", authMiddleware, async (req, res) => {
 
 router.post("/parties", authMiddleware, async (req, res) => {
   const data = req.body;
+  const existing = await db.select({ id: partiesTable.id }).from(partiesTable)
+    .where(and(eq(partiesTable.name, data.name), eq(partiesTable.isDeleted, "false"))).limit(1);
+  if (existing.length > 0) return res.status(409).json({ error: `A party named "${data.name}" already exists` });
   const [party] = await db.insert(partiesTable).values({
     name: data.name,
     type: data.type || "customer",
+    gstType: data.gstType || "unregistered",
+    isOutOfState: data.isOutOfState === true || data.isOutOfState === "true" ? "true" : "false",
     address: data.address,
     city: data.city,
     state: data.state,
@@ -63,9 +68,16 @@ router.get("/parties/:id", authMiddleware, async (req, res) => {
 router.put("/parties/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const data = req.body;
+  if (data.name) {
+    const existing = await db.select({ id: partiesTable.id }).from(partiesTable)
+      .where(and(eq(partiesTable.name, data.name), eq(partiesTable.isDeleted, "false"), ne(partiesTable.id, Number(id)))).limit(1);
+    if (existing.length > 0) return res.status(409).json({ error: `A party named "${data.name}" already exists` });
+  }
   const [party] = await db.update(partiesTable).set({
     name: data.name,
     type: data.type,
+    gstType: data.gstType,
+    isOutOfState: data.isOutOfState === true || data.isOutOfState === "true" ? "true" : "false",
     address: data.address,
     city: data.city,
     state: data.state,
@@ -141,6 +153,14 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     transactions: rows,
     closingBalance: balance,
   });
+});
+
+router.get("/parties/:id/orders", authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const orders = await db.select().from(ordersTable)
+    .where(and(eq(ordersTable.partyId, Number(id)), eq(ordersTable.isDeleted, "false")))
+    .orderBy(sql`created_at DESC`);
+  res.json(orders.map(o => ({ ...o, grandTotal: Number(o.grandTotal) })));
 });
 
 export default router;

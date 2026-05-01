@@ -46,6 +46,7 @@ import ItemForm from "@/pages/inventory/item-form";
 import ItemDetail from "@/pages/inventory/item-detail";
 import Categories from "@/pages/inventory/categories";
 import CurrentStock from "@/pages/inventory/current-stock";
+import Batches from "@/pages/inventory/batches";
 
 // Reports
 import ReportsLanding from "@/pages/reports/index";
@@ -144,6 +145,7 @@ function Router() {
       <PR path="/inventory/items/:id" component={ItemDetail} />
       <PR path="/inventory/categories" component={Categories} />
       <PR path="/inventory/current-stock" component={CurrentStock} />
+      <PR path="/inventory/batches" component={Batches} />
 
       {/* Reports */}
       <PR path="/reports" component={ReportsLanding} />

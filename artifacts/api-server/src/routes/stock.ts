@@ -1,10 +1,40 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { stockCategoriesTable, stockItemsTable, stockTransactionsTable } from "@workspace/db/schema";
+import { stockCategoriesTable, stockItemsTable, stockTransactionsTable, stockBatchesTable } from "@workspace/db/schema";
 import { eq, and, like, lte, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
+
+// ---- BATCHES ----
+router.get("/stock-batches", authMiddleware, async (_req, res) => {
+  const batches = await db.select().from(stockBatchesTable).orderBy(stockBatchesTable.name);
+  res.json(batches);
+});
+
+router.post("/stock-batches", authMiddleware, async (req, res) => {
+  const [batch] = await db.insert(stockBatchesTable).values({
+    name: req.body.name,
+    description: req.body.description,
+    expiryDate: req.body.expiryDate,
+  }).returning();
+  res.status(201).json(batch);
+});
+
+router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
+  const [batch] = await db.update(stockBatchesTable).set({
+    name: req.body.name,
+    description: req.body.description,
+    expiryDate: req.body.expiryDate,
+  }).where(eq(stockBatchesTable.id, Number(req.params.id))).returning();
+  if (!batch) return res.status(404).json({ error: "Not found" });
+  res.json(batch);
+});
+
+router.delete("/stock-batches/:id", authMiddleware, async (req, res) => {
+  await db.delete(stockBatchesTable).where(eq(stockBatchesTable.id, Number(req.params.id)));
+  res.json({ ok: true });
+});
 
 // ---- CATEGORIES ----
 router.get("/stock-categories", authMiddleware, async (_req, res) => {
@@ -62,7 +92,7 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
   const [item] = await db.insert(stockItemsTable).values({
     name: d.name,
     categoryId: d.categoryId,
-    brand: d.brand,
+    batchId: d.batchId ? Number(d.batchId) : null,
     hsnCode: d.hsnCode,
     unit: d.unit || "pcs",
     purchaseRate: String(d.purchaseRate || 0),
@@ -70,6 +100,8 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
     minStockLevel: String(d.minStockLevel || 0),
     barcode: d.barcode,
     physicalStock: String(d.physicalStock || 0),
+    gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
+    gstRate: String(d.gstRate || 0),
   }).returning();
   res.status(201).json({ ...item, physicalStock: Number(item.physicalStock) });
 });
@@ -85,13 +117,15 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
   const [item] = await db.update(stockItemsTable).set({
     name: d.name,
     categoryId: d.categoryId,
-    brand: d.brand,
+    batchId: d.batchId ? Number(d.batchId) : null,
     hsnCode: d.hsnCode,
     unit: d.unit,
     purchaseRate: String(d.purchaseRate || 0),
     saleRate: String(d.saleRate || 0),
     minStockLevel: String(d.minStockLevel || 0),
     barcode: d.barcode,
+    gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
+    gstRate: String(d.gstRate || 0),
   }).where(eq(stockItemsTable.id, Number(req.params.id))).returning();
   if (!item) return res.status(404).json({ error: "Not found" });
   res.json(item);

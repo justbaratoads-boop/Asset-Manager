@@ -6,6 +6,8 @@ export const partiesTable = pgTable("parties", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").notNull().default("customer"),
+  gstType: text("gst_type").notNull().default("unregistered"),
+  isOutOfState: text("is_out_of_state").notNull().default("false"),
   address: text("address"),
   city: text("city"),
   state: text("state"),
