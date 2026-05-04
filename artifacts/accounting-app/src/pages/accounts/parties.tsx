@@ -9,14 +9,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
-import { Plus, Search, Eye, Pencil, Trash2, Phone } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, Phone, ShieldCheck, ShieldOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
-const typeStyle: Record<string, string> = {
-  customer: "bg-blue-100 text-blue-700",
-  supplier: "bg-purple-100 text-purple-700",
-  both: "bg-gray-100 text-gray-700",
+const gstBadge: Record<string, string> = {
+  registered:   "bg-green-100 text-green-700 border-green-300",
+  unregistered: "bg-gray-100 text-gray-600 border-gray-300",
+  composition:  "bg-blue-100 text-blue-700 border-blue-300",
 };
 
 export default function PartiesList() {
@@ -43,9 +43,11 @@ export default function PartiesList() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">Parties</h1>
-          <p className="text-sm text-muted-foreground">{filtered.length} parties</p>
+          <p className="text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "party" : "parties"}</p>
         </div>
-        <Link href="/accounts/parties/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Party</Button></Link>
+        <Link href="/accounts/parties/new">
+          <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Party</Button>
+        </Link>
       </div>
 
       <div className="flex gap-2">
@@ -54,9 +56,9 @@ export default function PartiesList() {
           <Input className="pl-9" placeholder="Search parties..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={type} onValueChange={setType}>
-          <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">All Parties</SelectItem>
             <SelectItem value="customer">Customers</SelectItem>
             <SelectItem value="supplier">Suppliers</SelectItem>
           </SelectContent>
@@ -75,9 +77,13 @@ export default function PartiesList() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-base truncate">{party.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{party.accountGroup}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <Badge variant="outline" className={`capitalize text-xs ${typeStyle[party.type] || ""}`}>{party.type}</Badge>
-                    {party.city && <span className="text-xs text-muted-foreground">{party.city}</span>}
+                    <Badge variant="outline" className={`text-xs ${gstBadge[party.gstType] || ""}`}>
+                      {party.gstType === "unregistered" ? <ShieldOff className="h-3 w-3 mr-1" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
+                      {party.gstType}
+                    </Badge>
+                    {party.city && <span className="text-xs text-muted-foreground">{party.city}, {party.state}</span>}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -96,7 +102,7 @@ export default function PartiesList() {
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
                 <Link href={`/accounts/parties/${party.id}`} className="flex-1">
-                  <Button size="sm" variant="outline" className="w-full"><Eye className="h-3.5 w-3.5 mr-1" />Ledger</Button>
+                  <Button size="sm" variant="outline" className="w-full"><Eye className="h-3.5 w-3.5 mr-1" />View</Button>
                 </Link>
                 <Button size="sm" variant="outline" className="text-destructive border-destructive/30 px-3" onClick={() => setDeleteId(party.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
@@ -109,37 +115,53 @@ export default function PartiesList() {
 
       {/* Desktop table */}
       <Card className="hidden md:block">
-        <CardContent className="p-4">
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>City</TableHead>
-                <TableHead>GSTIN</TableHead>
+                <TableHead>Account Group</TableHead>
+                <TableHead>GST Status</TableHead>
+                <TableHead>State</TableHead>
                 <TableHead>Phone</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
+                <TableHead className="text-right">Bal.</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No parties found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No parties found</TableCell></TableRow>
               ) : filtered.map((party: any) => (
                 <TableRow key={party.id}>
-                  <TableCell className="font-medium">{party.name}</TableCell>
-                  <TableCell><Badge variant="outline" className={`capitalize ${typeStyle[party.type] || ""}`}>{party.type}</Badge></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{party.city}</TableCell>
-                  <TableCell className="text-xs font-mono">{party.gstin || "-"}</TableCell>
-                  <TableCell className="text-sm">{party.phone || "-"}</TableCell>
-                  <TableCell className="text-right text-sm">{formatCurrency(party.openingBalance)} <span className="text-muted-foreground uppercase text-xs">{party.balanceType}</span></TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      <Link href={`/accounts/parties/${party.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
-                      <Link href={`/accounts/parties/${party.id}`}><Button size="icon" variant="ghost" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button></Link>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(party.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <p className="font-medium">{party.name}</p>
+                    {party.gstin && <p className="text-xs font-mono text-muted-foreground">{party.gstin}</p>}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{party.accountGroup}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={`text-xs capitalize ${gstBadge[party.gstType] || ""}`}>
+                      {party.gstType}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">{party.state || "—"}</TableCell>
+                  <TableCell className="text-sm">{party.phone || "—"}</TableCell>
+                  <TableCell className="text-right text-sm whitespace-nowrap">
+                    {formatCurrency(party.openingBalance)}
+                    <span className="text-muted-foreground uppercase text-xs ml-1">{party.balanceType}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1 justify-end">
+                      <Link href={`/accounts/parties/${party.id}`}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="View"><Eye className="h-3.5 w-3.5" /></Button>
+                      </Link>
+                      <Link href={`/accounts/parties/${party.id}/edit`}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                      </Link>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(party.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -148,6 +170,7 @@ export default function PartiesList() {
           </Table>
         </CardContent>
       </Card>
+
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
     </div>
   );

@@ -3,16 +3,27 @@ import { db } from "@workspace/db";
 import {
   partiesTable, saleInvoicesTable, purchaseInvoicesTable,
   paymentsTable, receiptsTable, journalLinesTable, journalEntriesTable,
-  ledgersTable, ordersTable, debitNotesTable, creditNotesTable
+  ordersTable, debitNotesTable, creditNotesTable, companySettingsTable
 } from "@workspace/db/schema";
 import { eq, and, like, sql, or, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
 
+function deriveType(accountGroup: string): string {
+  const lower = (accountGroup || "").toLowerCase();
+  if (lower.includes("debtor") || lower.includes("customer")) return "customer";
+  if (lower.includes("creditor") || lower.includes("supplier")) return "supplier";
+  return "both";
+}
+
+async function getCompanyState(): Promise<string> {
+  const [co] = await db.select({ state: companySettingsTable.state }).from(companySettingsTable).limit(1);
+  return co?.state || "";
+}
+
 router.get("/parties", authMiddleware, async (req, res) => {
   const { type, search } = req.query;
-  let query = db.select().from(partiesTable).where(eq(partiesTable.isDeleted, "false"));
 
   const conditions: any[] = [eq(partiesTable.isDeleted, "false")];
   if (type && type !== "all") {
@@ -30,6 +41,7 @@ router.get("/parties", authMiddleware, async (req, res) => {
     ...p,
     openingBalance: Number(p.openingBalance),
     creditLimit: p.creditLimit ? Number(p.creditLimit) : null,
+    gstHistory: (() => { try { return JSON.parse(p.gstHistory || "[]"); } catch { return []; } })(),
   })));
 });
 
@@ -38,31 +50,47 @@ router.post("/parties", authMiddleware, async (req, res) => {
   const existing = await db.select({ id: partiesTable.id }).from(partiesTable)
     .where(and(eq(partiesTable.name, data.name), eq(partiesTable.isDeleted, "false"))).limit(1);
   if (existing.length > 0) return res.status(409).json({ error: `A party named "${data.name}" already exists` });
+
+  const accountGroup = data.accountGroup || "Sundry Debtors";
+  const companyState = await getCompanyState();
+  const partyState = data.state || "";
+  const isOutOfState = companyState && partyState && companyState !== partyState ? "true" : "false";
+
   const [party] = await db.insert(partiesTable).values({
     name: data.name,
-    type: data.type || "customer",
+    type: deriveType(accountGroup),
+    accountGroup,
     gstType: data.gstType || "unregistered",
-    isOutOfState: data.isOutOfState === true || data.isOutOfState === "true" ? "true" : "false",
+    gstHistory: JSON.stringify(data.gstHistory || []),
+    isOutOfState,
     address: data.address,
     city: data.city,
-    state: data.state,
+    state: partyState,
     pincode: data.pincode,
-    gstin: data.gstin,
+    gstin: data.gstType !== "unregistered" ? data.gstin : null,
     pan: data.pan,
     phone: data.phone,
     email: data.email,
-    creditLimit: data.creditLimit != null ? String(data.creditLimit) : null,
+    creditLimitEnabled: data.creditLimitEnabled === true || data.creditLimitEnabled === "true" ? "true" : "false",
+    creditLimit: data.creditLimitEnabled && data.creditLimit != null ? String(data.creditLimit) : null,
     openingBalance: String(data.openingBalance || 0),
     balanceType: data.balanceType || "dr",
   }).returning();
-  res.status(201).json(party);
+  res.status(201).json({ ...party, openingBalance: Number(party.openingBalance), gstHistory: data.gstHistory || [] });
 });
 
 router.get("/parties/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const [party] = await db.select().from(partiesTable).where(eq(partiesTable.id, Number(id))).limit(1);
   if (!party) return res.status(404).json({ error: "Party not found" });
-  res.json({ ...party, openingBalance: Number(party.openingBalance), creditLimit: party.creditLimit ? Number(party.creditLimit) : null });
+  let gstHistory: any[] = [];
+  try { gstHistory = JSON.parse(party.gstHistory || "[]"); } catch {}
+  res.json({
+    ...party,
+    openingBalance: Number(party.openingBalance),
+    creditLimit: party.creditLimit ? Number(party.creditLimit) : null,
+    gstHistory,
+  });
 });
 
 router.put("/parties/:id", authMiddleware, async (req, res) => {
@@ -73,25 +101,36 @@ router.put("/parties/:id", authMiddleware, async (req, res) => {
       .where(and(eq(partiesTable.name, data.name), eq(partiesTable.isDeleted, "false"), ne(partiesTable.id, Number(id)))).limit(1);
     if (existing.length > 0) return res.status(409).json({ error: `A party named "${data.name}" already exists` });
   }
+
+  const accountGroup = data.accountGroup || "Sundry Debtors";
+  const companyState = await getCompanyState();
+  const partyState = data.state || "";
+  const isOutOfState = companyState && partyState && companyState !== partyState ? "true" : "false";
+
   const [party] = await db.update(partiesTable).set({
     name: data.name,
-    type: data.type,
+    type: deriveType(accountGroup),
+    accountGroup,
     gstType: data.gstType,
-    isOutOfState: data.isOutOfState === true || data.isOutOfState === "true" ? "true" : "false",
+    gstHistory: JSON.stringify(data.gstHistory || []),
+    isOutOfState,
     address: data.address,
     city: data.city,
-    state: data.state,
+    state: partyState,
     pincode: data.pincode,
-    gstin: data.gstin,
+    gstin: data.gstType !== "unregistered" ? data.gstin : null,
     pan: data.pan,
     phone: data.phone,
     email: data.email,
-    creditLimit: data.creditLimit != null ? String(data.creditLimit) : null,
+    creditLimitEnabled: data.creditLimitEnabled === true || data.creditLimitEnabled === "true" ? "true" : "false",
+    creditLimit: data.creditLimitEnabled && data.creditLimit != null ? String(data.creditLimit) : null,
     openingBalance: String(data.openingBalance || 0),
     balanceType: data.balanceType || "dr",
   }).where(eq(partiesTable.id, Number(id))).returning();
   if (!party) return res.status(404).json({ error: "Party not found" });
-  res.json(party);
+  let gstHistory: any[] = [];
+  try { gstHistory = JSON.parse(party.gstHistory || "[]"); } catch {}
+  res.json({ ...party, openingBalance: Number(party.openingBalance), gstHistory });
 });
 
 router.delete("/parties/:id", authMiddleware, async (req, res) => {
@@ -108,7 +147,6 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
 
   const transactions: any[] = [];
 
-  // Sale invoices — party is debited (Dr)
   const saleInvoices = await db.select({
     date: saleInvoicesTable.date,
     type: sql<string>`'sale_invoice'`,
@@ -120,7 +158,6 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(saleInvoicesTable.partyId, Number(id)), eq(saleInvoicesTable.isDeleted, "false")));
   transactions.push(...saleInvoices);
 
-  // Purchase invoices — party is credited (Cr)
   const purchaseInvoices = await db.select({
     date: purchaseInvoicesTable.date,
     type: sql<string>`'purchase_invoice'`,
@@ -132,7 +169,6 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(purchaseInvoicesTable.partyId, Number(id)), eq(purchaseInvoicesTable.isDeleted, "false")));
   transactions.push(...purchaseInvoices);
 
-  // Receipts — party pays us (Cr on party account)
   const rcpts = await db.select({
     date: receiptsTable.date,
     type: sql<string>`'receipt'`,
@@ -144,7 +180,6 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(receiptsTable.partyId, Number(id)), eq(receiptsTable.isDeleted, "false")));
   transactions.push(...rcpts);
 
-  // Payments — we pay to party (Dr on party account)
   const pmts = await db.select({
     date: paymentsTable.date,
     type: sql<string>`'payment'`,
@@ -156,7 +191,6 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(paymentsTable.partyId, Number(id)), eq(paymentsTable.isDeleted, "false")));
   transactions.push(...pmts);
 
-  // Credit notes — reduce party's receivable (Cr)
   const crNotes = await db.select({
     date: creditNotesTable.date,
     type: sql<string>`'credit_note'`,
@@ -168,7 +202,6 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(creditNotesTable.partyId, Number(id)), eq(creditNotesTable.isDeleted, "false")));
   transactions.push(...crNotes);
 
-  // Debit notes — reduce party's payable (Dr)
   const dbNotes = await db.select({
     date: debitNotesTable.date,
     type: sql<string>`'debit_note'`,
@@ -180,7 +213,6 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(debitNotesTable.partyId, Number(id)), eq(debitNotesTable.isDeleted, "false")));
   transactions.push(...dbNotes);
 
-  // Journal lines — pick lines where party_id matches, use Dr/Cr from the line
   const jLines = await db.select({
     date: journalEntriesTable.date,
     type: sql<string>`'journal'`,
