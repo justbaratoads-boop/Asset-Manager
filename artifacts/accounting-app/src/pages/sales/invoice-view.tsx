@@ -29,96 +29,130 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
   const termsAndConditions = ps.termsAndConditions || "";
 
   return (
-    <div className="bg-white border rounded-xl p-8 max-w-3xl mx-auto text-black" id="invoice-print">
+    <div className="bg-white border rounded-xl p-4 sm:p-8 max-w-3xl mx-auto text-black" id="invoice-print">
       {copyLabel && (
         <div className="text-right text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">{copyLabel}</div>
       )}
-      <div className="flex justify-between items-start mb-8">
+
+      {/* Header: company info + invoice number */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6 sm:mb-8">
         <div className="flex items-start gap-3">
           {showLogo && company?.logoUrl && (
-            <img src={company.logoUrl} alt="Logo" className="h-16 w-auto object-contain" />
+            <img src={company.logoUrl} alt="Logo" className="h-14 w-auto object-contain shrink-0" />
           )}
           <div>
-            <h2 className="text-xl font-bold">{company?.companyName || company?.name || "Company Name"}</h2>
-            {showAddress && <p className="text-sm text-gray-600 whitespace-pre-line">{company?.address}{company?.city ? `, ${company.city}` : ""}{company?.state ? `, ${company.state}` : ""}{company?.pincode ? ` - ${company.pincode}` : ""}</p>}
-            {showGstin && company?.gstin && <p className="text-sm">GSTIN: {company.gstin}</p>}
-            {company?.phone && <p className="text-sm">{company.phone}</p>}
-            {company?.email && <p className="text-sm">{company.email}</p>}
+            <h2 className="text-lg sm:text-xl font-bold">{company?.companyName || company?.name || "Company Name"}</h2>
+            {showAddress && (
+              <p className="text-xs sm:text-sm text-gray-600 whitespace-pre-line">
+                {company?.address}{company?.city ? `, ${company.city}` : ""}{company?.state ? `, ${company.state}` : ""}{company?.pincode ? ` - ${company.pincode}` : ""}
+              </p>
+            )}
+            {showGstin && company?.gstin && <p className="text-xs sm:text-sm">GSTIN: {company.gstin}</p>}
+            {company?.phone && <p className="text-xs sm:text-sm">{company.phone}</p>}
+            {company?.email && <p className="text-xs sm:text-sm">{company.email}</p>}
           </div>
         </div>
-        <div className="text-right">
-          <h1 className="text-2xl font-bold text-primary">{billTitle}</h1>
+        <div className="sm:text-right">
+          <h1 className="text-xl sm:text-2xl font-bold text-primary">{billTitle}</h1>
           <p className="font-mono text-sm">#{invoice.invoiceNumber}</p>
           <p className="text-sm">{formatDate(invoice.date)}</p>
         </div>
       </div>
 
-      <div className="border-t border-b py-4 mb-6">
+      {/* Bill To */}
+      <div className="border-t border-b py-3 mb-5">
         <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Bill To</p>
         <p className="font-semibold">{invoice.partyName}</p>
         {showPartyGstin && invoice.partyGstin && <p className="text-sm">GSTIN: {invoice.partyGstin}</p>}
         {invoice.billingAddress && <p className="text-sm text-gray-600">{invoice.billingAddress}</p>}
       </div>
 
-      <table className="w-full text-sm mb-6">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2 font-semibold">#</th>
-            <th className="text-left py-2 font-semibold">Item</th>
-            {showHsnCode && <th className="text-left py-2 font-semibold">HSN</th>}
-            <th className="text-right py-2 font-semibold">Qty</th>
-            <th className="text-right py-2 font-semibold">Rate</th>
-            <th className="text-right py-2 font-semibold">Disc%</th>
-            <th className="text-right py-2 font-semibold">GST%</th>
-            <th className="text-right py-2 font-semibold">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoice.items?.map((item: any, i: number) => (
-            <tr key={i} className="border-b">
-              <td className="py-2">{i + 1}</td>
-              <td className="py-2">{item.itemName}</td>
-              {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
-              <td className="py-2 text-right">{item.quantity} {item.unit}</td>
-              <td className="py-2 text-right">{formatCurrency(item.rate)}</td>
-              <td className="py-2 text-right">{item.discountPct}%</td>
-              <td className="py-2 text-right">{item.gstPct}%</td>
-              <td className="py-2 text-right font-medium">{formatCurrency(item.total)}</td>
+      {/* Items — scrollable on mobile, full table on desktop */}
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <table className="w-full text-sm mb-6 min-w-[500px] px-4 sm:px-0">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2 pl-4 sm:pl-0 font-semibold w-6">#</th>
+              <th className="text-left py-2 font-semibold">Item</th>
+              {showHsnCode && <th className="text-left py-2 font-semibold">HSN</th>}
+              <th className="text-right py-2 font-semibold">Qty</th>
+              <th className="text-right py-2 font-semibold">Rate</th>
+              <th className="text-right py-2 font-semibold">Disc%</th>
+              <th className="text-right py-2 font-semibold">GST%</th>
+              <th className="text-right py-2 pr-4 sm:pr-0 font-semibold">Total</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {invoice.items?.map((item: any, i: number) => (
+              <tr key={i} className="border-b">
+                <td className="py-2 pl-4 sm:pl-0">{i + 1}</td>
+                <td className="py-2">{item.itemName}</td>
+                {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
+                <td className="py-2 text-right">{item.quantity} {item.unit}</td>
+                <td className="py-2 text-right">{formatCurrency(item.rate)}</td>
+                <td className="py-2 text-right">{item.discountPct}%</td>
+                <td className="py-2 text-right">{item.gstPct}%</td>
+                <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <div className="flex justify-end">
-        <div className="w-64 space-y-1 text-sm">
-          <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(invoice.subtotal)}</span></div>
-          {Number(invoice.totalDiscount) > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>}
-          {Number(invoice.totalCgst) > 0 && <div className="flex justify-between"><span>CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>}
-          {Number(invoice.totalSgst) > 0 && <div className="flex justify-between"><span>SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>}
-          {Number(invoice.totalIgst) > 0 && <div className="flex justify-between"><span>IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>}
-          <div className="flex justify-between font-bold text-base border-t pt-1"><span>Total</span><span>{formatCurrency(invoice.grandTotal)}</span></div>
-          <div className="flex justify-between text-green-600"><span>Paid</span><span>{formatCurrency(invoice.amountPaid)}</span></div>
-          {Number(invoice.balanceDue) > 0 && <div className="flex justify-between font-semibold text-red-600"><span>Balance Due</span><span>{formatCurrency(invoice.balanceDue)}</span></div>}
+      {/* Totals */}
+      <div className="flex justify-end mb-4">
+        <div className="w-full sm:w-64 space-y-1 text-sm border rounded-lg p-3 sm:border-none sm:rounded-none sm:p-0">
+          <div className="flex justify-between"><span className="text-gray-600">Subtotal</span><span>{formatCurrency(invoice.subtotal)}</span></div>
+          {Number(invoice.totalDiscount) > 0 && (
+            <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>
+          )}
+          {Number(invoice.totalCgst) > 0 && (
+            <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>
+          )}
+          {Number(invoice.totalSgst) > 0 && (
+            <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>
+          )}
+          {Number(invoice.totalIgst) > 0 && (
+            <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>
+          )}
+          <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
+            <span>Total</span><span>{formatCurrency(invoice.grandTotal)}</span>
+          </div>
+          <div className="flex justify-between text-green-600">
+            <span>Paid</span><span>{formatCurrency(invoice.amountPaid)}</span>
+          </div>
+          {Number(invoice.balanceDue) > 0 && (
+            <div className="flex justify-between font-semibold text-red-600">
+              <span>Balance Due</span><span>{formatCurrency(invoice.balanceDue)}</span>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Payment details */}
       {invoice.payments?.length > 0 && (
-        <div className="mt-6 pt-4 border-t">
+        <div className="mt-4 pt-4 border-t">
           <p className="text-sm font-semibold mb-2">Payment Details</p>
           {invoice.payments.map((p: any, i: number) => (
-            <p key={i} className="text-sm text-gray-500 capitalize">{p.mode}: {formatCurrency(p.amount)} {p.reference && `(Ref: ${p.reference})`}</p>
+            <p key={i} className="text-sm text-gray-500 capitalize">
+              {p.mode}: {formatCurrency(p.amount)}{p.reference ? ` (Ref: ${p.reference})` : ""}
+            </p>
           ))}
         </div>
       )}
 
+      {/* Bank details */}
       {showBankDetails && company?.bankAccount && (
-        <div className="mt-6 pt-4 border-t">
+        <div className="mt-4 pt-4 border-t">
           <p className="text-sm font-semibold mb-1">Bank Details</p>
           <p className="text-sm text-gray-600">{company.bankName} — A/C: {company.bankAccount}</p>
-          {company.bankIfsc && <p className="text-sm text-gray-600">IFSC: {company.bankIfsc}{company.bankBranch ? ` | Branch: ${company.bankBranch}` : ""}</p>}
+          {company.bankIfsc && (
+            <p className="text-sm text-gray-600">IFSC: {company.bankIfsc}{company.bankBranch ? ` | Branch: ${company.bankBranch}` : ""}</p>
+          )}
         </div>
       )}
 
+      {/* Terms */}
       {termsAndConditions && (
         <div className="mt-4 pt-3 border-t">
           <p className="text-xs font-semibold text-gray-500 mb-1">Terms & Conditions</p>
@@ -126,17 +160,21 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
         </div>
       )}
 
+      {/* Signature */}
       {showSignatureLine && (
         <div className="mt-8 flex justify-between text-sm text-gray-500">
           <div className="text-center">
-            <div className="border-t border-gray-400 mt-8 pt-1 w-36">Customer Signature</div>
+            <div className="border-t border-gray-400 mt-8 pt-1 w-32 sm:w-36">Customer Signature</div>
           </div>
           <div className="text-center">
-            <div className="border-t border-gray-400 mt-8 pt-1 w-48">For {company?.companyName || company?.name || ""}<br />Authorised Signatory</div>
+            <div className="border-t border-gray-400 mt-8 pt-1 w-36 sm:w-48">
+              For {company?.companyName || company?.name || ""}<br />Authorised Signatory
+            </div>
           </div>
         </div>
       )}
 
+      {/* Footer */}
       {showFooter && company?.billFooter && (
         <div className="mt-8 pt-4 border-t text-center text-sm text-gray-500">{company.billFooter}</div>
       )}
@@ -190,16 +228,17 @@ export default function SaleInvoiceView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between print:hidden">
+      {/* Action bar */}
+      <div className="flex items-center justify-between gap-2 print:hidden">
         <Link href="/sales/invoices">
-          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
+          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
         </Link>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setCopies("2"); setPrintDialogOpen(true); }}>
-            <Copy className="h-4 w-4 mr-2" />Print 2nd Copy
+          <Button variant="outline" size="sm" onClick={() => { setCopies("2"); setPrintDialogOpen(true); }}>
+            <Copy className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Print 2nd Copy</span>
           </Button>
-          <Button onClick={() => { setCopies(defaultCopies); setPrintDialogOpen(true); }}>
-            <Printer className="h-4 w-4 mr-2" />Print
+          <Button size="sm" onClick={() => { setCopies(defaultCopies); setPrintDialogOpen(true); }}>
+            <Printer className="h-4 w-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Print</span><span className="sm:hidden">Print</span>
           </Button>
         </div>
       </div>
