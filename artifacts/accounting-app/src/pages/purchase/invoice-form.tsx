@@ -15,11 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Item { stockItemId?: number; itemName: string; hsnCode: string; quantity: number; unit: string; rate: number; discountPct: number; gstPct: number; gstLocked: boolean; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number; }
 
-function calc(item: Partial<Item>, isInterstate: boolean): Item {
+function calc(item: Partial<Item>, isInterstate: boolean, gstInclusive = false): Item {
   const qty = Number(item.quantity) || 0; const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0; const gstPct = Number(item.gstPct) || 0;
-  const taxable = qty * rate * (1 - discPct / 100);
-  const gst = taxable * (gstPct / 100);
+  const grossAmount = qty * rate * (1 - discPct / 100);
+  const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
+  const gst = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, gstLocked: item.gstLocked ?? false, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId };
 }
 
@@ -83,6 +84,7 @@ export default function PurchaseInvoiceForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
+  const [gstInclusive, setGstInclusive] = useState(false);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
@@ -108,6 +110,10 @@ export default function PurchaseInvoiceForm() {
     }
   }, [existing]);
 
+  useEffect(() => {
+    setItems(prev => prev.map(item => calc(item, isInterstate, gstInclusive)));
+  }, [gstInclusive]);
+
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
   const isInterstate = selectedParty?.isOutOfState === "true" || selectedParty?.isOutOfState === true;
 
@@ -120,14 +126,14 @@ export default function PurchaseInvoiceForm() {
   };
 
   const updateItem = (index: number, field: keyof Item, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], [field]: value }, isInterstate); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], [field]: value }, isInterstate, gstInclusive); return u; });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate, gstInclusive); return u; });
     }
   };
 
@@ -135,7 +141,7 @@ export default function PurchaseInvoiceForm() {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
       const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate, gstInclusive); return u; });
     }
   };
 
@@ -198,6 +204,16 @@ export default function PurchaseInvoiceForm() {
           {selectedParty?.isOutOfState === "true" && (
             <div className="text-xs text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded">Interstate supplier — IGST will apply</div>
           )}
+
+          {/* GST Inclusive / Exclusive toggle */}
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/40 rounded-lg">
+            <span className="text-sm font-medium">GST Type:</span>
+            <div className="flex gap-1.5">
+              <button type="button" onClick={() => setGstInclusive(false)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${!gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Exclusive</button>
+              <button type="button" onClick={() => setGstInclusive(true)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Inclusive</button>
+            </div>
+            <span className="text-xs text-muted-foreground">{gstInclusive ? "Entered price already includes GST" : "GST will be added on top of price"}</span>
+          </div>
 
           {errors.items && <p className="text-xs text-destructive">{errors.items}</p>}
 

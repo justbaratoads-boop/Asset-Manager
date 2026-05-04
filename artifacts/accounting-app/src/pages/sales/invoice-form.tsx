@@ -32,15 +32,16 @@ interface InvoiceItem {
   total: number;
 }
 
-function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceItem {
+function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean, gstInclusive = false): InvoiceItem {
   const qty = Number(item.quantity) || 0;
   const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const gstPct = Number(item.gstPct) || 0;
   const subtotal = qty * rate;
   const discount = subtotal * (discPct / 100);
-  const taxable = subtotal - discount;
-  const gstAmount = taxable * (gstPct / 100);
+  const grossAmount = subtotal - discount;
+  const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
+  const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   const cgst = isInterstate ? 0 : gstAmount / 2;
   const sgst = isInterstate ? 0 : gstAmount / 2;
   const igst = isInterstate ? gstAmount : 0;
@@ -146,6 +147,7 @@ export default function SaleInvoiceForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
+  const [gstInclusive, setGstInclusive] = useState(false);
 
   // Payment entry
   const [payType, setPayType] = useState<"none" | "partial" | "full">("none");
@@ -192,9 +194,13 @@ export default function SaleInvoiceForm() {
     if (selectedParty) {
       const interstate = selectedParty.isOutOfState === "true" || selectedParty.isOutOfState === true;
       setIsInterstate(interstate);
-      setItems(prev => prev.map(item => calcItem(item, interstate)));
+      setItems(prev => prev.map(item => calcItem(item, interstate, gstInclusive)));
     }
   }, [partyId]);
+
+  useEffect(() => {
+    setItems(prev => prev.map(item => calcItem(item, isInterstate, gstInclusive)));
+  }, [gstInclusive]);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
@@ -245,7 +251,7 @@ export default function SaleInvoiceForm() {
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = calcItem({ ...updated[index], [field]: value }, isInterstate);
+      updated[index] = calcItem({ ...updated[index], [field]: value }, isInterstate, gstInclusive);
       return updated;
     });
   };
@@ -256,7 +262,7 @@ export default function SaleInvoiceForm() {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate);
+        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate, gstInclusive);
         return updated;
       });
     }
@@ -268,7 +274,7 @@ export default function SaleInvoiceForm() {
       const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate);
+        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate, gstInclusive);
         return updated;
       });
     }
@@ -401,6 +407,16 @@ export default function SaleInvoiceForm() {
                 {selectedParty.phone && <span className="ml-4">Ph: {selectedParty.phone}</span>}
               </div>
             )}
+
+            {/* GST Inclusive / Exclusive toggle */}
+            <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/40 rounded-lg">
+              <span className="text-sm font-medium">GST Type:</span>
+              <div className="flex gap-1.5">
+                <button type="button" onClick={() => setGstInclusive(false)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${!gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Exclusive</button>
+                <button type="button" onClick={() => setGstInclusive(true)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Inclusive</button>
+              </div>
+              <span className="text-xs text-muted-foreground">{gstInclusive ? "Entered price already includes GST" : "GST will be added on top of price"}</span>
+            </div>
 
             {errors.items && <p className="text-xs text-destructive">{errors.items}</p>}
 

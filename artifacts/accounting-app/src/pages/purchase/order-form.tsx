@@ -30,13 +30,14 @@ interface POItem {
   total: number;
 }
 
-function calcItem(item: Partial<POItem>): POItem {
+function calcItem(item: Partial<POItem>, gstInclusive = false): POItem {
   const qty = Number(item.quantity) || 0;
   const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const gstPct = Number(item.gstPct) || 0;
-  const taxable = qty * rate * (1 - discPct / 100);
-  const gst = taxable * (gstPct / 100);
+  const grossAmount = qty * rate * (1 - discPct / 100);
+  const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
+  const gst = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   return {
     stockItemId: item.stockItemId,
     itemName: item.itemName || "",
@@ -70,6 +71,7 @@ export default function PurchaseOrderForm() {
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<POItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [gstInclusive, setGstInclusive] = useState(false);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
@@ -94,6 +96,10 @@ export default function PurchaseOrderForm() {
     }
   }, [existing]);
 
+  useEffect(() => {
+    setItems(prev => prev.map(item => calcItem(item, gstInclusive)));
+  }, [gstInclusive]);
+
   const grandTotal = items.reduce((s, i) => s + i.total, 0);
 
   const selectParty = (id: string) => {
@@ -102,14 +108,14 @@ export default function PurchaseOrderForm() {
   };
 
   const updateItem = (index: number, field: keyof POItem, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }, gstInclusive); return u; });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, gstInclusive); return u; });
     }
   };
 
@@ -188,6 +194,16 @@ export default function PurchaseOrderForm() {
       <Card>
         <CardHeader><CardTitle className="text-base">Items</CardTitle></CardHeader>
         <CardContent>
+          {/* GST Inclusive / Exclusive toggle */}
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/40 rounded-lg mb-2">
+            <span className="text-sm font-medium">GST Type:</span>
+            <div className="flex gap-1.5">
+              <button type="button" onClick={() => setGstInclusive(false)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${!gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Exclusive</button>
+              <button type="button" onClick={() => setGstInclusive(true)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Inclusive</button>
+            </div>
+            <span className="text-xs text-muted-foreground">{gstInclusive ? "Entered price already includes GST" : "GST will be added on top of price"}</span>
+          </div>
+
           {errors.items && <p className="text-xs text-destructive mb-2">{errors.items}</p>}
 
           {/* Mobile card layout */}
