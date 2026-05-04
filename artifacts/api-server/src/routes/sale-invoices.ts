@@ -246,6 +246,41 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
   res.json({ ...invoice, id: invoice.id });
 });
 
+// Record an additional payment against an existing invoice
+router.post("/sale-invoices/:id/payments", authMiddleware, async (req, res) => {
+  const invoiceId = Number(req.params.id);
+  const { mode, amount, reference } = req.body;
+
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ error: "Amount must be greater than 0" });
+  }
+
+  const [invoice] = await db.select().from(saleInvoicesTable)
+    .where(eq(saleInvoicesTable.id, invoiceId)).limit(1);
+  if (!invoice) return res.status(404).json({ error: "Not found" });
+
+  const currentPaid = Number(invoice.amountPaid) || 0;
+  const grandTotal = Number(invoice.grandTotal) || 0;
+  const newPaid = Math.min(currentPaid + Number(amount), grandTotal);
+  const newBalance = grandTotal - newPaid;
+  const newStatus = newPaid >= grandTotal ? "paid" : newPaid > 0 ? "partial" : "confirmed";
+
+  await db.insert(saleInvoicePaymentsTable).values({
+    invoiceId,
+    mode: mode || "cash",
+    amount: String(Number(amount)),
+    reference: reference || "",
+  });
+
+  await db.update(saleInvoicesTable).set({
+    amountPaid: String(newPaid),
+    balanceDue: String(newBalance),
+    status: newStatus,
+  }).where(eq(saleInvoicesTable.id, invoiceId));
+
+  res.json({ ok: true, amountPaid: newPaid, balanceDue: newBalance, status: newStatus });
+});
+
 router.delete("/sale-invoices/:id", authMiddleware, async (req, res) => {
   await db.update(saleInvoicesTable).set({ isDeleted: "true" }).where(eq(saleInvoicesTable.id, Number(req.params.id)));
   res.json({ ok: true });

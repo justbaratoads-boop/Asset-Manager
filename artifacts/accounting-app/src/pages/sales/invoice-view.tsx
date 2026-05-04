@@ -1,18 +1,40 @@
 import { useState, useEffect } from "react";
 import { useRoute, Link, useLocation } from "wouter";
-import { useGetSaleInvoice, useGetCompanySettings } from "@workspace/api-client-react";
+import { useGetSaleInvoice, useGetCompanySettings, getGetSaleInvoiceQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Printer, ArrowLeft, Copy } from "lucide-react";
+import { Printer, ArrowLeft, Copy, IndianRupee, Edit } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { customFetch } from "@workspace/api-client-react";
 
 const PRINT_SETTINGS_KEY = "print_settings";
 
 function loadPrintSettings() {
   try { return JSON.parse(localStorage.getItem(PRINT_SETTINGS_KEY) || "{}"); }
   catch { return {}; }
+}
+
+const PAYMENT_MODES = [
+  { value: "cash", label: "Cash" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "upi", label: "UPI" },
+  { value: "cheque", label: "Cheque" },
+];
+
+function statusBadge(status: string) {
+  const map: Record<string, string> = {
+    paid: "bg-green-100 text-green-700 border-green-200",
+    partial: "bg-amber-100 text-amber-700 border-amber-200",
+    confirmed: "bg-blue-100 text-blue-700 border-blue-200",
+    cancelled: "bg-red-100 text-red-700 border-red-200",
+  };
+  return map[status] || "bg-gray-100 text-gray-600";
 }
 
 function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; company: any; copyLabel?: string }) {
@@ -34,7 +56,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
         <div className="text-right text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">{copyLabel}</div>
       )}
 
-      {/* Header: company info + invoice number */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6 sm:mb-8">
         <div className="flex items-start gap-3">
           {showLogo && company?.logoUrl && (
@@ -67,7 +89,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
         {invoice.billingAddress && <p className="text-sm text-gray-600">{invoice.billingAddress}</p>}
       </div>
 
-      {/* Items — scrollable on mobile, full table on desktop */}
+      {/* Items */}
       <div className="overflow-x-auto -mx-4 sm:mx-0">
         <table className="w-full text-sm mb-6 min-w-[500px] px-4 sm:px-0">
           <thead>
@@ -135,7 +157,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
           <p className="text-sm font-semibold mb-2">Payment Details</p>
           {invoice.payments.map((p: any, i: number) => (
             <p key={i} className="text-sm text-gray-500 capitalize">
-              {p.mode}: {formatCurrency(p.amount)}{p.reference ? ` (Ref: ${p.reference})` : ""}
+              {p.mode?.replace("_", " ")}: {formatCurrency(p.amount)}{p.reference ? ` (Ref: ${p.reference})` : ""}
             </p>
           ))}
         </div>
@@ -186,6 +208,8 @@ export default function SaleInvoiceView() {
   const [, params] = useRoute("/sales/invoices/:id");
   const [, search] = useLocation();
   const id = Number(params?.id);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: invoice, isLoading } = useGetSaleInvoice(id, { query: { enabled: !!id } });
   const { data: company } = useGetCompanySettings();
 
@@ -195,6 +219,47 @@ export default function SaleInvoiceView() {
   const defaultCopies = ps.invoiceCopies || "1";
   const copyLabelsStr = ps.copyLabels || "Original, Duplicate, Triplicate";
   const copyLabels = copyLabelsStr.split(",").map((s: string) => s.trim());
+
+  // Record payment dialog
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMode, setPayMode] = useState("cash");
+  const [payRef, setPayRef] = useState("");
+  const [payError, setPayError] = useState("");
+  const [isSavingPay, setIsSavingPay] = useState(false);
+
+  const inv = invoice as any;
+  const balanceDue = Number(inv?.balanceDue) || 0;
+
+  const openPayDialog = () => {
+    setPayAmount(String(balanceDue.toFixed(2)));
+    setPayMode("cash");
+    setPayRef("");
+    setPayError("");
+    setPayDialogOpen(true);
+  };
+
+  const handleRecordPayment = async () => {
+    const amt = Number(payAmount);
+    if (!amt || amt <= 0) { setPayError("Enter a valid amount"); return; }
+    if (amt > balanceDue) { setPayError(`Amount cannot exceed balance due (${formatCurrency(balanceDue)})`); return; }
+    setIsSavingPay(true);
+    try {
+      await customFetch(`/api/sale-invoices/${id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: payMode, amount: amt, reference: payRef }),
+      });
+      await queryClient.invalidateQueries({ queryKey: getGetSaleInvoiceQueryKey(id) });
+      toast({ title: "Payment recorded successfully" });
+      setPayDialogOpen(false);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err.message || "Failed to record payment";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setIsSavingPay(false);
+    }
+  };
 
   useEffect(() => {
     if (new URLSearchParams(search || "").get("print") === "1") {
@@ -213,7 +278,7 @@ export default function SaleInvoiceView() {
       elements.push(document.getElementById("invoice-print")?.innerHTML || "");
       elements.push(`</div>`);
     }
-    const html = `<!DOCTYPE html><html><head><title>Invoice ${(invoice as any)?.invoiceNumber}</title><style>body{font-family:sans-serif;font-size:13px;padding:16px;color:#000}table{border-collapse:collapse;width:100%}@media print{.no-print{display:none}}</style></head><body>${elements.join("")}</body></html>`;
+    const html = `<!DOCTYPE html><html><head><title>Invoice ${inv?.invoiceNumber}</title><style>body{font-family:sans-serif;font-size:13px;padding:16px;color:#000}table{border-collapse:collapse;width:100%}@media print{.no-print{display:none}}</style></head><body>${elements.join("")}</body></html>`;
     const win = window.open("", "_blank");
     if (win) {
       win.document.write(html);
@@ -230,21 +295,55 @@ export default function SaleInvoiceView() {
     <div className="space-y-4">
       {/* Action bar */}
       <div className="flex items-center justify-between gap-2 print:hidden">
-        <Link href="/sales/invoices">
-          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
-        </Link>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Link href="/sales/invoices">
+            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
+          </Link>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${statusBadge(inv.status)}`}>
+            {inv.status}
+          </span>
+        </div>
+        <div className="flex gap-2 flex-wrap justify-end">
+          {balanceDue > 0 && (
+            <Button size="sm" variant="default" onClick={openPayDialog} className="gap-1.5 bg-green-600 hover:bg-green-700">
+              <IndianRupee className="h-4 w-4" />
+              <span className="hidden sm:inline">Record Payment</span>
+              <span className="sm:hidden">Pay</span>
+            </Button>
+          )}
+          <Link href={`/sales/invoices/${id}/edit`}>
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Edit className="h-4 w-4" /><span className="hidden sm:inline">Edit</span>
+            </Button>
+          </Link>
           <Button variant="outline" size="sm" onClick={() => { setCopies("2"); setPrintDialogOpen(true); }}>
             <Copy className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Print 2nd Copy</span>
           </Button>
           <Button size="sm" onClick={() => { setCopies(defaultCopies); setPrintDialogOpen(true); }}>
-            <Printer className="h-4 w-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Print</span><span className="sm:hidden">Print</span>
+            <Printer className="h-4 w-4 mr-1" />Print
           </Button>
         </div>
       </div>
 
-      <InvoiceDocument invoice={invoice as any} company={company as any} />
+      {/* Balance due banner */}
+      {balanceDue > 0 && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 print:hidden">
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Payment Pending</p>
+            <p className="text-xs text-amber-600">
+              {formatCurrency(Number(inv.amountPaid))} received of {formatCurrency(inv.grandTotal)} —{" "}
+              <span className="font-bold">{formatCurrency(balanceDue)} still due</span>
+            </p>
+          </div>
+          <Button size="sm" onClick={openPayDialog} className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shrink-0">
+            <IndianRupee className="h-3.5 w-3.5" />Collect Now
+          </Button>
+        </div>
+      )}
 
+      <InvoiceDocument invoice={inv} company={company as any} />
+
+      {/* Print dialog */}
       <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Print Invoice</DialogTitle></DialogHeader>
@@ -267,6 +366,78 @@ export default function SaleInvoiceView() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPrintDialogOpen(false)}>Cancel</Button>
             <Button onClick={handlePrint}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment dialog */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IndianRupee className="h-5 w-5 text-green-600" />
+              Record Payment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="bg-muted/50 rounded-lg px-3 py-2 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Invoice Total</span>
+                <span className="font-medium">{formatCurrency(inv.grandTotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Already Paid</span>
+                <span className="font-medium text-green-600">{formatCurrency(inv.amountPaid)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-1 mt-1">
+                <span className="font-semibold">Balance Due</span>
+                <span className="font-bold text-red-600">{formatCurrency(balanceDue)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Amount Received *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                <Input
+                  className="pl-7 h-10 text-base font-semibold"
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  step="any"
+                  value={payAmount}
+                  onChange={e => { setPayAmount(e.target.value); setPayError(""); }}
+                  autoFocus
+                />
+              </div>
+              {payError && <p className="text-xs text-destructive">{payError}</p>}
+            </div>
+
+            <div className="space-y-1">
+              <Label>Payment Mode</Label>
+              <Select value={payMode} onValueChange={setPayMode}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Reference / Cheque No. <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                placeholder="e.g. UTR number, cheque no."
+                value={payRef}
+                onChange={e => setPayRef(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRecordPayment} disabled={isSavingPay} className="bg-green-600 hover:bg-green-700">
+              <IndianRupee className="h-4 w-4 mr-1" />
+              {isSavingPay ? "Saving..." : "Record Payment"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
