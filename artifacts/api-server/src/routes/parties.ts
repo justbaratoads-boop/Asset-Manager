@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   partiesTable, saleInvoicesTable, purchaseInvoicesTable,
   paymentsTable, receiptsTable, journalLinesTable, journalEntriesTable,
-  ledgersTable, ordersTable
+  ledgersTable, ordersTable, debitNotesTable, creditNotesTable
 } from "@workspace/db/schema";
 import { eq, and, like, sql, or, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -102,13 +102,13 @@ router.delete("/parties/:id", authMiddleware, async (req, res) => {
 
 router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const { id } = req.params;
-  const { from, to } = req.query;
 
   const [party] = await db.select().from(partiesTable).where(eq(partiesTable.id, Number(id))).limit(1);
   if (!party) return res.status(404).json({ error: "Party not found" });
 
   const transactions: any[] = [];
 
+  // Sale invoices — party is debited (Dr)
   const saleInvoices = await db.select({
     date: saleInvoicesTable.date,
     type: sql<string>`'sale_invoice'`,
@@ -120,6 +120,19 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(saleInvoicesTable.partyId, Number(id)), eq(saleInvoicesTable.isDeleted, "false")));
   transactions.push(...saleInvoices);
 
+  // Purchase invoices — party is credited (Cr)
+  const purchaseInvoices = await db.select({
+    date: purchaseInvoicesTable.date,
+    type: sql<string>`'purchase_invoice'`,
+    description: sql<string>`'Purchase Invoice #' || invoice_number`,
+    dr: sql<string>`'0'`,
+    cr: purchaseInvoicesTable.grandTotal,
+    ref: purchaseInvoicesTable.invoiceNumber,
+  }).from(purchaseInvoicesTable)
+    .where(and(eq(purchaseInvoicesTable.partyId, Number(id)), eq(purchaseInvoicesTable.isDeleted, "false")));
+  transactions.push(...purchaseInvoices);
+
+  // Receipts — party pays us (Cr on party account)
   const rcpts = await db.select({
     date: receiptsTable.date,
     type: sql<string>`'receipt'`,
@@ -131,12 +144,71 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .where(and(eq(receiptsTable.partyId, Number(id)), eq(receiptsTable.isDeleted, "false")));
   transactions.push(...rcpts);
 
+  // Payments — we pay to party (Dr on party account)
+  const pmts = await db.select({
+    date: paymentsTable.date,
+    type: sql<string>`'payment'`,
+    description: sql<string>`'Payment #' || voucher_number`,
+    dr: paymentsTable.amount,
+    cr: sql<string>`'0'`,
+    ref: paymentsTable.voucherNumber,
+  }).from(paymentsTable)
+    .where(and(eq(paymentsTable.partyId, Number(id)), eq(paymentsTable.isDeleted, "false")));
+  transactions.push(...pmts);
+
+  // Credit notes — reduce party's receivable (Cr)
+  const crNotes = await db.select({
+    date: creditNotesTable.date,
+    type: sql<string>`'credit_note'`,
+    description: sql<string>`'Credit Note #' || note_number`,
+    dr: sql<string>`'0'`,
+    cr: creditNotesTable.amount,
+    ref: creditNotesTable.noteNumber,
+  }).from(creditNotesTable)
+    .where(and(eq(creditNotesTable.partyId, Number(id)), eq(creditNotesTable.isDeleted, "false")));
+  transactions.push(...crNotes);
+
+  // Debit notes — reduce party's payable (Dr)
+  const dbNotes = await db.select({
+    date: debitNotesTable.date,
+    type: sql<string>`'debit_note'`,
+    description: sql<string>`'Debit Note #' || note_number`,
+    dr: debitNotesTable.amount,
+    cr: sql<string>`'0'`,
+    ref: debitNotesTable.noteNumber,
+  }).from(debitNotesTable)
+    .where(and(eq(debitNotesTable.partyId, Number(id)), eq(debitNotesTable.isDeleted, "false")));
+  transactions.push(...dbNotes);
+
+  // Journal lines — pick lines where party_id matches, use Dr/Cr from the line
+  const jLines = await db.select({
+    date: journalEntriesTable.date,
+    type: sql<string>`'journal'`,
+    narration: journalEntriesTable.narration,
+    voucherNumber: journalEntriesTable.voucherNumber,
+    lineType: journalLinesTable.type,
+    amount: journalLinesTable.amount,
+  }).from(journalLinesTable)
+    .innerJoin(journalEntriesTable, eq(journalLinesTable.entryId, journalEntriesTable.id))
+    .where(and(
+      eq(journalLinesTable.partyId, Number(id)),
+      eq(journalEntriesTable.isDeleted, "false"),
+    ));
+
+  for (const jl of jLines) {
+    const amt = Number(jl.amount);
+    transactions.push({
+      date: jl.date,
+      type: "journal",
+      description: jl.narration || `Journal ${jl.voucherNumber}`,
+      dr: jl.lineType === "dr" ? amt : 0,
+      cr: jl.lineType === "cr" ? amt : 0,
+      ref: jl.voucherNumber,
+    });
+  }
+
   const sorted = transactions
-    .map(t => ({
-      ...t,
-      dr: Number(t.dr),
-      cr: Number(t.cr),
-    }))
+    .map(t => ({ ...t, dr: Number(t.dr), cr: Number(t.cr) }))
     .sort((a, b) => (a.date > b.date ? 1 : -1));
 
   let balance = Number(party.openingBalance) * (party.balanceType === "dr" ? 1 : -1);

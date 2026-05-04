@@ -42,6 +42,7 @@ router.post("/journals", authMiddleware, async (req, res) => {
       await db.insert(journalLinesTable).values({
         entryId: entry.id,
         ledgerId: line.ledgerId,
+        partyId: line.partyId || null,
         type: line.type,
         amount: String(line.amount),
       });
@@ -54,7 +55,14 @@ router.post("/journals", authMiddleware, async (req, res) => {
 router.get("/journals/:id", authMiddleware, async (req, res) => {
   const [entry] = await db.select().from(journalEntriesTable).where(eq(journalEntriesTable.id, Number(req.params.id))).limit(1);
   if (!entry) return res.status(404).json({ error: "Not found" });
-  const lines = await db.select().from(journalLinesTable).where(eq(journalLinesTable.entryId, Number(req.params.id)));
+  const lines = await db.select({
+    id: journalLinesTable.id,
+    entryId: journalLinesTable.entryId,
+    ledgerId: journalLinesTable.ledgerId,
+    partyId: journalLinesTable.partyId,
+    type: journalLinesTable.type,
+    amount: journalLinesTable.amount,
+  }).from(journalLinesTable).where(eq(journalLinesTable.entryId, Number(req.params.id)));
   res.json({ ...entry, totalDebit: Number(entry.totalDebit), totalCredit: Number(entry.totalCredit), lines });
 });
 
@@ -76,6 +84,7 @@ router.put("/journals/:id", authMiddleware, async (req, res) => {
       await db.insert(journalLinesTable).values({
         entryId: id,
         ledgerId: line.ledgerId,
+        partyId: line.partyId || null,
         type: line.type,
         amount: String(line.amount),
       });

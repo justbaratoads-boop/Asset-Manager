@@ -19,6 +19,7 @@ export const journalLinesTable = pgTable("journal_lines", {
   id: serial("id").primaryKey(),
   entryId: integer("entry_id").notNull(),
   ledgerId: integer("ledger_id").notNull(),
+  partyId: integer("party_id"),
   type: text("type").notNull(),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
