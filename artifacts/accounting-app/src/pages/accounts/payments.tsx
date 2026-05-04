@@ -24,34 +24,82 @@ export default function PaymentList() {
     setDeleteId(null);
   };
 
+  const list = payments as any[];
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Payment Vouchers</h1>
-        <Link href="/accounts/payments/new"><Button><Plus className="h-4 w-4 mr-2" />New Payment</Button></Link>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold">Payment Vouchers</h1>
+          <p className="text-sm text-muted-foreground">{list.length} payments</p>
+        </div>
+        <Link href="/accounts/payments/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Payment</Button></Link>
       </div>
-      <Card>
+
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="text-center text-muted-foreground py-10">Loading...</div>
+        ) : list.length === 0 ? (
+          <div className="text-center text-muted-foreground py-10">No payments found</div>
+        ) : list.map((p: any) => (
+          <Card key={p.id}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-bold text-base">{p.partyName || "—"}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{p.voucherNumber} · {formatDate(p.date)}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{p.paymentMode?.replace("_", " ")}</p>
+                </div>
+                <p className="font-bold text-base text-red-600">{formatCurrency(p.amount)}</p>
+              </div>
+              <div className="flex gap-2 border-t pt-3">
+                <Link href={`/accounts/payments/${p.id}/edit`} className="flex-1">
+                  <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+                </Link>
+                <Button size="sm" variant="outline" className="text-destructive border-destructive/30 px-3" onClick={() => setDeleteId(p.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <Card className="hidden md:block">
         <CardContent className="p-4">
           <Table>
-            <TableHeader><TableRow><TableHead>Voucher#</TableHead><TableHead>Date</TableHead><TableHead>Party</TableHead><TableHead>Mode</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Voucher#</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Party</TableHead>
+                <TableHead>Mode</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
             <TableBody>
-              {isLoading ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                : (payments as any[]).length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No payments</TableCell></TableRow>
-                  : (payments as any[]).map((p: any) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-mono text-sm">{p.voucherNumber}</TableCell>
-                      <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
-                      <TableCell>{p.partyName || "-"}</TableCell>
-                      <TableCell className="capitalize text-sm">{p.paymentMode?.replace("_", " ")}</TableCell>
-                      <TableCell className="text-right font-medium text-red-600">{formatCurrency(p.amount)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Link href={`/accounts/payments/${p.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+              {isLoading ? (
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              ) : list.length === 0 ? (
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No payments</TableCell></TableRow>
+              ) : list.map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-mono text-sm">{p.voucherNumber}</TableCell>
+                  <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
+                  <TableCell>{p.partyName || "-"}</TableCell>
+                  <TableCell className="capitalize text-sm">{p.paymentMode?.replace("_", " ")}</TableCell>
+                  <TableCell className="text-right font-medium text-red-600">{formatCurrency(p.amount)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Link href={`/accounts/payments/${p.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>

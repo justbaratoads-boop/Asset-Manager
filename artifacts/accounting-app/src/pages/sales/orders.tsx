@@ -36,22 +36,63 @@ export default function OrderList() {
     setDeleteId(null);
   };
 
-  const handleConvertToInvoice = (orderId: number) => {
-    setLocation(`/sales/invoices/new?fromOrder=${orderId}`);
-  };
+  const list = orders as any[];
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Order Booking</h1>
-        <Link href="/sales/orders/new"><Button><Plus className="h-4 w-4 mr-2" />New Order</Button></Link>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold">Order Booking</h1>
+          <p className="text-sm text-muted-foreground">{list.length} orders</p>
+        </div>
+        <Link href="/sales/orders/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Order</Button></Link>
       </div>
-      <Card>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input className="pl-9" placeholder="Search by party name..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="text-center text-muted-foreground py-10">Loading...</div>
+        ) : list.length === 0 ? (
+          <div className="text-center text-muted-foreground py-10">No orders found</div>
+        ) : list.map((order: any) => (
+          <Card key={order.id}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-bold text-base">{order.partyName}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{order.orderNumber} · {formatDate(order.date)}</p>
+                </div>
+                <div className="text-right space-y-1">
+                  <p className="font-bold text-base">{formatCurrency(order.grandTotal)}</p>
+                  <Badge variant="outline" className={`capitalize text-xs ${statusColors[order.status] || ""}`}>{order.status}</Badge>
+                </div>
+              </div>
+              <div className="flex gap-2 border-t pt-3">
+                <Link href={`/sales/orders/${order.id}`} className="flex-1">
+                  <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+                </Link>
+                {order.status === "pending" && (
+                  <Button size="sm" variant="outline" className="flex-1 text-blue-600 border-blue-200" onClick={() => setLocation(`/sales/invoices/new?fromOrder=${order.id}`)}>
+                    <FileText className="h-3.5 w-3.5 mr-1" />Invoice
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" className="text-destructive border-destructive/30 px-3" onClick={() => setDeleteId(order.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <Card className="hidden md:block">
         <CardContent className="p-4">
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -66,9 +107,9 @@ export default function OrderList() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-              ) : (orders as any[]).length === 0 ? (
+              ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No orders found</TableCell></TableRow>
-              ) : (orders as any[]).map((order: any) => (
+              ) : list.map((order: any) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono text-sm">{order.orderNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(order.date)}</TableCell>
@@ -77,23 +118,13 @@ export default function OrderList() {
                   <TableCell><Badge variant="outline" className={`capitalize ${statusColors[order.status] || ""}`}>{order.status}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Link href={`/sales/orders/${order.id}`}>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
-                      </Link>
+                      <Link href={`/sales/orders/${order.id}`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
                       {order.status === "pending" && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-blue-600"
-                          title="Create Invoice from Order"
-                          onClick={() => handleConvertToInvoice(order.id)}
-                        >
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-600" title="Create Invoice" onClick={() => setLocation(`/sales/invoices/new?fromOrder=${order.id}`)}>
                           <FileText className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(order.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(order.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>

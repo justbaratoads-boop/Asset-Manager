@@ -159,7 +159,7 @@ export default function SaleInvoiceView() {
   const copyLabels = copyLabelsStr.split(",").map((s: string) => s.trim());
 
   useEffect(() => {
-    if (new URLSearchParams(search?.split("?")[1]).get("print") === "1") {
+    if (new URLSearchParams(search || "").get("print") === "1") {
       setPrintDialogOpen(true);
     }
   }, [search]);
