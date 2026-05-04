@@ -10,17 +10,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
-import { Plus, Trash2, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-interface Item { stockItemId?: number; itemName: string; hsnCode: string; quantity: number; unit: string; rate: number; discountPct: number; gstPct: number; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number; }
+interface Item { stockItemId?: number; itemName: string; hsnCode: string; quantity: number; unit: string; rate: number; discountPct: number; gstPct: number; gstLocked: boolean; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number; }
 
 function calc(item: Partial<Item>, isInterstate: boolean): Item {
   const qty = Number(item.quantity) || 0; const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0; const gstPct = Number(item.gstPct) || 0;
   const taxable = qty * rate * (1 - discPct / 100);
   const gst = taxable * (gstPct / 100);
-  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId };
+  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, gstLocked: item.gstLocked ?? false, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId };
 }
 
 function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (item: any) => void }) {
@@ -103,6 +103,7 @@ export default function PurchaseInvoiceForm() {
         rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0,
         gstPct: Number(i.gstPct) || 0,
+        gstLocked: !!i.stockItemId,
       }, interstate)));
     }
   }, [existing]);
@@ -126,7 +127,7 @@ export default function PurchaseInvoiceForm() {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate); return u; });
     }
   };
 
@@ -134,7 +135,7 @@ export default function PurchaseInvoiceForm() {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
       const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate); return u; });
     }
   };
 
@@ -224,7 +225,11 @@ export default function PurchaseInvoiceForm() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Unit</Label>
-                    <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
+                    {item.stockItemId ? (
+                      <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
+                    ) : (
+                      <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Rate *</Label>
@@ -236,10 +241,14 @@ export default function PurchaseInvoiceForm() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">GST%</Label>
-                    <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
-                      <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
-                    </Select>
+                    {item.gstLocked ? (
+                      <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
+                    ) : (
+                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
+                        <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Total</Label>
@@ -285,10 +294,18 @@ export default function PurchaseInvoiceForm() {
                       {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
                     </TableCell>
                     <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                    <TableCell><Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} /></TableCell>
+                    <TableCell>{item.stockItemId ? (
+                      <div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
+                    ) : (
+                      <Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
+                    )}</TableCell>
                     <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                     <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>
-                    <TableCell><Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select></TableCell>
+                    <TableCell>{item.gstLocked ? (
+                      <div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
+                    ) : (
+                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select>
+                    )}</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>
                     <TableCell><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></TableCell>
                   </TableRow>
