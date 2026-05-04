@@ -12,25 +12,41 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-const PARENT_GROUPS = [
-  { value: "assets",      label: "Assets" },
-  { value: "liabilities", label: "Liabilities" },
-  { value: "income",      label: "Income" },
-  { value: "expenses",    label: "Expenses" },
-  { value: "capital",     label: "Capital" },
+const NATURE_OPTIONS = [
+  { value: "Asset",     label: "Asset",     statement: "Balance Sheet" },
+  { value: "Liability", label: "Liability", statement: "Balance Sheet" },
+  { value: "Equity",    label: "Equity",    statement: "Balance Sheet" },
+  { value: "Income",    label: "Income",    statement: "Profit & Loss" },
+  { value: "Expense",   label: "Expense",   statement: "Profit & Loss" },
 ];
 
-const parentColors: Record<string, string> = {
-  assets:      "bg-blue-100 text-blue-700 border-blue-200",
-  liabilities: "bg-red-100 text-red-700 border-red-200",
-  income:      "bg-green-100 text-green-700 border-green-200",
-  expenses:    "bg-orange-100 text-orange-700 border-orange-200",
-  capital:     "bg-purple-100 text-purple-700 border-purple-200",
-};
+const PARENT_GROUPS = [
+  { value: "assets",      label: "Assets",      nature: "Asset" },
+  { value: "liabilities", label: "Liabilities", nature: "Liability" },
+  { value: "equity",      label: "Equity",      nature: "Equity" },
+  { value: "income",      label: "Income",      nature: "Income" },
+  { value: "expenses",    label: "Expenses",    nature: "Expense" },
+];
 
 const natureColors: Record<string, string> = {
-  dr: "bg-sky-50 text-sky-700 border-sky-200",
-  cr: "bg-rose-50 text-rose-700 border-rose-200",
+  Asset:     "bg-blue-50 text-blue-700 border-blue-200",
+  Liability: "bg-red-50 text-red-700 border-red-200",
+  Equity:    "bg-purple-50 text-purple-700 border-purple-200",
+  Income:    "bg-green-50 text-green-700 border-green-200",
+  Expense:   "bg-orange-50 text-orange-700 border-orange-200",
+};
+
+const statementColors: Record<string, string> = {
+  "Balance Sheet": "bg-sky-50 text-sky-700 border-sky-200",
+  "Profit & Loss": "bg-amber-50 text-amber-700 border-amber-200",
+};
+
+const parentColors: Record<string, string> = {
+  assets:      "bg-blue-100 text-blue-800 border-blue-200",
+  liabilities: "bg-red-100 text-red-800 border-red-200",
+  equity:      "bg-purple-100 text-purple-800 border-purple-200",
+  income:      "bg-green-100 text-green-800 border-green-200",
+  expenses:    "bg-orange-100 text-orange-800 border-orange-200",
 };
 
 function useAccountGroups() {
@@ -40,7 +56,7 @@ function useAccountGroups() {
   });
 }
 
-const BLANK = { name: "", nature: "dr", parentGroup: "assets" };
+const BLANK = { name: "", nature: "Asset", statement: "Balance Sheet", parentGroup: "assets" };
 
 export default function ChartOfAccounts() {
   const { data: groups = [], isLoading } = useAccountGroups();
@@ -74,8 +90,19 @@ export default function ChartOfAccounts() {
 
   const openEdit = (g: any) => {
     setEditItem(g);
-    setForm({ name: g.name, nature: g.nature, parentGroup: g.parentGroup });
+    setForm({ name: g.name, nature: g.nature, statement: g.statement, parentGroup: g.parentGroup });
     setDialogOpen(true);
+  };
+
+  const handleNatureChange = (nature: string) => {
+    const opt = NATURE_OPTIONS.find(o => o.value === nature);
+    const pg = PARENT_GROUPS.find(p => p.nature === nature);
+    setForm(prev => ({
+      ...prev,
+      nature,
+      statement: opt?.statement ?? prev.statement,
+      parentGroup: pg?.value ?? prev.parentGroup,
+    }));
   };
 
   const handleSave = async () => {
@@ -138,7 +165,7 @@ export default function ChartOfAccounts() {
           <Input className="pl-9" placeholder="Search groups..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={filterParent} onValueChange={setFilterParent}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="All Categories" /></SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue placeholder="All Categories" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {PARENT_GROUPS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
@@ -153,8 +180,12 @@ export default function ChartOfAccounts() {
           {filterParent === "all" ? (
             grouped.map(pg => (
               <Card key={pg.value}>
-                <div className={`px-4 py-2 rounded-t-lg border-b font-semibold text-sm ${parentColors[pg.value]}`}>
-                  {pg.label} <span className="font-normal opacity-70">({pg.items.length})</span>
+                <div className={`px-4 py-2 rounded-t-lg border-b font-semibold text-sm flex items-center gap-2 ${parentColors[pg.value]}`}>
+                  {pg.label}
+                  <span className="font-normal opacity-60 text-xs">({pg.items.length} groups)</span>
+                  <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded border ${statementColors[pg.items[0]?.statement] ?? ""}`}>
+                    {pg.items[0]?.statement}
+                  </span>
                 </div>
                 <CardContent className="p-0">
                   <Table>
@@ -162,6 +193,7 @@ export default function ChartOfAccounts() {
                       <TableRow>
                         <TableHead>Group Name</TableHead>
                         <TableHead>Nature</TableHead>
+                        <TableHead>Statement</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -175,8 +207,13 @@ export default function ChartOfAccounts() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${natureColors[g.nature]}`}>
-                              {g.nature === "dr" ? "Dr (Debit)" : "Cr (Credit)"}
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${natureColors[g.nature] ?? ""}`}>
+                              {g.nature}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded border ${statementColors[g.statement] ?? ""}`}>
+                              {g.statement}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
@@ -201,8 +238,8 @@ export default function ChartOfAccounts() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Group Name</TableHead>
-                      <TableHead>Category</TableHead>
                       <TableHead>Nature</TableHead>
+                      <TableHead>Statement</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -216,11 +253,13 @@ export default function ChartOfAccounts() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded border capitalize ${parentColors[g.parentGroup]}`}>{g.parentGroup}</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${natureColors[g.nature] ?? ""}`}>
+                            {g.nature}
+                          </span>
                         </TableCell>
                         <TableCell>
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${natureColors[g.nature]}`}>
-                            {g.nature === "dr" ? "Dr" : "Cr"}
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded border ${statementColors[g.statement] ?? ""}`}>
+                            {g.statement}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
@@ -253,31 +292,39 @@ export default function ChartOfAccounts() {
           <div className="space-y-4 py-1">
             <div className="space-y-1">
               <Label>Group Name *</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Advance to Employees" autoFocus />
-            </div>
-            <div className="space-y-1">
-              <Label>Category</Label>
-              <Select value={form.parentGroup} onValueChange={v => setForm(p => ({ ...p, parentGroup: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PARENT_GROUPS.map(pg => <SelectItem key={pg.value} value={pg.value}>{pg.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Input
+                value={form.name}
+                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Advance to Employees"
+                autoFocus
+              />
             </div>
             <div className="space-y-1">
               <Label>Nature</Label>
-              <Select value={form.nature} onValueChange={v => setForm(p => ({ ...p, nature: v }))}>
+              <Select value={form.nature} onValueChange={handleNatureChange}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="dr">Debit (Dr) — Assets / Expenses</SelectItem>
-                  <SelectItem value="cr">Credit (Cr) — Liabilities / Income</SelectItem>
+                  {NATURE_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Financial Statement</Label>
+              <div className={`text-sm px-3 py-2 rounded-md border font-medium ${statementColors[form.statement] ?? "bg-muted"}`}>
+                {form.statement}
+              </div>
+              <p className="text-xs text-muted-foreground">Auto-set based on Nature</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={isSaving}>{isSaving ? "Saving..." : editItem ? "Update" : "Add Group"}</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : editItem ? "Update" : "Add Group"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

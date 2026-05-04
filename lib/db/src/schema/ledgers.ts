@@ -5,7 +5,8 @@ import { z } from "zod/v4";
 export const accountGroupsTable = pgTable("account_groups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
-  nature: text("nature").notNull().default("dr"),
+  nature: text("nature").notNull().default("Asset"),
+  statement: text("statement").notNull().default("Balance Sheet"),
   parentGroup: text("parent_group").notNull().default("assets"),
   isSystem: text("is_system").notNull().default("false"),
   isDeleted: text("is_deleted").notNull().default("false"),
