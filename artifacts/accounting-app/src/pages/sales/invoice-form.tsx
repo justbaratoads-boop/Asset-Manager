@@ -111,6 +111,13 @@ function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose
   );
 }
 
+const PAYMENT_MODES = [
+  { value: "cash", label: "Cash" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "upi", label: "UPI" },
+  { value: "cheque", label: "Cheque" },
+];
+
 export default function SaleInvoiceForm() {
   const [, setLocation] = useLocation();
   const params = useParams<{ id: string }>();
@@ -125,7 +132,8 @@ export default function SaleInvoiceForm() {
 
   const fromOrderId = new URLSearchParams(window.location.search).get("fromOrder");
 
-  const [paymentMode, setPaymentMode] = useState<"cash" | "credit">("credit");
+  // Bill type: credit = party required; cash = walk-in
+  const [billType, setBillType] = useState<"credit" | "cash">("credit");
   const [partyId, setPartyId] = useState<number | undefined>();
   const [manualName, setManualName] = useState("");
   const [date, setDate] = useState(today());
@@ -137,7 +145,46 @@ export default function SaleInvoiceForm() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
+  // Payment entry
+  const [payType, setPayType] = useState<"none" | "partial" | "full">("none");
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("cash");
+  const [payRef, setPayRef] = useState("");
+
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
+
+  const totals = items.reduce((acc, item) => ({
+    subtotal: acc.subtotal + item.quantity * item.rate,
+    discount: acc.discount + (item.quantity * item.rate - item.taxableAmount),
+    taxable: acc.taxable + item.taxableAmount,
+    cgst: acc.cgst + item.cgst,
+    sgst: acc.sgst + item.sgst,
+    igst: acc.igst + item.igst,
+    grand: acc.grand + item.total,
+  }), { subtotal: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, grand: 0 });
+
+  const amountPaid = payType === "none" ? 0
+    : payType === "full" ? totals.grand
+    : Math.min(Number(payAmount) || 0, totals.grand);
+  const balanceDue = totals.grand - amountPaid;
+
+  // Sync payAmount when payType = full and totals change
+  useEffect(() => {
+    if (payType === "full") setPayAmount(totals.grand > 0 ? String(totals.grand.toFixed(2)) : "");
+  }, [payType, totals.grand]);
+
+  // When bill type changes, reset payment
+  const handleBillTypeChange = (type: "credit" | "cash") => {
+    setBillType(type);
+    if (type === "cash") {
+      setPayType("full");
+      setPayAmount(String(totals.grand.toFixed(2)));
+      setPayMethod("cash");
+    } else {
+      setPayType("none");
+      setPayAmount("");
+    }
+  };
 
   useEffect(() => {
     if (selectedParty) {
@@ -150,22 +197,27 @@ export default function SaleInvoiceForm() {
   useEffect(() => {
     if (!existing || !isEdit) return;
     const inv = existing as any;
-    if (inv.partyId) setPartyId(inv.partyId);
+    if (inv.partyId) { setPartyId(inv.partyId); setBillType("credit"); }
+    else { setBillType("cash"); }
     if (inv.date) setDate(inv.date);
     const interstate = inv.isInterstate === "true" || inv.isInterstate === true;
     setIsInterstate(interstate);
     setNotes(inv.notes || "");
-    setPaymentMode(inv.amountPaid > 0 && inv.balanceDue <= 0 ? "cash" : "credit");
+    // Restore payment state
+    const paid = Number(inv.amountPaid) || 0;
+    const grand = Number(inv.grandTotal) || 0;
+    if (paid <= 0) { setPayType("none"); }
+    else if (paid >= grand) { setPayType("full"); setPayAmount(String(paid.toFixed(2))); }
+    else { setPayType("partial"); setPayAmount(String(paid.toFixed(2))); }
+    if (inv.payments?.length) {
+      setPayMethod(inv.payments[0].mode || "cash");
+      setPayRef(inv.payments[0].reference || "");
+    }
     if (inv.items?.length) {
       setItems(inv.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId,
-        itemName: i.itemName,
-        hsnCode: i.hsnCode || "",
-        quantity: Number(i.quantity),
-        unit: i.unit,
-        rate: Number(i.rate),
-        discountPct: Number(i.discountPct) || 0,
-        gstPct: Number(i.gstPct) || 0,
+        stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+        quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
+        discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
       }, interstate)));
     }
   }, [existing]);
@@ -178,31 +230,13 @@ export default function SaleInvoiceForm() {
       if (order.notes) setNotes(order.notes);
       if (order.items?.length) {
         setItems(order.items.map((i: any) => calcItem({
-          stockItemId: i.stockItemId,
-          itemName: i.itemName,
-          hsnCode: i.hsnCode || "",
-          quantity: Number(i.quantity),
-          unit: i.unit,
-          rate: Number(i.rate),
-          discountPct: Number(i.discountPct) || 0,
-          gstPct: Number(i.gstPct) || 0,
+          stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+          quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
+          discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
         }, false)));
       }
     }).catch(() => {});
   }, [fromOrderId]);
-
-  const totals = items.reduce((acc, item) => ({
-    subtotal: acc.subtotal + item.quantity * item.rate,
-    discount: acc.discount + (item.quantity * item.rate - item.taxableAmount),
-    taxable: acc.taxable + item.taxableAmount,
-    cgst: acc.cgst + item.cgst,
-    sgst: acc.sgst + item.sgst,
-    igst: acc.igst + item.igst,
-    grand: acc.grand + item.total,
-  }), { subtotal: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, grand: 0 });
-
-  const totalPaid = paymentMode === "cash" ? totals.grand : 0;
-  const balance = totals.grand - totalPaid;
 
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => {
@@ -238,21 +272,31 @@ export default function SaleInvoiceForm() {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (paymentMode === "credit" && !partyId) e.party = "Party is required for credit invoices";
+    if (billType === "credit" && !partyId) e.party = "Party is required for credit invoices";
     if (!date) e.date = "Date is required";
     for (let i = 0; i < items.length; i++) {
       if (!items[i].itemName) { e.items = `Row ${i + 1}: Item name is required`; break; }
-      if (!items[i].quantity || items[i].quantity <= 0) { e.items = `Row ${i + 1}: Quantity must be greater than 0`; break; }
-      if (!items[i].rate || items[i].rate <= 0) { e.items = `Row ${i + 1}: Rate must be greater than 0`; break; }
+      if (!items[i].quantity || items[i].quantity <= 0) { e.items = `Row ${i + 1}: Quantity must be > 0`; break; }
+      if (!items[i].rate || items[i].rate <= 0) { e.items = `Row ${i + 1}: Rate must be > 0`; break; }
     }
     if (items.length === 0) e.items = "Add at least one item";
+    if (payType === "partial") {
+      const amt = Number(payAmount);
+      if (!amt || amt <= 0) e.payment = "Enter a valid partial payment amount";
+      else if (amt > totals.grand) e.payment = `Amount cannot exceed total (${formatCurrency(totals.grand)})`;
+    }
     return e;
   };
 
   const buildPayload = () => {
-    const partyName = paymentMode === "credit" ? (selectedParty?.name || "") : (manualName || "Cash Sale");
+    const partyName = billType === "credit" ? (selectedParty?.name || "") : (manualName || "Cash Sale");
+    const payments = payType !== "none" && amountPaid > 0
+      ? [{ mode: payMethod, amount: amountPaid, reference: payRef }]
+      : [];
     return {
-      date, partyId: paymentMode === "credit" ? partyId : undefined, partyName,
+      date,
+      partyId: billType === "credit" ? partyId : undefined,
+      partyName,
       partyGstin: selectedParty?.gstin,
       billingAddress: selectedParty ? [selectedParty.city, selectedParty.state].filter(Boolean).join(", ") : "",
       isGst: items.some(i => i.gstPct > 0),
@@ -265,11 +309,11 @@ export default function SaleInvoiceForm() {
       totalIgst: totals.igst,
       totalGst: totals.cgst + totals.sgst + totals.igst,
       grandTotal: totals.grand,
-      amountPaid: totalPaid,
-      balanceDue: balance,
+      amountPaid,
+      balanceDue,
       notes,
       items,
-      payments: paymentMode === "cash" && totals.grand > 0 ? [{ mode: "cash", amount: totals.grand, reference: "" }] : [],
+      payments,
     };
   };
 
@@ -302,7 +346,6 @@ export default function SaleInvoiceForm() {
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); handleSave(); };
   const handleSaveAndPrint = () => handleSave((inv: any) => { const id = inv?.id || inv?.invoiceId; if (id) setLocation(`/sales/invoices/${id}?print=1`); else setLocation("/sales/invoices"); });
   const handleSaveAndSend = () => { toast({ title: "WhatsApp sharing coming soon" }); handleSave(); };
-  const handlePrintOnly = () => { const errs = validate(); if (Object.keys(errs).length > 0) { setErrors(errs); return; } toast({ title: "Save the invoice first before printing" }); };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -312,18 +355,21 @@ export default function SaleInvoiceForm() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left: main form */}
         <Card className="lg:col-span-2">
           <CardContent className="p-4 space-y-4">
+            {/* Bill Type */}
             <div className="flex items-center gap-4 p-3 bg-muted/40 rounded-lg">
               <span className="text-sm font-medium">Bill Type:</span>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setPaymentMode("credit")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${paymentMode === "credit" ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Credit</button>
-                <button type="button" onClick={() => setPaymentMode("cash")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${paymentMode === "cash" ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Cash</button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => handleBillTypeChange("credit")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${billType === "credit" ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Credit</button>
+                <button type="button" onClick={() => handleBillTypeChange("cash")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${billType === "cash" ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Cash</button>
               </div>
             </div>
 
+            {/* Party + Date */}
             <div className="grid grid-cols-2 gap-4">
-              {paymentMode === "credit" ? (
+              {billType === "credit" ? (
                 <div className="space-y-1">
                   <Label>Party *</Label>
                   <Select value={partyId ? String(partyId) : ""} onValueChange={v => { setPartyId(Number(v)); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}>
@@ -367,38 +413,22 @@ export default function SaleInvoiceForm() {
                       <SelectTrigger className="h-10 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
                       <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Button type="button" size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Quick add" onClick={() => { setQuickAddForIndex(index); setQuickAddOpen(true); }}><Plus className="h-4 w-4" /></Button>
+                    <Button type="button" size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={() => { setQuickAddForIndex(index); setQuickAddOpen(true); }}><Plus className="h-4 w-4" /></Button>
                   </div>
                   {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(index, "itemName", e.target.value)} />}
                   {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Qty *</Label>
-                      <Input className="h-10 text-base" type="number" inputMode="decimal" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Unit</Label>
-                      <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Rate *</Label>
-                      <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="0.00" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Disc%</Label>
-                      <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">GST%</Label>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" /></div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label><Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Rate *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="0.00" /></div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Disc%</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">GST%</Label>
                       <Select value={String(item.gstPct)} onValueChange={v => updateItem(index, "gstPct", v)}>
                         <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Total</Label>
-                      <div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div>
-                    </div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div></div>
                   </div>
                 </div>
               ))}
@@ -431,13 +461,11 @@ export default function SaleInvoiceForm() {
                             <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
                             <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
                           </Select>
-                          <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" title="Quick add new item" onClick={() => { setQuickAddForIndex(index); setQuickAddOpen(true); }}>
+                          <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" onClick={() => { setQuickAddForIndex(index); setQuickAddOpen(true); }}>
                             <Plus className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                        {!item.stockItemId && (
-                          <Input className="h-9 mt-1 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(index, "itemName", e.target.value)} />
-                        )}
+                        {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(index, "itemName", e.target.value)} />}
                         {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
                       </TableCell>
                       <TableCell><Input className="h-9 text-sm" type="number" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
@@ -472,7 +500,9 @@ export default function SaleInvoiceForm() {
           </CardContent>
         </Card>
 
+        {/* Right: totals + payment */}
         <div className="space-y-4">
+          {/* Totals */}
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Totals</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
@@ -488,17 +518,85 @@ export default function SaleInvoiceForm() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Payment</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {paymentMode === "cash" ? (
-                <div className="space-y-1">
-                  <div className="flex justify-between font-medium text-green-700"><span>Amount Received</span><span>{formatCurrency(totals.grand)}</span></div>
-                  <p className="text-xs text-muted-foreground">Cash sale: amount equals bill total</p>
+          {/* Payment Entry */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-primary">Payment Entry</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {/* None / Partial / Full tabs */}
+              <div className="grid grid-cols-3 gap-1 bg-muted/50 p-1 rounded-lg">
+                {(["none", "partial", "full"] as const).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      setPayType(t);
+                      setErrors(p => { const n = { ...p }; delete n.payment; return n; });
+                      if (t === "full") setPayAmount(String(totals.grand.toFixed(2)));
+                      if (t === "none") setPayAmount("");
+                    }}
+                    className={`py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${payType === t ? "bg-white dark:bg-zinc-800 shadow text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {t === "none" ? "No Payment" : t === "partial" ? "Partial" : "Full"}
+                  </button>
+                ))}
+              </div>
+
+              {payType !== "none" && (
+                <div className="space-y-3">
+                  {/* Amount */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Amount Received *</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <Input
+                        className="pl-7 h-10 text-base font-semibold"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="any"
+                        value={payAmount}
+                        onChange={e => {
+                          setPayAmount(e.target.value);
+                          if (payType === "full") setPayType("partial");
+                          setErrors(p => { const n = { ...p }; delete n.payment; return n; });
+                        }}
+                        placeholder="0.00"
+                        readOnly={payType === "full"}
+                      />
+                    </div>
+                    {errors.payment && <p className="text-xs text-destructive">{errors.payment}</p>}
+                  </div>
+
+                  {/* Payment Mode */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Payment Mode</Label>
+                    <Select value={payMethod} onValueChange={setPayMethod}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Reference */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Reference / Cheque No. (optional)</Label>
+                    <Input className="h-9 text-sm" placeholder="e.g. UTR, Cheque no." value={payRef} onChange={e => setPayRef(e.target.value)} />
+                  </div>
                 </div>
-              ) : (
-                <div className="flex justify-between font-semibold"><span>Balance Due</span><span className="text-red-600">{formatCurrency(balance)}</span></div>
               )}
+
+              {/* Summary */}
+              <div className="border-t pt-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount Paid</span>
+                  <span className="font-semibold text-green-600">{formatCurrency(amountPaid)}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>Balance Due</span>
+                  <span className={balanceDue > 0 ? "text-red-600" : "text-green-600"}>{formatCurrency(balanceDue)}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -508,7 +606,6 @@ export default function SaleInvoiceForm() {
         <Button type="submit" disabled={isSaving} className="gap-2"><Save className="h-4 w-4" />{isSaving ? "Saving..." : "Save Invoice"}</Button>
         <Button type="button" variant="outline" disabled={isSaving} onClick={handleSaveAndPrint} className="gap-2"><Printer className="h-4 w-4" />Save &amp; Print</Button>
         <Button type="button" variant="outline" disabled={isSaving} onClick={handleSaveAndSend} className="gap-2"><Send className="h-4 w-4" />Save &amp; Send</Button>
-        <Button type="button" variant="ghost" onClick={handlePrintOnly} className="gap-2"><Printer className="h-4 w-4" />Print Only</Button>
       </div>
 
       <QuickAddItemDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={handleQuickAdded} />

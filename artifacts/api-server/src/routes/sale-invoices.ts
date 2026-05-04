@@ -108,7 +108,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
         invoiceId: invoice.id,
         mode: payment.mode,
         amount: String(payment.amount),
-        reference: payment.reference,
+        reference: payment.reference || "",
       });
     }
   }
@@ -144,15 +144,106 @@ router.get("/sale-invoices/:id", authMiddleware, async (req, res) => {
 router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const data = req.body;
+
+  // Update the invoice header
   const [invoice] = await db.update(saleInvoicesTable).set({
     date: data.date,
     partyId: data.partyId,
     partyName: data.partyName,
+    partyGstin: data.partyGstin,
+    billingAddress: data.billingAddress,
+    isGst: data.isGst,
+    isInterstate: data.isInterstate,
+    subtotal: String(data.subtotal || 0),
+    totalDiscount: String(data.totalDiscount || 0),
+    totalTaxable: String(data.totalTaxable || 0),
+    totalCgst: String(data.totalCgst || 0),
+    totalSgst: String(data.totalSgst || 0),
+    totalIgst: String(data.totalIgst || 0),
+    totalGst: String(data.totalGst || 0),
+    grandTotal: String(data.grandTotal || 0),
+    amountPaid: String(data.amountPaid || 0),
+    balanceDue: String(data.balanceDue || 0),
     notes: data.notes,
-    status: data.status,
+    status: data.amountPaid >= data.grandTotal ? "paid" : (data.amountPaid > 0 ? "partial" : "confirmed"),
   }).where(eq(saleInvoicesTable.id, Number(id))).returning();
+
   if (!invoice) return res.status(404).json({ error: "Not found" });
-  res.json(invoice);
+
+  // Reverse old stock deductions, then delete old items
+  if (data.items?.length) {
+    const oldItems = await db.select().from(saleInvoiceItemsTable)
+      .where(eq(saleInvoiceItemsTable.invoiceId, Number(id)));
+
+    for (const oldItem of oldItems) {
+      if (oldItem.stockItemId) {
+        const [si] = await db.select().from(stockItemsTable)
+          .where(eq(stockItemsTable.id, oldItem.stockItemId)).limit(1);
+        if (si) {
+          const restored = Number(si.physicalStock) + Number(oldItem.quantity);
+          await db.update(stockItemsTable)
+            .set({ physicalStock: String(restored) })
+            .where(eq(stockItemsTable.id, oldItem.stockItemId));
+        }
+      }
+    }
+
+    await db.delete(saleInvoiceItemsTable).where(eq(saleInvoiceItemsTable.invoiceId, Number(id)));
+
+    for (const item of data.items) {
+      await db.insert(saleInvoiceItemsTable).values({
+        invoiceId: invoice.id,
+        stockItemId: item.stockItemId,
+        itemName: item.itemName,
+        hsnCode: item.hsnCode,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        rate: String(item.rate),
+        discountPct: String(item.discountPct || 0),
+        gstPct: String(item.gstPct || 0),
+        taxableAmount: String(item.taxableAmount),
+        cgst: String(item.cgst || 0),
+        sgst: String(item.sgst || 0),
+        igst: String(item.igst || 0),
+        total: String(item.total),
+      });
+
+      if (item.stockItemId) {
+        const [si] = await db.select().from(stockItemsTable)
+          .where(eq(stockItemsTable.id, item.stockItemId)).limit(1);
+        if (si) {
+          const newStock = Number(si.physicalStock) - Number(item.quantity);
+          await db.update(stockItemsTable)
+            .set({ physicalStock: String(newStock) })
+            .where(eq(stockItemsTable.id, item.stockItemId));
+          await db.insert(stockTransactionsTable).values({
+            itemId: item.stockItemId,
+            type: "sale",
+            quantity: String(item.quantity),
+            balanceAfter: String(newStock),
+            reference: invoice.invoiceNumber,
+          });
+        }
+      }
+    }
+  }
+
+  // Replace payments
+  await db.delete(saleInvoicePaymentsTable)
+    .where(eq(saleInvoicePaymentsTable.invoiceId, Number(id)));
+
+  if (data.payments?.length) {
+    for (const payment of data.payments) {
+      await db.insert(saleInvoicePaymentsTable).values({
+        invoiceId: invoice.id,
+        mode: payment.mode,
+        amount: String(payment.amount),
+        reference: payment.reference || "",
+      });
+    }
+  }
+
+  res.json({ ...invoice, id: invoice.id });
 });
 
 router.delete("/sale-invoices/:id", authMiddleware, async (req, res) => {
