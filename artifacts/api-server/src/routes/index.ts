@@ -13,6 +13,7 @@ import reportsRouter from "./reports";
 import gstRouter from "./gst";
 import deliveryRouter from "./delivery";
 import usersRouter from "./users";
+import accountGroupsRouter from "./account-groups";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(reportsRouter);
 router.use(gstRouter);
 router.use(deliveryRouter);
 router.use(usersRouter);
+router.use(accountGroupsRouter);
 
 export default router;

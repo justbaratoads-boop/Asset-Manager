@@ -2,6 +2,16 @@ import { pgTable, serial, text, numeric, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const accountGroupsTable = pgTable("account_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  nature: text("nature").notNull().default("dr"),
+  parentGroup: text("parent_group").notNull().default("assets"),
+  isSystem: text("is_system").notNull().default("false"),
+  isDeleted: text("is_deleted").notNull().default("false"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const ledgersTable = pgTable("ledgers", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -16,3 +26,4 @@ export const ledgersTable = pgTable("ledgers", {
 export const insertLedgerSchema = createInsertSchema(ledgersTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertLedger = z.infer<typeof insertLedgerSchema>;
 export type Ledger = typeof ledgersTable.$inferSelect;
+export type AccountGroup = typeof accountGroupsTable.$inferSelect;
