@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { useCreateStockItem, useListStockCategories, getListStockItemsQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useParams } from "wouter";
+import { useCreateStockItem, useGetStockItem, useListStockCategories, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,11 +15,17 @@ import { useFetch } from "@/hooks/use-fetch";
 
 export default function ItemForm() {
   const [, setLocation] = useLocation();
+  const params = useParams<{ id: string }>();
+  const isEdit = !!params?.id;
+  const editId = isEdit ? Number(params.id) : undefined;
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateStockItem();
   const { data: categories = [] } = useListStockCategories({});
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
+  const { data: existing } = useGetStockItem(editId!, { query: { enabled: isEdit } });
+
   const [form, setForm] = useState({
     name: "", categoryId: "", batchId: "none", hsnCode: "", unit: "pcs",
     purchaseRate: "", saleRate: "", minStockLevel: "", physicalStock: "", barcode: "",
@@ -27,26 +33,57 @@ export default function ItemForm() {
   });
   const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
+  useEffect(() => {
+    if (!existing) return;
+    const e = existing as any;
+    setForm({
+      name: e.name || "",
+      categoryId: e.categoryId ? String(e.categoryId) : "",
+      batchId: e.batchId ? String(e.batchId) : "none",
+      hsnCode: e.hsnCode || "",
+      unit: e.unit || "pcs",
+      purchaseRate: String(e.purchaseRate || ""),
+      saleRate: String(e.saleRate || ""),
+      minStockLevel: String(e.minStockLevel || ""),
+      physicalStock: String(e.physicalStock || e.openingStock || ""),
+      barcode: e.barcode || "",
+      gstApplicable: e.gstApplicable === "true" || e.gstApplicable === true,
+      gstRate: String(e.gstRate || "18"),
+    });
+  }, [existing]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      name: form.name,
+      categoryId: form.categoryId ? Number(form.categoryId) : undefined,
+      batchId: form.batchId && form.batchId !== "none" ? Number(form.batchId) : undefined,
+      hsnCode: form.hsnCode,
+      unit: form.unit,
+      purchaseRate: Number(form.purchaseRate) || 0,
+      saleRate: Number(form.saleRate) || 0,
+      minStockLevel: Number(form.minStockLevel) || 0,
+      physicalStock: Number(form.physicalStock) || 0,
+      barcode: form.barcode,
+      gstApplicable: String(form.gstApplicable),
+      gstRate: Number(form.gstRate) || 0,
+    };
     try {
-      await createMutation.mutateAsync({
-        data: {
-          ...form,
-          categoryId: form.categoryId ? Number(form.categoryId) : undefined,
-          batchId: form.batchId && form.batchId !== "none" ? Number(form.batchId) : undefined,
-          purchaseRate: Number(form.purchaseRate) || 0,
-          saleRate: Number(form.saleRate) || 0,
-          minStockLevel: Number(form.minStockLevel) || 0,
-          physicalStock: Number(form.physicalStock) || 0,
-          gstRate: Number(form.gstRate) || 0,
-        } as any
-      });
+      if (isEdit) {
+        await customFetch(`/api/stock-items/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        toast({ title: "Item updated" });
+      } else {
+        await createMutation.mutateAsync({ data: payload as any });
+        toast({ title: "Item created" });
+      }
       queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey() });
-      toast({ title: "Item created" });
       setLocation("/inventory/items");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to create item";
+      const msg = err?.response?.data?.error || err.message || "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
@@ -55,7 +92,7 @@ export default function ItemForm() {
     <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
       <div className="flex items-center gap-3">
         <Link href="/inventory/items"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
-        <h1 className="text-xl font-bold">New Stock Item</h1>
+        <h1 className="text-xl font-bold">{isEdit ? "Edit Stock Item" : "New Stock Item"}</h1>
       </div>
       <Card>
         <CardHeader><CardTitle className="text-base">Item Details</CardTitle></CardHeader>
@@ -89,7 +126,7 @@ export default function ItemForm() {
             <Label>Unit</Label>
             <Select value={form.unit} onValueChange={v => set("unit", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["pcs","kg","g","ltr","ml","mtr","cm","box","pack","dozen","set"].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+              <SelectContent>{["pcs", "kg", "g", "ltr", "ml", "mtr", "cm", "box", "pack", "dozen", "set"].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
@@ -132,12 +169,14 @@ export default function ItemForm() {
             <Input type="number" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label>Opening Stock</Label>
+            <Label>{isEdit ? "Physical Stock" : "Opening Stock"}</Label>
             <Input type="number" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} />
           </div>
         </CardContent>
       </Card>
-      <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Create Item"}</Button>
+      <Button type="submit" disabled={createMutation.isPending}>
+        {createMutation.isPending ? "Saving..." : isEdit ? "Update Item" : "Create Item"}
+      </Button>
     </form>
   );
 }

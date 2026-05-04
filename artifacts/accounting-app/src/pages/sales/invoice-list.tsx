@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Printer, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Printer, Eye, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -85,6 +85,9 @@ export default function SaleInvoiceList() {
                   <TableCell>{statusBadge(inv.status)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Link href={`/sales/invoices/${inv.id}/edit`}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                      </Link>
                       <Link href={`/sales/invoices/${inv.id}`}>
                         <Button size="icon" variant="ghost" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
                       </Link>

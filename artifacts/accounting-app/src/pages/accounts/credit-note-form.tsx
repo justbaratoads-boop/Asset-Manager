@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useCreateCreditNote, useListParties, useListStockItems, getListCreditNotesQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useCreateCreditNote, useGetCreditNote, useListParties, useListStockItems, getListCreditNotesQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,11 +52,16 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
 
 export default function CreditNoteForm() {
   const [, setLocation] = useLocation();
+  const params = useParams<{ id: string }>();
+  const isEdit = !!(params?.id);
+  const editId = isEdit ? Number(params.id) : undefined;
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateCreditNote();
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
+  const { data: existing } = useGetCreditNote(editId!, { query: { enabled: isEdit } });
 
   const [partyId, setPartyId] = useState<number | undefined>();
   const [date, setDate] = useState(today());
@@ -64,6 +69,28 @@ export default function CreditNoteForm() {
   const [isInterstate, setIsInterstate] = useState(false);
   const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0 }, false)]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!existing || !isEdit) return;
+    const n = existing as any;
+    if (n.partyId) setPartyId(n.partyId);
+    if (n.date) setDate(n.date);
+    setReason(n.reason || "");
+    const interstate = n.isInterstate === "true" || n.isInterstate === true;
+    setIsInterstate(interstate);
+    if (n.items?.length) {
+      setItems(n.items.map((i: any) => calcItem({
+        stockItemId: i.stockItemId,
+        itemName: i.itemName,
+        hsnCode: i.hsnCode || "",
+        quantity: Number(i.quantity),
+        unit: i.unit,
+        rate: Number(i.rate),
+        discountPct: Number(i.discountPct) || 0,
+        gstPct: Number(i.gstPct) || 0,
+      }, interstate)));
+    }
+  }, [existing]);
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
 
@@ -100,27 +127,28 @@ export default function CreditNoteForm() {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    const payload = {
+      date, partyId, partyName: selectedParty?.name || "",
+      reason, amount: totals.grand, items,
+      totalTaxable: totals.taxable, totalCgst: totals.cgst,
+      totalSgst: totals.sgst, totalIgst: totals.igst, isInterstate,
+    };
     try {
-      await createMutation.mutateAsync({
-        data: {
-          date,
-          partyId,
-          partyName: selectedParty?.name || "",
-          reason,
-          amount: totals.grand,
-          items,
-          totalTaxable: totals.taxable,
-          totalCgst: totals.cgst,
-          totalSgst: totals.sgst,
-          totalIgst: totals.igst,
-          isInterstate,
-        } as any
-      });
+      if (isEdit) {
+        await customFetch(`/api/credit-notes/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        toast({ title: "Credit note updated" });
+      } else {
+        await createMutation.mutateAsync({ data: payload as any });
+        toast({ title: "Credit note created", description: "Stock has been updated (returned to inventory)" });
+      }
       queryClient.invalidateQueries({ queryKey: getListCreditNotesQueryKey() });
-      toast({ title: "Credit note created", description: "Stock has been updated (returned to inventory)" });
       setLocation("/accounts/credit-notes");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to create";
+      const msg = err?.response?.data?.error || err.message || "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
@@ -129,7 +157,7 @@ export default function CreditNoteForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center gap-3">
         <Link href="/accounts/credit-notes"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
-        <h1 className="text-xl font-bold">New Credit Note</h1>
+        <h1 className="text-xl font-bold">{isEdit ? "Edit Credit Note" : "New Credit Note"}</h1>
         <span className="text-sm text-muted-foreground">(Sale Return — stock increases)</span>
       </div>
 
@@ -207,7 +235,9 @@ export default function CreditNoteForm() {
       </div>
 
       <div className="pt-2 border-t">
-        <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save Credit Note"}</Button>
+        <Button type="submit" disabled={createMutation.isPending}>
+          {createMutation.isPending ? "Saving..." : isEdit ? "Update Credit Note" : "Save Credit Note"}
+        </Button>
       </div>
     </form>
   );

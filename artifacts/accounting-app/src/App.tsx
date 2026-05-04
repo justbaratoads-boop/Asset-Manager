@@ -121,6 +121,7 @@ function Router() {
       {/* Sales */}
       <PR path="/sales/invoices" component={SaleInvoiceList} />
       <PR path="/sales/invoices/new" component={SaleInvoiceForm} />
+      <PR path="/sales/invoices/:id/edit" component={SaleInvoiceForm} />
       <PR path="/sales/invoices/:id" component={SaleInvoiceView} />
       <PR path="/sales/orders" component={OrderList} />
       <PR path="/sales/orders/new" component={OrderForm} />
@@ -129,28 +130,37 @@ function Router() {
       {/* Purchase */}
       <PR path="/purchase/invoices" component={PurchaseInvoiceList} />
       <PR path="/purchase/invoices/new" component={PurchaseInvoiceForm} />
+      <PR path="/purchase/invoices/:id/edit" component={PurchaseInvoiceForm} />
       <PR path="/purchase/orders" component={PurchaseOrderList} />
       <PR path="/purchase/orders/new" component={PurchaseOrderForm} />
+      <PR path="/purchase/orders/:id/edit" component={PurchaseOrderForm} />
 
       {/* Accounts */}
       <PR path="/accounts/parties" component={PartiesList} />
       <PR path="/accounts/parties/new" component={PartyForm} />
+      <PR path="/accounts/parties/:id/edit" component={PartyForm} />
       <PR path="/accounts/parties/:id" component={PartyLedger} />
       <PR path="/accounts/ledgers" component={LedgersList} />
       <PR path="/accounts/journal" component={JournalList} />
       <PR path="/accounts/journal/new" component={JournalForm} />
+      <PR path="/accounts/journal/:id/edit" component={JournalForm} />
       <PR path="/accounts/payments" component={PaymentList} />
       <PR path="/accounts/payments/new" component={PaymentForm} />
+      <PR path="/accounts/payments/:id/edit" component={PaymentForm} />
       <PR path="/accounts/receipts" component={ReceiptList} />
       <PR path="/accounts/receipts/new" component={ReceiptForm} />
+      <PR path="/accounts/receipts/:id/edit" component={ReceiptForm} />
       <PR path="/accounts/credit-notes" component={CreditNotesList} />
       <PR path="/accounts/credit-notes/new" component={CreditNoteForm} />
+      <PR path="/accounts/credit-notes/:id/edit" component={CreditNoteForm} />
       <PR path="/accounts/debit-notes" component={DebitNotesList} />
       <PR path="/accounts/debit-notes/new" component={DebitNoteForm} />
+      <PR path="/accounts/debit-notes/:id/edit" component={DebitNoteForm} />
 
       {/* Inventory */}
       <PR path="/inventory/items" component={StockItemList} />
       <PR path="/inventory/items/new" component={ItemForm} />
+      <PR path="/inventory/items/:id/edit" component={ItemForm} />
       <PR path="/inventory/items/:id" component={ItemDetail} />
       <PR path="/inventory/categories" component={Categories} />
       <PR path="/inventory/current-stock" component={CurrentStock} />

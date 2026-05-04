@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { useCreateParty, getListPartiesQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useParams } from "wouter";
+import { useCreateParty, useGetParty, getListPartiesQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,17 +16,45 @@ const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 export default function PartyForm() {
   const [, setLocation] = useLocation();
+  const params = useParams<{ id: string }>();
+  const isEdit = !!params?.id;
+  const editId = isEdit ? Number(params.id) : undefined;
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateParty();
+  const { data: existing } = useGetParty(editId!, { query: { enabled: isEdit } });
+
   const [form, setForm] = useState({
     name: "", type: "customer",
     gstType: "unregistered", isOutOfState: false,
     address: "", city: "", state: "", pincode: "",
     gstin: "", pan: "", phone: "", email: "",
-    openingBalance: "", balanceType: "dr", creditLimit: ""
+    openingBalance: "", balanceType: "dr", creditLimit: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!existing) return;
+    const e = existing as any;
+    setForm({
+      name: e.name || "",
+      type: e.type || "customer",
+      gstType: e.gstType || "unregistered",
+      isOutOfState: e.isOutOfState === "true" || e.isOutOfState === true,
+      address: e.address || "",
+      city: e.city || "",
+      state: e.state || "",
+      pincode: e.pincode || "",
+      gstin: e.gstin || "",
+      pan: e.pan || "",
+      phone: e.phone || "",
+      email: e.email || "",
+      openingBalance: String(e.openingBalance || ""),
+      balanceType: e.balanceType || "dr",
+      creditLimit: e.creditLimit ? String(e.creditLimit) : "",
+    });
+  }, [existing]);
 
   const set = (k: string, v: string | boolean) => {
     setForm(prev => ({ ...prev, [k]: v }));
@@ -37,7 +65,7 @@ export default function PartyForm() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Party name is required";
     if (form.phone && !/^\d{10}$/.test(form.phone)) e.phone = "Phone must be exactly 10 digits";
-    if (form.gstin && !GSTIN_REGEX.test(form.gstin.toUpperCase())) e.gstin = "Invalid GSTIN format (e.g. 27AADCS0472N1Z1)";
+    if (form.gstin && !GSTIN_REGEX.test(form.gstin.toUpperCase())) e.gstin = "Invalid GSTIN format";
     if (form.gstType === "registered" && !form.gstin) e.gstin = "GSTIN is required for registered parties";
     return e;
   };
@@ -46,21 +74,29 @@ export default function PartyForm() {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    const payload = {
+      ...form,
+      gstin: form.gstin.toUpperCase() || undefined,
+      openingBalance: Number(form.openingBalance) || 0,
+      creditLimit: form.creditLimit ? Number(form.creditLimit) : undefined,
+      isOutOfState: form.isOutOfState,
+    };
     try {
-      await createMutation.mutateAsync({
-        data: {
-          ...form,
-          gstin: form.gstin.toUpperCase() || undefined,
-          openingBalance: Number(form.openingBalance) || 0,
-          creditLimit: form.creditLimit ? Number(form.creditLimit) : undefined,
-          isOutOfState: form.isOutOfState,
-        } as any
-      });
+      if (isEdit) {
+        await customFetch(`/api/parties/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        toast({ title: "Party updated" });
+      } else {
+        await createMutation.mutateAsync({ data: payload as any });
+        toast({ title: "Party created" });
+      }
       queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-      toast({ title: "Party created" });
       setLocation("/accounts/parties");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to create party";
+      const msg = err?.response?.data?.error || err.message || "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
@@ -69,7 +105,7 @@ export default function PartyForm() {
     <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
       <div className="flex items-center gap-3">
         <Link href="/accounts/parties"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
-        <h1 className="text-xl font-bold">New Party</h1>
+        <h1 className="text-xl font-bold">{isEdit ? "Edit Party" : "New Party"}</h1>
       </div>
 
       <Card>
@@ -133,10 +169,7 @@ export default function PartyForm() {
             <Input value={form.pan} onChange={e => set("pan", e.target.value.toUpperCase())} placeholder="AADCS0472N" />
           </div>
           <div className="flex items-center gap-3 pt-5">
-            <Switch
-              checked={form.isOutOfState}
-              onCheckedChange={v => set("isOutOfState", v)}
-            />
+            <Switch checked={form.isOutOfState} onCheckedChange={v => set("isOutOfState", v)} />
             <Label className="cursor-pointer">Out of State Party (IGST applies)</Label>
           </div>
         </CardContent>
@@ -192,7 +225,7 @@ export default function PartyForm() {
       </Card>
 
       <Button type="submit" disabled={createMutation.isPending}>
-        {createMutation.isPending ? "Saving..." : "Create Party"}
+        {createMutation.isPending ? "Saving..." : isEdit ? "Update Party" : "Create Party"}
       </Button>
     </form>
   );

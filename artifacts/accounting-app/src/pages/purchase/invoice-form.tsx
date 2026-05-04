@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useCreatePurchaseInvoice, useListParties, useListStockItems, useCreateStockItem, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, useCreateStockItem, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,11 +65,15 @@ function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose
 
 export default function PurchaseInvoiceForm() {
   const [, setLocation] = useLocation();
+  const params = useParams<{ id: string }>();
+  const isEdit = !!(params?.id);
+  const editId = isEdit ? Number(params.id) : undefined;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreatePurchaseInvoice();
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
+  const { data: existing } = useGetPurchaseInvoice(editId!, { query: { enabled: isEdit } });
   const [partyId, setPartyId] = useState<number | undefined>();
   const [date, setDate] = useState(today());
   const [supplierInvNumber, setSupplierInvNumber] = useState("");
@@ -79,6 +83,29 @@ export default function PurchaseInvoiceForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!existing || !isEdit) return;
+    const inv = existing as any;
+    if (inv.partyId) setPartyId(inv.partyId);
+    if (inv.date) setDate(inv.date);
+    setSupplierInvNumber(inv.supplierInvoiceNumber || "");
+    setPaymentAmount(inv.amountPaid || 0);
+    if (inv.payments?.length) setPaymentMode(inv.payments[0].mode || "cash");
+    const interstate = inv.isInterstate === "true" || inv.isInterstate === true;
+    if (inv.items?.length) {
+      setItems(inv.items.map((i: any) => calc({
+        stockItemId: i.stockItemId,
+        itemName: i.itemName,
+        hsnCode: i.hsnCode || "",
+        quantity: Number(i.quantity),
+        unit: i.unit,
+        rate: Number(i.rate),
+        discountPct: Number(i.discountPct) || 0,
+        gstPct: Number(i.gstPct) || 0,
+      }, interstate)));
+    }
+  }, [existing]);
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
   const isInterstate = selectedParty?.isOutOfState === "true" || selectedParty?.isOutOfState === true;
@@ -129,10 +156,16 @@ export default function PurchaseInvoiceForm() {
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     const party = (parties as any[]).find((p: any) => p.id === partyId);
+    const payload = { date, supplierInvoiceNumber: supplierInvNumber, partyId, partyName: party?.name || "", isGst: true, isInterstate, isReverseCharge: false, ...totals, totalCgst: totals.cgst, totalSgst: totals.sgst, totalIgst: totals.igst, subtotal: totals.grand, totalTaxable: totals.taxable, grandTotal: totals.grand, amountPaid: paymentAmount, balanceDue: totals.grand - paymentAmount, items, payments: paymentAmount > 0 ? [{ mode: paymentMode, amount: paymentAmount }] : [] };
     try {
-      await createMutation.mutateAsync({ data: { date, supplierInvoiceNumber: supplierInvNumber, partyId, partyName: party?.name || "", isGst: true, isInterstate, isReverseCharge: false, ...totals, totalCgst: totals.cgst, totalSgst: totals.sgst, totalIgst: totals.igst, subtotal: totals.grand, totalTaxable: totals.taxable, grandTotal: totals.grand, amountPaid: paymentAmount, balanceDue: totals.grand - paymentAmount, items, payments: paymentAmount > 0 ? [{ mode: paymentMode, amount: paymentAmount }] : [] } as any });
+      if (isEdit) {
+        await customFetch(`/api/purchase-invoices/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        toast({ title: "Purchase invoice updated" });
+      } else {
+        await createMutation.mutateAsync({ data: payload as any });
+        toast({ title: "Purchase invoice created" });
+      }
       queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
-      toast({ title: "Purchase invoice created" });
       setLocation("/purchase/invoices");
     } catch (err: any) {
       const msg = err?.response?.data?.error || err.message || "Failed to save";
@@ -144,7 +177,7 @@ export default function PurchaseInvoiceForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center gap-3">
         <Link href="/purchase/invoices"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
-        <h1 className="text-xl font-bold">New Purchase Invoice</h1>
+        <h1 className="text-xl font-bold">{isEdit ? "Edit Purchase Invoice" : "New Purchase Invoice"}</h1>
       </div>
       <Card>
         <CardContent className="p-4 space-y-4">
@@ -225,7 +258,7 @@ export default function PurchaseInvoiceForm() {
           </div>
         </CardContent>
       </Card>
-      <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save Invoice"}</Button>
+      <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : isEdit ? "Update Invoice" : "Save Invoice"}</Button>
       <QuickAddItemDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={handleQuickAdded} />
     </form>
   );

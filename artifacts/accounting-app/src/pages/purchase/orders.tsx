@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Trash2, CheckCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, CheckCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -73,6 +73,7 @@ export default function PurchaseOrderList() {
                   <TableCell><Badge variant="outline" className={`capitalize ${o.status === "open" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>{o.status}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Link href={`/purchase/orders/${o.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
                       {o.status === "open" && <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" title="Receive Goods" onClick={() => handleReceive(o.id)}><CheckCircle className="h-3.5 w-3.5" /></Button>}
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(o.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>

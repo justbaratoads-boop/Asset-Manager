@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Eye, Trash2, FileText } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -78,7 +78,7 @@ export default function OrderList() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Link href={`/sales/orders/${order.id}`}>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" title="View / Edit"><Eye className="h-3.5 w-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
                       </Link>
                       {order.status === "pending" && (
                         <Button

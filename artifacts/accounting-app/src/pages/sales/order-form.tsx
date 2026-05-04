@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useCreateOrder, useListParties, useListStockItems, useCreateStockItem, getListOrdersQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useCreateOrder, useGetOrder, useListParties, useListStockItems, useCreateStockItem, getListOrdersQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,10 +35,8 @@ function calcItem(item: Partial<OrderItem>): OrderItem {
   const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const gstPct = Number(item.gstPct) || 0;
-  const subtotal = qty * rate;
-  const discount = subtotal * (discPct / 100);
-  const taxable = subtotal - discount;
-  const gstAmount = taxable * (gstPct / 100);
+  const taxable = qty * rate * (1 - discPct / 100);
+  const gst = taxable * (gstPct / 100);
   return {
     stockItemId: item.stockItemId,
     itemName: item.itemName || "",
@@ -46,8 +44,8 @@ function calcItem(item: Partial<OrderItem>): OrderItem {
     quantity: qty, unit: item.unit || "pcs", rate,
     discountPct: discPct, gstPct,
     taxableAmount: taxable,
-    cgst: gstAmount / 2, sgst: gstAmount / 2, igst: 0,
-    total: taxable + gstAmount,
+    cgst: gst / 2, sgst: gst / 2, igst: 0,
+    total: taxable + gst,
   };
 }
 
@@ -93,11 +91,16 @@ function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose
 
 export default function OrderForm() {
   const [, setLocation] = useLocation();
+  const params = useParams<{ id: string }>();
+  const isEdit = !!(params?.id);
+  const editId = isEdit ? Number(params.id) : undefined;
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateOrder();
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
+  const { data: existing } = useGetOrder(editId!, { query: { enabled: isEdit } });
 
   const [partyId, setPartyId] = useState<number | undefined>();
   const [partyName, setPartyName] = useState("");
@@ -114,6 +117,34 @@ export default function OrderForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!existing || !isEdit) return;
+    const o = existing as any;
+    if (o.partyId) setPartyId(o.partyId);
+    setPartyName(o.partyName || "");
+    setPartyPhone(o.partyPhone || "");
+    setDeliveryAddress(o.deliveryAddress || "");
+    if (o.date) setDate(o.date);
+    setDeliveryDate(o.deliveryDate || "");
+    setNotes(o.notes || "");
+    setDriverName(o.driverName || "");
+    setVehicleName(o.vehicleName || "");
+    setVehicleNo(o.vehicleNo || "");
+    setDispatchNotes(o.dispatchNotes || "");
+    if (o.items?.length) {
+      setItems(o.items.map((i: any) => calcItem({
+        stockItemId: i.stockItemId,
+        itemName: i.itemName,
+        hsnCode: i.hsnCode || "",
+        quantity: Number(i.quantity),
+        unit: i.unit,
+        rate: Number(i.rate),
+        discountPct: Number(i.discountPct) || 0,
+        gstPct: Number(i.gstPct) || 0,
+      })));
+    }
+  }, [existing]);
 
   const grandTotal = items.reduce((s, i) => s + i.total, 0);
 
@@ -159,13 +190,23 @@ export default function OrderForm() {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    const payload = { date, partyId, partyName, partyPhone, deliveryAddress, notes, driverName, vehicleName, vehicleNo, dispatchNotes, deliveryDate: deliveryDate || undefined, grandTotal, items };
     try {
-      await createMutation.mutateAsync({ data: { date, partyId, partyName, partyPhone, deliveryAddress, notes, driverName, vehicleName, vehicleNo, dispatchNotes, deliveryDate: deliveryDate || undefined, grandTotal, items } as any });
+      if (isEdit) {
+        await customFetch(`/api/orders/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        toast({ title: "Order updated" });
+      } else {
+        await createMutation.mutateAsync({ data: payload as any });
+        toast({ title: "Order created" });
+      }
       queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
-      toast({ title: "Order created" });
       setLocation("/sales/orders");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to create order";
+      const msg = err?.response?.data?.error || err.message || "Failed to save order";
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
@@ -175,9 +216,11 @@ export default function OrderForm() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/sales/orders"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
-          <h1 className="text-xl font-bold">New Order</h1>
+          <h1 className="text-xl font-bold">{isEdit ? "Edit Order" : "New Order"}</h1>
         </div>
-        <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save Order"}</Button>
+        <Button type="submit" disabled={createMutation.isPending}>
+          {createMutation.isPending ? "Saving..." : isEdit ? "Update Order" : "Save Order"}
+        </Button>
       </div>
 
       <Card>
@@ -185,7 +228,7 @@ export default function OrderForm() {
         <CardContent className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label>Party *</Label>
-            <Select onValueChange={selectParty}>
+            <Select value={partyId ? String(partyId) : ""} onValueChange={selectParty}>
               <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select party" /></SelectTrigger>
               <SelectContent>{(parties as any[]).filter((p: any) => p.type === "customer" || p.type === "both").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
             </Select>

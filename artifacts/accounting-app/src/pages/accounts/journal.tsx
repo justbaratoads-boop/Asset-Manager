@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -47,7 +47,12 @@ export default function JournalList() {
                       <TableCell className="text-sm">{j.narration}</TableCell>
                       <TableCell className="text-right">{formatCurrency(j.totalDebit)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(j.totalCredit)}</TableCell>
-                      <TableCell><Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(j.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Link href={`/accounts/journal/${j.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(j.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
             </TableBody>

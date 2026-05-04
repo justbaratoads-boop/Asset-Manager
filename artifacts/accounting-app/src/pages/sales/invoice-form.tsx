@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useCreateSaleInvoice, useListParties, useListStockItems, useCreateStockItem, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
+import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, useCreateStockItem, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,11 +113,15 @@ function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose
 
 export default function SaleInvoiceForm() {
   const [, setLocation] = useLocation();
+  const params = useParams<{ id: string }>();
+  const isEdit = !!(params?.id);
+  const editId = isEdit ? Number(params.id) : undefined;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateSaleInvoice();
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
+  const { data: existing } = useGetSaleInvoice(editId!, { query: { enabled: isEdit } });
 
   const fromOrderId = new URLSearchParams(window.location.search).get("fromOrder");
 
@@ -142,6 +146,29 @@ export default function SaleInvoiceForm() {
       setItems(prev => prev.map(item => calcItem(item, interstate)));
     }
   }, [partyId]);
+
+  useEffect(() => {
+    if (!existing || !isEdit) return;
+    const inv = existing as any;
+    if (inv.partyId) setPartyId(inv.partyId);
+    if (inv.date) setDate(inv.date);
+    const interstate = inv.isInterstate === "true" || inv.isInterstate === true;
+    setIsInterstate(interstate);
+    setNotes(inv.notes || "");
+    setPaymentMode(inv.amountPaid > 0 && inv.balanceDue <= 0 ? "cash" : "credit");
+    if (inv.items?.length) {
+      setItems(inv.items.map((i: any) => calcItem({
+        stockItemId: i.stockItemId,
+        itemName: i.itemName,
+        hsnCode: i.hsnCode || "",
+        quantity: Number(i.quantity),
+        unit: i.unit,
+        rate: Number(i.rate),
+        discountPct: Number(i.discountPct) || 0,
+        gstPct: Number(i.gstPct) || 0,
+      }, interstate)));
+    }
+  }, [existing]);
 
   useEffect(() => {
     if (!fromOrderId) return;
@@ -251,13 +278,23 @@ export default function SaleInvoiceForm() {
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setIsSaving(true);
     try {
-      const inv = await createMutation.mutateAsync({ data: buildPayload() as any });
+      let inv: any;
+      if (isEdit) {
+        inv = await customFetch(`/api/sale-invoices/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildPayload()),
+        });
+        toast({ title: "Invoice updated successfully" });
+      } else {
+        inv = await createMutation.mutateAsync({ data: buildPayload() as any });
+        toast({ title: "Invoice created successfully" });
+      }
       queryClient.invalidateQueries({ queryKey: getListSaleInvoicesQueryKey() });
-      toast({ title: "Invoice created successfully" });
       if (then) then(inv);
       else setLocation("/sales/invoices");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to create invoice";
+      const msg = err?.response?.data?.error || err.message || "Failed to save invoice";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally { setIsSaving(false); }
   };
@@ -271,7 +308,7 @@ export default function SaleInvoiceForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center gap-3">
         <Link href="/sales/invoices"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
-        <h1 className="text-xl font-bold">{fromOrderId ? "New Invoice (from Order)" : "New Sale Invoice"}</h1>
+        <h1 className="text-xl font-bold">{isEdit ? "Edit Sale Invoice" : fromOrderId ? "New Invoice (from Order)" : "New Sale Invoice"}</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

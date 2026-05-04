@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,7 +44,12 @@ export default function ReceiptList() {
                       <TableCell>{r.partyName || "-"}</TableCell>
                       <TableCell className="capitalize text-sm">{r.paymentMode?.replace("_", " ")}</TableCell>
                       <TableCell className="text-right font-medium text-green-600">{formatCurrency(r.amount)}</TableCell>
-                      <TableCell><Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Link href={`/accounts/receipts/${r.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
             </TableBody>
