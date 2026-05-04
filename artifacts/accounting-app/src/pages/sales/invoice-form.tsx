@@ -353,7 +353,62 @@ export default function SaleInvoiceForm() {
             )}
 
             {errors.items && <p className="text-xs text-destructive">{errors.items}</p>}
-            <div className="overflow-x-auto">
+
+            {/* Mobile card layout */}
+            <div className="md:hidden space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="border rounded-lg p-3 space-y-3 bg-card shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-muted-foreground">Item {index + 1}</span>
+                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0" onClick={() => setItems(prev => prev.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Select onValueChange={v => selectStockItem(index, v)}>
+                      <SelectTrigger className="h-10 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
+                      <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Button type="button" size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Quick add" onClick={() => { setQuickAddForIndex(index); setQuickAddOpen(true); }}><Plus className="h-4 w-4" /></Button>
+                  </div>
+                  {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(index, "itemName", e.target.value)} />}
+                  {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Qty *</Label>
+                      <Input className="h-10 text-base" type="number" inputMode="decimal" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Unit</Label>
+                      <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Rate *</Label>
+                      <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="0.00" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Disc%</Label>
+                      <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">GST%</Label>
+                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(index, "gstPct", v)}>
+                        <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Total</Label>
+                      <div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0 }, isInterstate)])}>
+                <Plus className="h-4 w-4 mr-2" />Add Item
+              </Button>
+            </div>
+
+            {/* Desktop table layout */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

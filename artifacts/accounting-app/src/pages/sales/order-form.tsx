@@ -245,54 +245,112 @@ export default function OrderForm() {
         <CardHeader><CardTitle className="text-base">Items</CardTitle></CardHeader>
         <CardContent>
           {errors.items && <p className="text-xs text-destructive mb-2">{errors.items}</p>}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[200px]">Item</TableHead>
-                <TableHead className="w-24">Qty</TableHead>
-                <TableHead className="w-20">Unit</TableHead>
-                <TableHead className="w-28">Rate</TableHead>
-                <TableHead className="w-20">Disc%</TableHead>
-                <TableHead className="w-24">GST%</TableHead>
-                <TableHead className="w-28 text-right">Total</TableHead>
-                <TableHead className="w-8"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <div className="flex gap-1 items-center">
-                      <Select onValueChange={v => selectStock(i, v)}>
-                        <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
-                        <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" title="Quick add item" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}>
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
-                    {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
-                  </TableCell>
-                  <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                  <TableCell><Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} /></TableCell>
-                  <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
-                  <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>
-                  <TableCell>
+
+          {/* Mobile card layout */}
+          <div className="md:hidden space-y-3">
+            {items.map((item, i) => (
+              <div key={i} className="border rounded-lg p-3 space-y-3 bg-card shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-muted-foreground">Item {i + 1}</span>
+                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+                <div className="flex gap-2">
+                  <Select onValueChange={v => selectStock(i, v)}>
+                    <SelectTrigger className="h-10 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
+                    <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Button type="button" size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Quick add" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}><Plus className="h-4 w-4" /></Button>
+                </div>
+                {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
+                {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Qty</Label>
+                    <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Unit</Label>
+                    <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Rate</Label>
+                    <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Disc%</Label>
+                    <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} placeholder="0" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">GST%</Label>
                     <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
                     </Select>
-                  </TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>
-                  <TableCell><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Total</Label>
+                    <div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="flex items-center justify-between">
+              <Button type="button" variant="outline" className="h-10 flex-1" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+            </div>
+            <div className="font-bold text-right text-base pt-1">Total: {formatCurrency(grandTotal)}</div>
+          </div>
+
+          {/* Desktop table layout */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[200px]">Item</TableHead>
+                  <TableHead className="w-24">Qty</TableHead>
+                  <TableHead className="w-20">Unit</TableHead>
+                  <TableHead className="w-28">Rate</TableHead>
+                  <TableHead className="w-20">Disc%</TableHead>
+                  <TableHead className="w-24">GST%</TableHead>
+                  <TableHead className="w-28 text-right">Total</TableHead>
+                  <TableHead className="w-8"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="flex items-center justify-between mt-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
-            <div className="font-bold">Total: {formatCurrency(grandTotal)}</div>
+              </TableHeader>
+              <TableBody>
+                {items.map((item, i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <div className="flex gap-1 items-center">
+                        <Select onValueChange={v => selectStock(i, v)}>
+                          <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
+                          <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" title="Quick add item" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}>
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
+                      {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
+                    </TableCell>
+                    <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
+                    <TableCell><Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} /></TableCell>
+                    <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
+                    <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>
+                    <TableCell>
+                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>
+                    <TableCell><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="flex items-center justify-between mt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+              <div className="font-bold">Total: {formatCurrency(grandTotal)}</div>
+            </div>
           </div>
         </CardContent>
       </Card>
