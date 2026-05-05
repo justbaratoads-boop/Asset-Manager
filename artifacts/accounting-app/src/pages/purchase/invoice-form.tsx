@@ -14,7 +14,23 @@ import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-interface Item { stockItemId?: number; itemName: string; hsnCode: string; quantity: number; unit: string; rate: number; discountPct: number; gstPct: number; gstLocked: boolean; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number; }
+interface Item {
+  stockItemId?: number;
+  itemName: string;
+  hsnCode: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  discountPct: number;
+  gstPct: number;
+  gstLocked: boolean;
+  gstInclusive: boolean;
+  taxableAmount: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total: number;
+}
 
 const PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
@@ -23,13 +39,29 @@ const PAYMENT_MODES = [
   { value: "cheque", label: "Cheque" },
 ];
 
-function calc(item: Partial<Item>, isInterstate: boolean, gstInclusive = false): Item {
+function calc(item: Partial<Item>, isInterstate: boolean): Item {
   const qty = Number(item.quantity) || 0; const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0; const gstPct = Number(item.gstPct) || 0;
+  const gstInclusive = item.gstInclusive ?? false;
   const grossAmount = qty * rate * (1 - discPct / 100);
   const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
   const gst = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
-  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, gstLocked: item.gstLocked ?? false, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId };
+  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId };
+}
+
+function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex rounded overflow-hidden border text-xs font-medium">
+      <button type="button" onClick={() => onChange(false)}
+        className={`px-1.5 py-0.5 transition-colors ${!value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        Ex
+      </button>
+      <button type="button" onClick={() => onChange(true)}
+        className={`px-1.5 py-0.5 border-l transition-colors ${value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        In
+      </button>
+    </div>
+  );
 }
 
 function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (item: any) => void }) {
@@ -88,14 +120,12 @@ export default function PurchaseInvoiceForm() {
   const [date, setDate] = useState(today());
   const [supplierInvNumber, setSupplierInvNumber] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<Item[]>([calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 }, false)]);
+  const [items, setItems] = useState<Item[]>([calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false }, false)]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
-  const [gstInclusive, setGstInclusive] = useState(false);
 
-  // Payment entry
   const [payType, setPayType] = useState<"none" | "partial" | "full">("none");
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("cash");
@@ -140,24 +170,20 @@ export default function PurchaseInvoiceForm() {
         stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId,
+        gstLocked: !!i.stockItemId, gstInclusive: false,
       }, interstate)));
     }
   }, [existing]);
 
-  useEffect(() => {
-    setItems(prev => prev.map(item => calc(item, isInterstate, gstInclusive)));
-  }, [gstInclusive]);
-
   const updateItem = (index: number, field: keyof Item, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], [field]: value }, isInterstate, gstInclusive); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], [field]: value }, isInterstate); return u; });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate, gstInclusive); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate); return u; });
     }
   };
 
@@ -165,7 +191,7 @@ export default function PurchaseInvoiceForm() {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
       const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate, gstInclusive); return u; });
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate); return u; });
     }
   };
 
@@ -234,7 +260,6 @@ export default function PurchaseInvoiceForm() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
-        {/* Left: Invoice details */}
         <div className="space-y-4">
           <Card>
             <CardContent className="p-4 space-y-4">
@@ -250,27 +275,13 @@ export default function PurchaseInvoiceForm() {
                 <div className="space-y-1"><Label>Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} className={errors.date ? "border-destructive" : ""} /></div>
                 <div className="space-y-1"><Label>Supplier Invoice#</Label><Input value={supplierInvNumber} onChange={e => setSupplierInvNumber(e.target.value)} placeholder="Supplier's invoice number" /></div>
               </div>
-
-              {isInterstate && (
-                <div className="text-xs text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded">Interstate supplier — IGST will apply</div>
-              )}
+              {isInterstate && <div className="text-xs text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded">Interstate supplier — IGST will apply</div>}
             </CardContent>
           </Card>
 
-          {/* Items card */}
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Items</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {/* GST Inclusive / Exclusive toggle */}
-              <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/40 rounded-lg">
-                <span className="text-sm font-medium">GST Type:</span>
-                <div className="flex gap-1.5">
-                  <button type="button" onClick={() => setGstInclusive(false)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${!gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Exclusive</button>
-                  <button type="button" onClick={() => setGstInclusive(true)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Inclusive</button>
-                </div>
-                <span className="text-xs text-muted-foreground">{gstInclusive ? "Entered price already includes GST" : "GST will be added on top of price"}</span>
-              </div>
-
               {errors.items && <p className="text-xs text-destructive">{errors.items}</p>}
 
               {/* Mobile card layout */}
@@ -295,12 +306,26 @@ export default function PurchaseInvoiceForm() {
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>{item.stockItemId ? (<div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />)}</div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Rate *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Disc%</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></div>
+                      {/* Per-item GST Type toggle */}
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-xs text-muted-foreground">GST Type</Label>
+                        <div className="flex rounded-md overflow-hidden border text-sm font-medium h-10">
+                          <button type="button" onClick={() => updateItem(i, "gstInclusive", false)}
+                            className={`flex-1 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                            Exclusive
+                          </button>
+                          <button type="button" onClick={() => updateItem(i, "gstInclusive", true)}
+                            className={`flex-1 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                            Inclusive
+                          </button>
+                        </div>
+                      </div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">GST%</Label>{item.gstLocked ? (<div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>) : (<Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select>)}</div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div></div>
                     </div>
                   </div>
                 ))}
-                <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 }, isInterstate)])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+                <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false }, isInterstate)])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
               </div>
 
               {/* Desktop table layout */}
@@ -313,7 +338,7 @@ export default function PurchaseInvoiceForm() {
                       <TableHead className="w-20">Unit</TableHead>
                       <TableHead className="w-28">Rate *</TableHead>
                       <TableHead className="w-20">Disc%</TableHead>
-                      <TableHead className="w-24">GST%</TableHead>
+                      <TableHead className="w-32">GST Type / %</TableHead>
                       <TableHead className="w-28 text-right">Taxable</TableHead>
                       <TableHead className="w-28 text-right">Total</TableHead>
                       <TableHead className="w-8"></TableHead>
@@ -337,7 +362,17 @@ export default function PurchaseInvoiceForm() {
                         <TableCell>{item.stockItemId ? (<div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />)}</TableCell>
                         <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                         <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>
-                        <TableCell>{item.gstLocked ? (<div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>) : (<Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select>)}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex rounded overflow-hidden border text-xs font-medium">
+                              <button type="button" onClick={() => updateItem(i, "gstInclusive", false)}
+                                className={`flex-1 px-1 py-0.5 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>Ex</button>
+                              <button type="button" onClick={() => updateItem(i, "gstInclusive", true)}
+                                className={`flex-1 px-1 py-0.5 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>In</button>
+                            </div>
+                            {item.gstLocked ? (<div className="h-8 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>) : (<Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select>)}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right text-sm">{formatCurrency(item.taxableAmount)}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
                         <TableCell><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></TableCell>
@@ -345,7 +380,7 @@ export default function PurchaseInvoiceForm() {
                     ))}
                   </TableBody>
                 </Table>
-                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 }, isInterstate)])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false }, isInterstate)])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
               </div>
             </CardContent>
           </Card>
@@ -359,7 +394,6 @@ export default function PurchaseInvoiceForm() {
 
         {/* Right: Totals + Payment */}
         <div className="space-y-4">
-          {/* Totals */}
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Totals</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
@@ -375,11 +409,9 @@ export default function PurchaseInvoiceForm() {
             </CardContent>
           </Card>
 
-          {/* Payment Entry */}
           <Card className="border-primary/20">
             <CardHeader className="pb-2"><CardTitle className="text-sm text-primary">Payment Entry</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {/* None / Partial / Full tabs */}
               <div className="grid grid-cols-3 gap-1 bg-muted/50 p-1 rounded-lg">
                 {(["none", "partial", "full"] as const).map(t => (
                   <button key={t} type="button"
@@ -408,7 +440,6 @@ export default function PurchaseInvoiceForm() {
                     </div>
                     {errors.payment && <p className="text-xs text-destructive">{errors.payment}</p>}
                   </div>
-
                   <div className="space-y-1">
                     <Label className="text-xs">Payment Mode</Label>
                     <Select value={payMethod} onValueChange={setPayMethod}>
@@ -416,7 +447,6 @@ export default function PurchaseInvoiceForm() {
                       <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
-
                   <div className="space-y-1">
                     <Label className="text-xs">Reference / Cheque No. (optional)</Label>
                     <Input className="h-9 text-sm" placeholder="e.g. UTR, Cheque no." value={payRef} onChange={e => setPayRef(e.target.value)} />

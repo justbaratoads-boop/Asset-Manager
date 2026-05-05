@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +22,7 @@ interface POItem {
   discountPct: number;
   gstPct: number;
   gstLocked: boolean;
+  gstInclusive: boolean;
   taxableAmount: number;
   cgst: number;
   sgst: number;
@@ -30,11 +30,12 @@ interface POItem {
   total: number;
 }
 
-function calcItem(item: Partial<POItem>, gstInclusive = false): POItem {
+function calcItem(item: Partial<POItem>): POItem {
   const qty = Number(item.quantity) || 0;
   const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const gstPct = Number(item.gstPct) || 0;
+  const gstInclusive = item.gstInclusive ?? false;
   const grossAmount = qty * rate * (1 - discPct / 100);
   const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
   const gst = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
@@ -45,6 +46,7 @@ function calcItem(item: Partial<POItem>, gstInclusive = false): POItem {
     quantity: qty, unit: item.unit || "pcs", rate,
     discountPct: discPct, gstPct,
     gstLocked: item.gstLocked ?? false,
+    gstInclusive,
     taxableAmount: taxable,
     cgst: gst / 2, sgst: gst / 2, igst: 0,
     total: taxable + gst,
@@ -69,9 +71,8 @@ export default function PurchaseOrderForm() {
   const [date, setDate] = useState(today());
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<POItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })]);
+  const [items, setItems] = useState<POItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [gstInclusive, setGstInclusive] = useState(false);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
@@ -83,22 +84,13 @@ export default function PurchaseOrderForm() {
     setNotes(o.notes || "");
     if (o.items?.length) {
       setItems(o.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId,
-        itemName: i.itemName,
-        hsnCode: i.hsnCode || "",
-        quantity: Number(i.quantity),
-        unit: i.unit,
-        rate: Number(i.rate),
-        discountPct: Number(i.discountPct) || 0,
-        gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId,
+        stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+        quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
+        discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
+        gstLocked: !!i.stockItemId, gstInclusive: false,
       })));
     }
   }, [existing]);
-
-  useEffect(() => {
-    setItems(prev => prev.map(item => calcItem(item, gstInclusive)));
-  }, [gstInclusive]);
 
   const grandTotal = items.reduce((s, i) => s + i.total, 0);
 
@@ -108,14 +100,14 @@ export default function PurchaseOrderForm() {
   };
 
   const updateItem = (index: number, field: keyof POItem, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }, gstInclusive); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }); return u; });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, gstInclusive); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }); return u; });
     }
   };
 
@@ -135,11 +127,7 @@ export default function PurchaseOrderForm() {
     const payload = { date, partyId, partyName, notes, deliveryDate: deliveryDate || undefined, grandTotal, items };
     try {
       if (isEdit) {
-        await customFetch(`/api/purchase-orders/${editId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await customFetch(`/api/purchase-orders/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         toast({ title: "Purchase order updated" });
       } else {
         await createMutation.mutateAsync({ data: payload as any });
@@ -176,34 +164,15 @@ export default function PurchaseOrderForm() {
             </Select>
             {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
           </div>
-          <div className="space-y-1">
-            <Label>PO Date *</Label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Expected Delivery Date</Label>
-            <Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Notes</Label>
-            <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes" />
-          </div>
+          <div className="space-y-1"><Label>PO Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Expected Delivery Date</Label><Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Notes</Label><Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes" /></div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Items</CardTitle></CardHeader>
         <CardContent>
-          {/* GST Inclusive / Exclusive toggle */}
-          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/40 rounded-lg mb-2">
-            <span className="text-sm font-medium">GST Type:</span>
-            <div className="flex gap-1.5">
-              <button type="button" onClick={() => setGstInclusive(false)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${!gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Exclusive</button>
-              <button type="button" onClick={() => setGstInclusive(true)} className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${gstInclusive ? "bg-primary text-primary-foreground" : "bg-background border"}`}>Inclusive</button>
-            </div>
-            <span className="text-xs text-muted-foreground">{gstInclusive ? "Entered price already includes GST" : "GST will be added on top of price"}</span>
-          </div>
-
           {errors.items && <p className="text-xs text-destructive mb-2">{errors.items}</p>}
 
           {/* Mobile card layout */}
@@ -221,28 +190,31 @@ export default function PurchaseOrderForm() {
                 {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
                 {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Qty</Label>
-                    <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Unit</Label>
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
                     {item.stockItemId ? (
                       <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                     ) : (
                       <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
                     )}
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Rate</Label>
-                    <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} placeholder="0.00" />
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Rate</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} placeholder="0.00" /></div>
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Disc%</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} placeholder="0" /></div>
+                  {/* Per-item GST Type toggle */}
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs text-muted-foreground">GST Type</Label>
+                    <div className="flex rounded-md overflow-hidden border text-sm font-medium h-10">
+                      <button type="button" onClick={() => updateItem(i, "gstInclusive", false)}
+                        className={`flex-1 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                        Exclusive
+                      </button>
+                      <button type="button" onClick={() => updateItem(i, "gstInclusive", true)}
+                        className={`flex-1 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                        Inclusive
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Disc%</Label>
-                    <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">GST%</Label>
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">GST%</Label>
                     {item.gstLocked ? (
                       <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
                     ) : (
@@ -252,14 +224,11 @@ export default function PurchaseOrderForm() {
                       </Select>
                     )}
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Total</Label>
-                    <div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div>
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div></div>
                 </div>
               </div>
             ))}
-            <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+            <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
             <div className="font-bold text-right text-base">Total: {formatCurrency(grandTotal)}</div>
           </div>
 
@@ -273,7 +242,7 @@ export default function PurchaseOrderForm() {
                   <TableHead>Unit</TableHead>
                   <TableHead>Rate</TableHead>
                   <TableHead>Disc%</TableHead>
-                  <TableHead>GST%</TableHead>
+                  <TableHead className="w-32">GST Type / %</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -297,14 +266,24 @@ export default function PurchaseOrderForm() {
                     )}</TableCell>
                     <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                     <TableCell><Input className="h-7 text-xs" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>
-                    <TableCell>{item.gstLocked ? (
-                      <div className="h-7 flex items-center gap-1 px-2 bg-muted rounded border text-xs text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
-                    ) : (
-                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
-                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex rounded overflow-hidden border text-xs font-medium">
+                          <button type="button" onClick={() => updateItem(i, "gstInclusive", false)}
+                            className={`flex-1 px-1 py-0.5 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>Ex</button>
+                          <button type="button" onClick={() => updateItem(i, "gstInclusive", true)}
+                            className={`flex-1 px-1 py-0.5 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>In</button>
+                        </div>
+                        {item.gstLocked ? (
+                          <div className="h-7 flex items-center gap-1 px-2 bg-muted rounded border text-xs text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
+                        ) : (
+                          <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>
                     <TableCell><Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                   </TableRow>
@@ -312,7 +291,7 @@ export default function PurchaseOrderForm() {
               </TableBody>
             </Table>
             <div className="flex items-center justify-between mt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
               <div className="font-bold">Total: {formatCurrency(grandTotal)}</div>
             </div>
           </div>
