@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, Calendar, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,12 +19,17 @@ const statusStyles: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
+const STATUSES = ["all", "confirmed", "partial", "paid", "cancelled"];
+
 function StatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className={`capitalize text-xs ${statusStyles[status] || ""}`}>{status}</Badge>;
 }
 
 export default function SaleInvoiceList() {
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { data: invoices = [], isLoading } = useListSaleInvoices({ search: search || undefined });
   const deleteMutation = useDeleteSaleInvoice();
@@ -39,7 +44,15 @@ export default function SaleInvoiceList() {
     setDeleteId(null);
   };
 
-  const list = invoices as any[];
+  const hasFilters = dateFrom || dateTo || statusFilter !== "all";
+  const clearFilters = () => { setDateFrom(""); setDateTo(""); setStatusFilter("all"); };
+
+  const list = (invoices as any[]).filter(inv => {
+    if (dateFrom && inv.date < dateFrom) return false;
+    if (dateTo && inv.date > dateTo) return false;
+    if (statusFilter !== "all" && inv.status !== statusFilter) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -53,9 +66,37 @@ export default function SaleInvoiceList() {
         </Link>
       </div>
 
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input className="pl-9" placeholder="Search by party name..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 bg-muted/50 border rounded-lg px-3 py-1.5">
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground">From</span>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="text-xs bg-transparent outline-none w-32 cursor-pointer" />
+        </div>
+        <div className="flex items-center gap-1.5 bg-muted/50 border rounded-lg px-3 py-1.5">
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground">To</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="text-xs bg-transparent outline-none w-32 cursor-pointer" />
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {STATUSES.map(s => (
+            <button key={s} type="button" onClick={() => setStatusFilter(s)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors ${statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/60"}`}>
+              {s === "all" ? "All Status" : s}
+            </button>
+          ))}
+        </div>
+        {hasFilters && (
+          <button type="button" onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">
+            <X className="h-3.5 w-3.5" />Clear
+          </button>
+        )}
       </div>
 
       {/* Mobile card list */}

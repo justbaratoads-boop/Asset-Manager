@@ -4,15 +4,32 @@ import { useListPurchaseInvoices, useDeletePurchaseInvoice, getListPurchaseInvoi
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Calendar, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
+const statusStyles: Record<string, string> = {
+  confirmed: "bg-blue-100 text-blue-700",
+  paid: "bg-green-100 text-green-700",
+  partial: "bg-amber-100 text-amber-700",
+  cancelled: "bg-red-100 text-red-700",
+};
+
+const STATUSES = ["all", "confirmed", "partial", "paid", "cancelled"];
+
+function StatusBadge({ status }: { status: string }) {
+  return <Badge variant="outline" className={`capitalize text-xs ${statusStyles[status] || ""}`}>{status}</Badge>;
+}
+
 export default function PurchaseInvoiceList() {
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { data: invoices = [], isLoading } = useListPurchaseInvoices({ search: search || undefined });
   const deleteMutation = useDeletePurchaseInvoice();
@@ -27,7 +44,15 @@ export default function PurchaseInvoiceList() {
     toast({ title: "Invoice deleted" });
   };
 
-  const list = invoices as any[];
+  const hasFilters = dateFrom || dateTo || statusFilter !== "all";
+  const clearFilters = () => { setDateFrom(""); setDateTo(""); setStatusFilter("all"); };
+
+  const list = (invoices as any[]).filter(inv => {
+    if (dateFrom && inv.date < dateFrom) return false;
+    if (dateTo && inv.date > dateTo) return false;
+    if (statusFilter !== "all" && inv.status !== statusFilter) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -39,9 +64,37 @@ export default function PurchaseInvoiceList() {
         <Link href="/purchase/invoices/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Invoice</Button></Link>
       </div>
 
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input className="pl-9" placeholder="Search by supplier..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 bg-muted/50 border rounded-lg px-3 py-1.5">
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground">From</span>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="text-xs bg-transparent outline-none w-32 cursor-pointer" />
+        </div>
+        <div className="flex items-center gap-1.5 bg-muted/50 border rounded-lg px-3 py-1.5">
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground">To</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="text-xs bg-transparent outline-none w-32 cursor-pointer" />
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {STATUSES.map(s => (
+            <button key={s} type="button" onClick={() => setStatusFilter(s)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors ${statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/60"}`}>
+              {s === "all" ? "All Status" : s}
+            </button>
+          ))}
+        </div>
+        {hasFilters && (
+          <button type="button" onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">
+            <X className="h-3.5 w-3.5" />Clear
+          </button>
+        )}
       </div>
 
       {/* Mobile card list */}
@@ -61,11 +114,19 @@ export default function PurchaseInvoiceList() {
                     <p className="text-xs text-muted-foreground">Supplier Inv: {inv.supplierInvoiceNumber}</p>
                   )}
                 </div>
-                <div className="text-right">
+                <div className="text-right space-y-1">
                   <p className="font-bold text-base">{formatCurrency(inv.grandTotal)}</p>
-                  {Number(inv.balanceDue) > 0 && (
-                    <p className="text-xs text-red-600">Due: {formatCurrency(inv.balanceDue)}</p>
-                  )}
+                  <StatusBadge status={inv.status} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Paid</p>
+                  <p className="font-semibold text-green-600">{formatCurrency(inv.amountPaid)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Balance Due</p>
+                  <p className="font-semibold text-red-600">{formatCurrency(inv.balanceDue)}</p>
                 </div>
               </div>
               <div className="flex gap-2 border-t pt-3">
@@ -92,15 +153,17 @@ export default function PurchaseInvoiceList() {
                 <TableHead>Supplier</TableHead>
                 <TableHead>Supplier Inv#</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Paid</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No purchase invoices</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No purchase invoices</TableCell></TableRow>
               ) : list.map((inv: any) => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
@@ -108,7 +171,9 @@ export default function PurchaseInvoiceList() {
                   <TableCell className="font-medium">{inv.partyName}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{inv.supplierInvoiceNumber || "-"}</TableCell>
                   <TableCell className="text-right">{formatCurrency(inv.grandTotal)}</TableCell>
+                  <TableCell className="text-right text-green-600">{formatCurrency(inv.amountPaid)}</TableCell>
                   <TableCell className="text-right text-red-600">{formatCurrency(inv.balanceDue)}</TableCell>
+                  <TableCell><StatusBadge status={inv.status} /></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Link href={`/purchase/invoices/${inv.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
