@@ -111,9 +111,99 @@ router.get("/purchase-invoices/:id", authMiddleware, async (req, res) => {
 });
 
 router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
-  const [invoice] = await db.update(purchaseInvoicesTable).set({ notes: req.body.notes }).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).returning();
+  const data = req.body;
+  const grandTotal = Number(data.grandTotal || 0);
+  const amountPaid = Number(data.amountPaid || 0);
+  const balanceDue = grandTotal - amountPaid;
+  const status = balanceDue <= 0 ? "paid" : amountPaid > 0 ? "partial" : "confirmed";
+
+  const [invoice] = await db.update(purchaseInvoicesTable).set({
+    supplierInvoiceNumber: data.supplierInvoiceNumber,
+    date: data.date,
+    partyId: data.partyId,
+    partyName: data.partyName,
+    isGst: data.isGst ?? true,
+    isInterstate: data.isInterstate ?? false,
+    subtotal: String(data.subtotal || 0),
+    totalTaxable: String(data.totalTaxable || 0),
+    totalCgst: String(data.totalCgst || 0),
+    totalSgst: String(data.totalSgst || 0),
+    totalIgst: String(data.totalIgst || 0),
+    grandTotal: String(grandTotal),
+    amountPaid: String(amountPaid),
+    balanceDue: String(balanceDue),
+    status,
+    notes: data.notes,
+  }).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).returning();
   if (!invoice) return res.status(404).json({ error: "Not found" });
-  res.json(invoice);
+
+  // Replace items
+  await db.delete(purchaseInvoiceItemsTable).where(eq(purchaseInvoiceItemsTable.invoiceId, Number(req.params.id)));
+  if (data.items?.length) {
+    for (const item of data.items) {
+      await db.insert(purchaseInvoiceItemsTable).values({
+        invoiceId: Number(req.params.id),
+        stockItemId: item.stockItemId,
+        itemName: item.itemName,
+        hsnCode: item.hsnCode,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        rate: String(item.rate),
+        discountPct: String(item.discountPct || 0),
+        gstPct: String(item.gstPct || 0),
+        taxableAmount: String(item.taxableAmount),
+        cgst: String(item.cgst || 0),
+        sgst: String(item.sgst || 0),
+        igst: String(item.igst || 0),
+        total: String(item.total),
+      });
+    }
+  }
+
+  // Append new payments
+  if (data.payments?.length) {
+    for (const payment of data.payments) {
+      await db.insert(purchaseInvoicePaymentsTable).values({
+        invoiceId: Number(req.params.id),
+        mode: payment.mode,
+        amount: String(payment.amount),
+        reference: payment.reference,
+      });
+    }
+  }
+
+  res.json({ ...invoice, grandTotal, amountPaid, balanceDue, status });
+});
+
+// Record a payment against an existing purchase invoice
+router.post("/purchase-invoices/:id/payment", authMiddleware, async (req, res) => {
+  const { amount, mode, reference } = req.body;
+  const payAmount = Number(amount);
+  if (!payAmount || payAmount <= 0) return res.status(400).json({ error: "Invalid payment amount" });
+
+  const [inv] = await db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).limit(1);
+  if (!inv) return res.status(404).json({ error: "Not found" });
+
+  const currentPaid = Number(inv.amountPaid);
+  const grandTotal = Number(inv.grandTotal);
+  const newPaid = Math.min(currentPaid + payAmount, grandTotal);
+  const newBalance = grandTotal - newPaid;
+  const status = newBalance <= 0 ? "paid" : "partial";
+
+  await db.update(purchaseInvoicesTable).set({
+    amountPaid: String(newPaid),
+    balanceDue: String(newBalance),
+    status,
+  }).where(eq(purchaseInvoicesTable.id, Number(req.params.id)));
+
+  await db.insert(purchaseInvoicePaymentsTable).values({
+    invoiceId: Number(req.params.id),
+    mode: mode || "cash",
+    amount: String(payAmount),
+    reference,
+  });
+
+  res.json({ ok: true, amountPaid: newPaid, balanceDue: newBalance, status });
 });
 
 router.delete("/purchase-invoices/:id", authMiddleware, async (req, res) => {

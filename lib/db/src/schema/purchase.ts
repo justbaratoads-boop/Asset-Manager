@@ -20,6 +20,7 @@ export const purchaseInvoicesTable = pgTable("purchase_invoices", {
   grandTotal: numeric("grand_total", { precision: 15, scale: 2 }).notNull().default("0"),
   amountPaid: numeric("amount_paid", { precision: 15, scale: 2 }).notNull().default("0"),
   balanceDue: numeric("balance_due", { precision: 15, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("confirmed"),
   notes: text("notes"),
   isDeleted: text("is_deleted").notNull().default("false"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListPurchaseInvoices, useDeletePurchaseInvoice, getListPurchaseInvoicesQueryKey } from "@workspace/api-client-react";
+import { useListPurchaseInvoices, useDeletePurchaseInvoice, getListPurchaseInvoicesQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Pencil, Trash2, Calendar, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Calendar, X, IndianRupee } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,9 +23,108 @@ const statusStyles: Record<string, string> = {
 };
 
 const STATUSES = ["all", "confirmed", "partial", "paid", "cancelled"];
+const PAYMENT_MODES = [
+  { value: "cash", label: "Cash" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "upi", label: "UPI" },
+  { value: "cheque", label: "Cheque" },
+];
 
 function StatusBadge({ status }: { status: string }) {
-  return <Badge variant="outline" className={`capitalize text-xs ${statusStyles[status] || ""}`}>{status}</Badge>;
+  return <Badge variant="outline" className={`capitalize text-xs ${statusStyles[status] || ""}`}>{status || "confirmed"}</Badge>;
+}
+
+interface PayDialogProps {
+  invoice: any;
+  onClose: () => void;
+  onPaid: () => void;
+}
+
+function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
+  const balance = Number(invoice.balanceDue) || 0;
+  const [amount, setAmount] = useState(String(balance.toFixed(2)));
+  const [mode, setMode] = useState("cash");
+  const [reference, setReference] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const handlePay = async () => {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { setError("Enter a valid amount"); return; }
+    if (amt > balance) { setError(`Cannot exceed balance due (${formatCurrency(balance)})`); return; }
+    setLoading(true);
+    try {
+      await customFetch(`/api/purchase-invoices/${invoice.id}/payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amt, mode, reference }),
+      });
+      toast({ title: "Payment recorded successfully" });
+      onPaid();
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Failed to record payment", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
+        <div className="space-y-1 text-sm bg-muted/40 rounded-lg p-3">
+          <p className="font-semibold">{invoice.partyName}</p>
+          <p className="text-muted-foreground font-mono text-xs">{invoice.invoiceNumber}</p>
+          <div className="flex justify-between mt-1">
+            <span className="text-muted-foreground">Total</span>
+            <span className="font-medium">{formatCurrency(invoice.grandTotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Already Paid</span>
+            <span className="text-green-600 font-medium">{formatCurrency(invoice.amountPaid)}</span>
+          </div>
+          <div className="flex justify-between font-bold">
+            <span>Balance Due</span>
+            <span className="text-red-600">{formatCurrency(balance)}</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Amount Paying *</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+              <Input className="pl-7 h-10 text-base font-semibold" type="number" inputMode="decimal" min="0" step="any"
+                value={amount} onChange={e => { setAmount(e.target.value); setError(""); }} />
+            </div>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setAmount(String(balance.toFixed(2)))}
+              className="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/70 transition-colors">Full Amount</button>
+          </div>
+          <div className="space-y-1">
+            <Label>Payment Mode</Label>
+            <Select value={mode} onValueChange={setMode}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Reference / Cheque No. (optional)</Label>
+            <Input className="h-9 text-sm" placeholder="e.g. UTR, Cheque no." value={reference} onChange={e => setReference(e.target.value)} />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handlePay} disabled={loading}>{loading ? "Processing..." : "Record Payment"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function PurchaseInvoiceList() {
@@ -31,6 +133,7 @@ export default function PurchaseInvoiceList() {
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [payInvoice, setPayInvoice] = useState<any | null>(null);
   const { data: invoices = [], isLoading } = useListPurchaseInvoices({ search: search || undefined });
   const deleteMutation = useDeletePurchaseInvoice();
   const queryClient = useQueryClient();
@@ -50,7 +153,7 @@ export default function PurchaseInvoiceList() {
   const list = (invoices as any[]).filter(inv => {
     if (dateFrom && inv.date < dateFrom) return false;
     if (dateTo && inv.date > dateTo) return false;
-    if (statusFilter !== "all" && inv.status !== statusFilter) return false;
+    if (statusFilter !== "all" && (inv.status || "confirmed") !== statusFilter) return false;
     return true;
   });
 
@@ -110,9 +213,7 @@ export default function PurchaseInvoiceList() {
                 <div>
                   <p className="font-bold text-base">{inv.partyName}</p>
                   <p className="text-xs text-muted-foreground font-mono">{inv.invoiceNumber} · {formatDate(inv.date)}</p>
-                  {inv.supplierInvoiceNumber && (
-                    <p className="text-xs text-muted-foreground">Supplier Inv: {inv.supplierInvoiceNumber}</p>
-                  )}
+                  {inv.supplierInvoiceNumber && <p className="text-xs text-muted-foreground">Supplier Inv: {inv.supplierInvoiceNumber}</p>}
                 </div>
                 <div className="text-right space-y-1">
                   <p className="font-bold text-base">{formatCurrency(inv.grandTotal)}</p>
@@ -120,19 +221,18 @@ export default function PurchaseInvoiceList() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground">Paid</p>
-                  <p className="font-semibold text-green-600">{formatCurrency(inv.amountPaid)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Balance Due</p>
-                  <p className="font-semibold text-red-600">{formatCurrency(inv.balanceDue)}</p>
-                </div>
+                <div><p className="text-xs text-muted-foreground">Paid</p><p className="font-semibold text-green-600">{formatCurrency(inv.amountPaid)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Balance Due</p><p className="font-semibold text-red-600">{formatCurrency(inv.balanceDue)}</p></div>
               </div>
               <div className="flex gap-2 border-t pt-3">
                 <Link href={`/purchase/invoices/${inv.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
+                {Number(inv.balanceDue) > 0 && (
+                  <Button size="sm" variant="outline" className="flex-1 text-green-600 border-green-200 hover:bg-green-50" onClick={() => setPayInvoice(inv)}>
+                    <IndianRupee className="h-3.5 w-3.5 mr-1" />Pay
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="text-destructive border-destructive/30 px-3" onClick={() => setDeleteId(inv.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -170,13 +270,18 @@ export default function PurchaseInvoiceList() {
                   <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>
                   <TableCell className="font-medium">{inv.partyName}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{inv.supplierInvoiceNumber || "-"}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(inv.grandTotal)}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>
                   <TableCell className="text-right text-green-600">{formatCurrency(inv.amountPaid)}</TableCell>
                   <TableCell className="text-right text-red-600">{formatCurrency(inv.balanceDue)}</TableCell>
                   <TableCell><StatusBadge status={inv.status} /></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Link href={`/purchase/invoices/${inv.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
+                      {Number(inv.balanceDue) > 0 && (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" title="Record Payment" onClick={() => setPayInvoice(inv)}>
+                          <IndianRupee className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(inv.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
@@ -186,6 +291,15 @@ export default function PurchaseInvoiceList() {
           </Table>
         </CardContent>
       </Card>
+
+      {payInvoice && (
+        <PayDialog
+          invoice={payInvoice}
+          onClose={() => setPayInvoice(null)}
+          onPaid={() => queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() })}
+        />
+      )}
+
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
     </div>
   );
