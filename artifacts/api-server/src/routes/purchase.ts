@@ -50,6 +50,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
     amountPaid: String(data.amountPaid || 0),
     balanceDue: String(data.balanceDue || 0),
     notes: data.notes,
+    otherCharges: data.otherCharges || null,
   }).returning();
 
   if (data.items?.length) {
@@ -134,6 +135,7 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
     balanceDue: String(balanceDue),
     status,
     notes: data.notes,
+    otherCharges: data.otherCharges || null,
   }).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).returning();
   if (!invoice) return res.status(404).json({ error: "Not found" });
 

@@ -14,6 +14,7 @@ import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save } from "lucide-react";
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
+import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 
@@ -130,6 +131,7 @@ export default function PurchaseInvoiceForm() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
+  const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [payType, setPayType] = useState<"none" | "partial" | "full">("none");
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("cash");
@@ -148,16 +150,22 @@ export default function PurchaseInvoiceForm() {
     grand: items.reduce((s, i) => s + i.total, 0),
   };
 
-  const amountPaid = payType === "none" ? 0 : payType === "full" ? totals.grand : Math.min(Number(payAmount) || 0, totals.grand);
-  const balanceDue = totals.grand - amountPaid;
+  const chargesTotal = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const grandTotal = totals.grand + chargesTotal;
+
+  const amountPaid = payType === "none" ? 0 : payType === "full" ? grandTotal : Math.min(Number(payAmount) || 0, grandTotal);
+  const balanceDue = grandTotal - amountPaid;
 
   useEffect(() => {
-    if (payType === "full") setPayAmount(totals.grand > 0 ? String(totals.grand.toFixed(2)) : "");
-  }, [payType, totals.grand]);
+    if (payType === "full") setPayAmount(grandTotal > 0 ? String(grandTotal.toFixed(2)) : "");
+  }, [payType, grandTotal]);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
     const inv = existing as any;
+    if (inv.otherCharges) {
+      try { setCharges(JSON.parse(inv.otherCharges)); } catch { setCharges([]); }
+    }
     if (inv.partyId) setPartyId(inv.partyId);
     if (inv.date) setDate(inv.date);
     setSupplierInvNumber(inv.supplierInvoiceNumber || "");
@@ -216,7 +224,7 @@ export default function PurchaseInvoiceForm() {
     if (payType === "partial") {
       const amt = Number(payAmount);
       if (!amt || amt <= 0) e.payment = "Enter a valid partial payment amount";
-      else if (amt > totals.grand) e.payment = `Amount cannot exceed total (${formatCurrency(totals.grand)})`;
+      else if (amt > grandTotal) e.payment = `Amount cannot exceed total (${formatCurrency(grandTotal)})`;
     }
     return e;
   };
@@ -232,8 +240,9 @@ export default function PurchaseInvoiceForm() {
       isGst: items.some(i => i.gstPct > 0), isInterstate, isReverseCharge: false,
       subtotal: totals.subtotal, totalTaxable: totals.taxable,
       totalCgst: totals.cgst, totalSgst: totals.sgst, totalIgst: totals.igst,
-      grandTotal: totals.grand, amountPaid, balanceDue,
+      grandTotal, amountPaid, balanceDue,
       notes, items, payments,
+      otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
     };
   };
 
@@ -400,7 +409,10 @@ export default function PurchaseInvoiceForm() {
           </Card>
 
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-4 space-y-3">
+              <div className="border rounded-lg p-3 bg-muted/20">
+                <OtherChargesSection charges={charges} onChange={setCharges} />
+              </div>
               <div className="space-y-1"><Label>Notes</Label><Textarea placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} rows={2} /></div>
             </CardContent>
           </Card>
@@ -419,7 +431,8 @@ export default function PurchaseInvoiceForm() {
                 <div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>{formatCurrency(totals.sgst)}</span></div>
               </>}
               {isInterstate && totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>{formatCurrency(totals.igst)}</span></div>}
-              <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(totals.grand)}</span></div>
+              {chargesTotal > 0 && <div className="flex justify-between text-muted-foreground"><span>Other Charges</span><span>+ {formatCurrency(chargesTotal)}</span></div>}
+              <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
             </CardContent>
           </Card>
 
@@ -432,7 +445,7 @@ export default function PurchaseInvoiceForm() {
                     onClick={() => {
                       setPayType(t);
                       setErrors(p => { const n = { ...p }; delete n.payment; return n; });
-                      if (t === "full") setPayAmount(String(totals.grand.toFixed(2)));
+                      if (t === "full") setPayAmount(String(grandTotal.toFixed(2)));
                       if (t === "none") setPayAmount("");
                     }}
                     className={`py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${payType === t ? "bg-white dark:bg-zinc-800 shadow text-primary" : "text-muted-foreground hover:text-foreground"}`}>

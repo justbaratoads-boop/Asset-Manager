@@ -13,6 +13,7 @@ import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Lock } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
+import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
 
 interface NoteItem {
   stockItemId?: number;
@@ -71,6 +72,7 @@ export default function CreditNoteForm() {
   const [reason, setReason] = useState("");
   const [isInterstate, setIsInterstate] = useState(false);
   const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstLocked: false }, false)]);
+  const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
@@ -95,6 +97,9 @@ export default function CreditNoteForm() {
         gstLocked: !!i.stockItemId,
       }, interstate)));
     }
+    if (n.otherCharges) {
+      try { setCharges(JSON.parse(n.otherCharges)); } catch { setCharges([]); }
+    }
   }, [existing]);
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
@@ -114,6 +119,9 @@ export default function CreditNoteForm() {
     igst: items.reduce((s, i) => s + i.igst, 0),
     grand: items.reduce((s, i) => s + i.total, 0),
   };
+
+  const chargesTotal = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const grandTotal = totals.grand + chargesTotal;
 
   const updateItem = (index: number, field: keyof NoteItem, value: any) => {
     setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }, isInterstate); return u; });
@@ -142,9 +150,10 @@ export default function CreditNoteForm() {
     setIsSaving(true);
     const payload = {
       date, partyId, partyName: selectedParty?.name || "",
-      reason, amount: totals.grand, items,
+      reason, amount: grandTotal, items,
       totalTaxable: totals.taxable, totalCgst: totals.cgst,
       totalSgst: totals.sgst, totalIgst: totals.igst, isInterstate,
+      otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
     };
     try {
       let saved: any;
@@ -311,6 +320,11 @@ export default function CreditNoteForm() {
               </Table>
               <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, blankItem()])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
             </div>
+
+            {/* Other Charges */}
+            <div className="border rounded-lg p-3 bg-muted/20">
+              <OtherChargesSection charges={charges} onChange={setCharges} />
+            </div>
           </CardContent>
         </Card>
 
@@ -320,7 +334,8 @@ export default function CreditNoteForm() {
             <div className="flex justify-between"><span className="text-muted-foreground">Taxable</span><span>{formatCurrency(totals.taxable)}</span></div>
             {totals.cgst > 0 && <><div className="flex justify-between"><span className="text-muted-foreground">CGST</span><span>{formatCurrency(totals.cgst)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>{formatCurrency(totals.sgst)}</span></div></>}
             {totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>{formatCurrency(totals.igst)}</span></div>}
-            <div className="flex justify-between font-bold text-base border-t pt-2"><span>Credit Amount</span><span className="text-green-600">{formatCurrency(totals.grand)}</span></div>
+            {chargesTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Other Charges</span><span>+ {formatCurrency(chargesTotal)}</span></div>}
+            <div className="flex justify-between font-bold text-base border-t pt-2"><span>Credit Amount</span><span className="text-green-600">{formatCurrency(grandTotal)}</span></div>
             <p className="text-xs text-muted-foreground pt-1">Items will be added back to inventory on save.</p>
           </CardContent>
         </Card>

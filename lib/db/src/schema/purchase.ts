@@ -22,6 +22,7 @@ export const purchaseInvoicesTable = pgTable("purchase_invoices", {
   balanceDue: numeric("balance_due", { precision: 15, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("confirmed"),
   notes: text("notes"),
+  otherCharges: text("other_charges"),
   isDeleted: text("is_deleted").notNull().default("false"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

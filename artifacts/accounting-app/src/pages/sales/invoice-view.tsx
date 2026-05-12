@@ -137,6 +137,13 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
           {Number(invoice.totalIgst) > 0 && (
             <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>
           )}
+          {(() => {
+            let parsedCharges: {name: string; amount: number}[] = [];
+            try { parsedCharges = JSON.parse(invoice.otherCharges || "[]"); } catch {}
+            return parsedCharges.map((c: any, i: number) => (
+              <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || "Other Charges"}</span><span>{formatCurrency(Number(c.amount))}</span></div>
+            ));
+          })()}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
             <span>Total</span><span>{formatCurrency(invoice.grandTotal)}</span>
           </div>

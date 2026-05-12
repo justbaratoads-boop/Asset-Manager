@@ -17,6 +17,7 @@ import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
+import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
 
 interface InvoiceItem {
   stockItemId?: number;
@@ -178,6 +179,7 @@ export default function SaleInvoiceForm() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
+  const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [payType, setPayType] = useState<"none" | "partial" | "full">("none");
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("cash");
@@ -196,20 +198,23 @@ export default function SaleInvoiceForm() {
     grand: acc.grand + item.total,
   }), { subtotal: 0, discount: 0, taxable: 0, gst: 0, cgst: 0, sgst: 0, igst: 0, grand: 0 });
 
+  const chargesTotal = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const grandTotal = totals.grand + chargesTotal;
+
   const amountPaid = payType === "none" ? 0
-    : payType === "full" ? totals.grand
-    : Math.min(Number(payAmount) || 0, totals.grand);
-  const balanceDue = totals.grand - amountPaid;
+    : payType === "full" ? grandTotal
+    : Math.min(Number(payAmount) || 0, grandTotal);
+  const balanceDue = grandTotal - amountPaid;
 
   useEffect(() => {
-    if (payType === "full") setPayAmount(totals.grand > 0 ? String(totals.grand.toFixed(2)) : "");
-  }, [payType, totals.grand]);
+    if (payType === "full") setPayAmount(grandTotal > 0 ? String(grandTotal.toFixed(2)) : "");
+  }, [payType, grandTotal]);
 
   const handleBillTypeChange = (type: "credit" | "cash") => {
     setBillType(type);
     if (type === "cash") {
       setPayType("full");
-      setPayAmount(String(totals.grand.toFixed(2)));
+      setPayAmount(String(grandTotal.toFixed(2)));
       setPayMethod("cash");
     } else {
       setPayType("none");
@@ -242,6 +247,9 @@ export default function SaleInvoiceForm() {
     if (inv.payments?.length) {
       setPayMethod(inv.payments[0].mode || "cash");
       setPayRef(inv.payments[0].reference || "");
+    }
+    if (inv.otherCharges) {
+      try { setCharges(JSON.parse(inv.otherCharges)); } catch { setCharges([]); }
     }
     if (inv.items?.length) {
       setItems(inv.items.map((i: any) => calcItem({
@@ -323,7 +331,7 @@ export default function SaleInvoiceForm() {
     if (payType === "partial") {
       const amt = Number(payAmount);
       if (!amt || amt <= 0) e.payment = "Enter a valid partial payment amount";
-      else if (amt > totals.grand) e.payment = `Amount cannot exceed total (${formatCurrency(totals.grand)})`;
+      else if (amt > grandTotal) e.payment = `Amount cannot exceed total (${formatCurrency(grandTotal)})`;
     }
     return e;
   };
@@ -348,12 +356,13 @@ export default function SaleInvoiceForm() {
       totalSgst: totals.sgst,
       totalIgst: totals.igst,
       totalGst: totals.cgst + totals.sgst + totals.igst,
-      grandTotal: totals.grand,
+      grandTotal,
       amountPaid,
       balanceDue,
       notes,
       items,
       payments,
+      otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
     };
   };
 
@@ -649,6 +658,10 @@ export default function SaleInvoiceForm() {
               </Button>
             </div>
 
+            <div className="border rounded-lg p-3 bg-muted/20">
+              <OtherChargesSection charges={charges} onChange={setCharges} />
+            </div>
+
             <div className="space-y-1">
               <Label>Notes</Label>
               <Textarea placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
@@ -670,7 +683,8 @@ export default function SaleInvoiceForm() {
               </>}
               {isInterstate && totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>+ {formatCurrency(totals.igst)}</span></div>}
               {totals.gst === 0 && <div className="flex justify-between text-muted-foreground/60 text-xs"><span>GST</span><span>Nil</span></div>}
-              <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(totals.grand)}</span></div>
+              {chargesTotal > 0 && <div className="flex justify-between text-muted-foreground"><span>Other Charges</span><span>+ {formatCurrency(chargesTotal)}</span></div>}
+              <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
             </CardContent>
           </Card>
 
@@ -683,7 +697,7 @@ export default function SaleInvoiceForm() {
                     onClick={() => {
                       setPayType(t);
                       setErrors(p => { const n = { ...p }; delete n.payment; return n; });
-                      if (t === "full") setPayAmount(String(totals.grand.toFixed(2)));
+                      if (t === "full") setPayAmount(String(grandTotal.toFixed(2)));
                       if (t === "none") setPayAmount("");
                     }}
                     className={`py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${payType === t ? "bg-white dark:bg-zinc-800 shadow text-primary" : "text-muted-foreground hover:text-foreground"}`}>

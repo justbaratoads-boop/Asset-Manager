@@ -228,6 +228,7 @@ router.post("/credit-notes", authMiddleware, async (req, res) => {
     partyName: data.partyName,
     reason: data.reason,
     amount: String(data.amount || 0),
+    otherCharges: data.otherCharges || null,
   }).returning();
 
   if (data.items?.length) {
@@ -288,6 +289,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
     partyName: data.partyName,
     reason: data.reason,
     amount: String(data.amount || 0),
+    otherCharges: data.otherCharges || null,
   }).where(eq(creditNotesTable.id, id));
 
   if (data.items?.length) {
@@ -343,6 +345,7 @@ router.post("/debit-notes", authMiddleware, async (req, res) => {
     partyName: data.partyName,
     reason: data.reason,
     amount: String(data.amount || 0),
+    otherCharges: data.otherCharges || null,
   }).returning();
 
   if (data.items?.length) {
@@ -403,6 +406,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
     partyName: data.partyName,
     reason: data.reason,
     amount: String(data.amount || 0),
+    otherCharges: data.otherCharges || null,
   }).where(eq(debitNotesTable.id, id));
 
   if (data.items?.length) {

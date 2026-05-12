@@ -114,6 +114,13 @@ export default function DebitNoteView() {
               </>
             )}
             {igst > 0 && <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(igst)}</span></div>}
+            {(() => {
+              let parsedCharges: {name: string; amount: number}[] = [];
+              try { parsedCharges = JSON.parse(n.otherCharges || "[]"); } catch {}
+              return parsedCharges.map((c, i) => (
+                <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || "Other Charges"}</span><span>{formatCurrency(Number(c.amount))}</span></div>
+              ));
+            })()}
             <div className="flex justify-between font-bold text-base border-t pt-2">
               <span>Debit Amount</span>
               <span className="text-red-700">{formatCurrency(Number(n.amount))}</span>

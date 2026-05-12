@@ -97,6 +97,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
     amountPaid: String(data.amountPaid || 0),
     balanceDue: String(data.balanceDue || 0),
     notes: data.notes,
+    otherCharges: data.otherCharges || null,
     status: data.amountPaid >= data.grandTotal ? "paid" : (data.amountPaid > 0 ? "partial" : "confirmed"),
   }).returning();
 
@@ -205,6 +206,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
     amountPaid: String(data.amountPaid || 0),
     balanceDue: String(data.balanceDue || 0),
     notes: data.notes,
+    otherCharges: data.otherCharges || null,
     status: data.amountPaid >= data.grandTotal ? "paid" : (data.amountPaid > 0 ? "partial" : "confirmed"),
   }).where(eq(saleInvoicesTable.id, Number(id))).returning();
 
