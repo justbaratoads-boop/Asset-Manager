@@ -33,7 +33,6 @@ const navigation = [
     icon: BookOpen,
     items: [
       { name: "Chart of Accounts", href: "/accounts/chart-of-accounts" },
-      { name: "Ledger Accounts", href: "/accounts/ledgers" },
       { name: "Journal Entries", href: "/accounts/journal" },
       { name: "Payments", href: "/accounts/payments" },
       { name: "Receipts", href: "/accounts/receipts" },
