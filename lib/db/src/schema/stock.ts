@@ -54,6 +54,16 @@ export const stockTransactionsTable = pgTable("stock_transactions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const stockItemGstHistoryTable = pgTable("stock_item_gst_history", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").notNull(),
+  oldRate: numeric("old_rate", { precision: 5, scale: 2 }).notNull(),
+  newRate: numeric("new_rate", { precision: 5, scale: 2 }).notNull(),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type StockItemGstHistory = typeof stockItemGstHistoryTable.$inferSelect;
+
 export const insertStockCategorySchema = createInsertSchema(stockCategoriesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertStockCategory = z.infer<typeof insertStockCategorySchema>;
 export type StockCategory = typeof stockCategoriesTable.$inferSelect;

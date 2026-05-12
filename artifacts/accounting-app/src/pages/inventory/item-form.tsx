@@ -9,9 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UnitSelect } from "@/components/unit-select";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { GST_RATES } from "@/lib/format";
 
 export default function ItemForm() {
   const [, setLocation] = useLocation();
@@ -24,6 +23,8 @@ export default function ItemForm() {
   const createMutation = useCreateStockItem();
   const { data: categories = [] } = useListStockCategories({});
   const { data: existing } = useGetStockItem(editId!, { query: { enabled: isEdit } });
+
+  const usedInBills = isEdit && !!(existing as any)?.usedInBills;
 
   const [form, setForm] = useState({
     name: "", categoryId: "", hsnCode: "", unit: "pcs",
@@ -91,27 +92,35 @@ export default function ItemForm() {
         <Link href="/inventory/items"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
         <h1 className="text-xl font-bold">{isEdit ? "Edit Stock Item" : "New Stock Item"}</h1>
       </div>
+
+      {usedInBills && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>This item is used in bills. Only GST settings can be edited.</span>
+        </div>
+      )}
+
       <Card>
         <CardHeader><CardTitle className="text-base">Item Details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
           <div className="space-y-1 col-span-2">
             <Label>Name *</Label>
-            <Input required value={form.name} onChange={e => set("name", e.target.value)} />
+            <Input required value={form.name} onChange={e => set("name", e.target.value)} disabled={usedInBills} />
           </div>
           <div className="space-y-1">
             <Label>Category</Label>
-            <Select value={form.categoryId} onValueChange={v => set("categoryId", v)}>
+            <Select value={form.categoryId} onValueChange={v => set("categoryId", v)} disabled={usedInBills}>
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>{(categories as any[]).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <Label>HSN Code</Label>
-            <Input value={form.hsnCode} onChange={e => set("hsnCode", e.target.value)} placeholder="e.g. 8471" />
+            <Input value={form.hsnCode} onChange={e => set("hsnCode", e.target.value)} placeholder="e.g. 8471" disabled={usedInBills} />
           </div>
           <div className="space-y-1">
             <Label>Unit</Label>
-            <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" />
+            <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" disabled={usedInBills} />
           </div>
         </CardContent>
       </Card>
@@ -143,27 +152,28 @@ export default function ItemForm() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={usedInBills ? "opacity-50" : ""}>
         <CardHeader><CardTitle className="text-base">Pricing & Stock</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
             <Label>Purchase Rate</Label>
-            <Input type="number" value={form.purchaseRate} onChange={e => set("purchaseRate", e.target.value)} />
+            <Input type="number" value={form.purchaseRate} onChange={e => set("purchaseRate", e.target.value)} disabled={usedInBills} />
           </div>
           <div className="space-y-1">
             <Label>Sale Rate</Label>
-            <Input type="number" value={form.saleRate} onChange={e => set("saleRate", e.target.value)} />
+            <Input type="number" value={form.saleRate} onChange={e => set("saleRate", e.target.value)} disabled={usedInBills} />
           </div>
           <div className="space-y-1">
             <Label>Min Stock Level</Label>
-            <Input type="number" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} />
+            <Input type="number" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} disabled={usedInBills} />
           </div>
           <div className="space-y-1">
             <Label>{isEdit ? "Physical Stock" : "Opening Stock"}</Label>
-            <Input type="number" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} />
+            <Input type="number" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} disabled={usedInBills} />
           </div>
         </CardContent>
       </Card>
+
       <Button type="submit" disabled={createMutation.isPending}>
         {createMutation.isPending ? "Saving..." : isEdit ? "Update Item" : "Create Item"}
       </Button>
