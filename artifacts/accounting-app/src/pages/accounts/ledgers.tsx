@@ -1,22 +1,23 @@
 import { useState, useEffect } from "react";
-import { useListLedgers, useCreateLedger, useUpdateLedger, useDeleteLedger, getListLedgersQueryKey } from "@workspace/api-client-react";
+import { useListLedgers, useListParties, useCreateLedger, useUpdateLedger, useDeleteLedger, getListLedgersQueryKey, getListPartiesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, BookOpen, Users } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 const BLANK = { name: "", group: "", nature: "dr", openingBalance: "" };
 
 function useAccountGroups() {
@@ -30,10 +31,21 @@ const natureColors: Record<string, string> = {
   dr: "bg-sky-50 text-sky-700 border-sky-200",
   cr: "bg-rose-50 text-rose-700 border-rose-200",
 };
+const gstBadge: Record<string, string> = {
+  registered:   "bg-green-100 text-green-700 border-green-300",
+  unregistered: "bg-gray-100 text-gray-600 border-gray-300",
+  composition:  "bg-blue-100 text-blue-700 border-blue-300",
+};
+
+// Unified result type across both sources
+type UnifiedAccount =
+  | { kind: "ledger"; id: number; name: string; group: string; nature: string; openingBalance: number; raw: any }
+  | { kind: "party";  id: number; name: string; group: string; gstType: string; openingBalance: number; balanceType: string; raw: any };
 
 export default function LedgerAccounts() {
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "ledger" | "party">("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
@@ -41,19 +53,46 @@ export default function LedgerAccounts() {
   const [isSaving, setIsSaving] = useState(false);
   const [page, setPage] = useState(1);
 
-  const { data: ledgers = [], isLoading } = useListLedgers({});
+  const { data: ledgers = [], isLoading: ledgersLoading } = useListLedgers({});
+  const { data: parties = [], isLoading: partiesLoading } = useListParties();
   const { data: accountGroups = [] } = useAccountGroups();
   const deleteMutation = useDeleteLedger();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  useEffect(() => { setPage(1); }, [search, groupFilter]);
+  const isLoading = ledgersLoading || partiesLoading;
 
-  const filtered = (ledgers as any[]).filter((l: any) =>
-    (groupFilter === "all" || l.group === groupFilter) &&
-    (!search || l.name.toLowerCase().includes(search.toLowerCase()))
-  );
+  useEffect(() => { setPage(1); }, [search, groupFilter, sourceFilter]);
+
+  // Build unified list
+  const unified: UnifiedAccount[] = [
+    ...(ledgers as any[]).map((l: any): UnifiedAccount => ({
+      kind: "ledger", id: l.id, name: l.name, group: l.group, nature: l.nature,
+      openingBalance: Number(l.openingBalance), raw: l,
+    })),
+    ...(parties as any[]).map((p: any): UnifiedAccount => ({
+      kind: "party", id: p.id, name: p.name, group: p.accountGroup || "Parties",
+      gstType: p.gstType, openingBalance: Number(p.openingBalance), balanceType: p.balanceType, raw: p,
+    })),
+  ];
+
+  const q = search.toLowerCase();
+  const filtered = unified.filter(u => {
+    if (sourceFilter !== "all" && u.kind !== sourceFilter) return false;
+    if (groupFilter !== "all" && u.group !== groupFilter) return false;
+    if (q) {
+      return u.name.toLowerCase().includes(q) || u.group.toLowerCase().includes(q);
+    }
+    return true;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // All groups: from account groups + party account groups
+  const allGroups = Array.from(new Set([
+    ...(accountGroups as any[]).map((g: any) => g.name),
+    ...(parties as any[]).map((p: any) => p.accountGroup).filter(Boolean),
+  ])).sort();
 
   const openNew = () => {
     setEditItem(null);
@@ -98,10 +137,15 @@ export default function LedgerAccounts() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteMutation.mutateAsync({ id: deleteId });
-    queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
-    setDeleteId(null);
-    toast({ title: "Account deleted" });
+    try {
+      await deleteMutation.mutateAsync({ id: deleteId });
+      queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
+      toast({ title: "Account deleted" });
+    } catch (err: any) {
+      toast({ title: "Cannot delete", description: err?.data?.error || err?.message || "Failed to delete", variant: "destructive" });
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   return (
@@ -110,8 +154,9 @@ export default function LedgerAccounts() {
         <div>
           <h1 className="text-xl font-bold">Ledger Accounts</h1>
           <p className="text-sm text-muted-foreground">
-            Individual accounts under your{" "}
+            Accounts from{" "}
             <Link href="/accounts/chart-of-accounts" className="text-primary underline underline-offset-2">Chart of Accounts</Link>
+            {" "}and Ledger — {filtered.length} total
           </p>
         </div>
         <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />New Account</Button>
@@ -119,47 +164,88 @@ export default function LedgerAccounts() {
 
       <Card>
         <CardContent className="p-4 space-y-4">
-          <div className="flex gap-3 flex-wrap">
+          {/* Search + filters */}
+          <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search accounts..." value={search} onChange={e => setSearch(e.target.value)} />
+              <Input
+                className="pl-9"
+                placeholder="Search ledgers and parties..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                autoFocus={false}
+              />
             </div>
+            <Select value={sourceFilter} onValueChange={v => setSourceFilter(v as any)}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                <SelectItem value="ledger">Ledger Accounts</SelectItem>
+                <SelectItem value="party">Parties / Ledger</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={groupFilter} onValueChange={setGroupFilter}>
               <SelectTrigger className="w-52">
                 <SelectValue placeholder="All Groups" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Groups</SelectItem>
-                {(accountGroups as any[]).map((g: any) => (
-                  <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
+                {allGroups.map(g => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Mobile card layout */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile */}
+          <div className="md:hidden space-y-2">
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">Loading...</div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">No accounts found</div>
-            ) : paginated.map((l: any) => (
-              <div key={l.id} className="border rounded-lg p-3 bg-card">
+            ) : paginated.map(u => (
+              <div key={`${u.kind}-${u.id}`} className="border rounded-lg p-3 bg-card">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{l.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{l.group}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold truncate">{u.name}</p>
+                      {u.kind === "ledger" ? (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-sky-200 text-sky-700 bg-sky-50">
+                          <BookOpen className="h-2.5 w-2.5" />Ledger
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-violet-200 text-violet-700 bg-violet-50">
+                          <Users className="h-2.5 w-2.5" />Party
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{u.group}</p>
                   </div>
-                  <p className="font-bold text-sm shrink-0">{formatCurrency(l.openingBalance)}</p>
+                  <p className="font-bold text-sm shrink-0">{formatCurrency(u.openingBalance)}</p>
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${natureColors[l.nature]}`}>
-                    {l.nature === "dr" ? "Dr" : "Cr"}
-                  </span>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(l.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                  </div>
+                  {u.kind === "ledger" ? (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${natureColors[u.nature]}`}>
+                      {u.nature === "dr" ? "Dr" : "Cr"}
+                    </span>
+                  ) : (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded border capitalize ${gstBadge[u.gstType] || ""}`}>
+                      {u.gstType}
+                    </span>
+                  )}
+                  {u.kind === "ledger" && (
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  )}
+                  {u.kind === "party" && (
+                    <Link href={`/accounts/parties/${u.id}/edit`}>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1"><Pencil className="h-3 w-3" />Edit</Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
@@ -174,31 +260,62 @@ export default function LedgerAccounts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Account Name</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Group</TableHead>
-                  <TableHead>Nature</TableHead>
+                  <TableHead>Type / GST</TableHead>
                   <TableHead className="text-right">Opening Balance</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No accounts found</TableCell></TableRow>
-                ) : paginated.map((l: any) => (
-                  <TableRow key={l.id}>
-                    <TableCell className="font-medium">{l.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{l.group}</TableCell>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No accounts found</TableCell></TableRow>
+                ) : paginated.map(u => (
+                  <TableRow key={`${u.kind}-${u.id}`}>
+                    <TableCell className="font-medium">{u.name}</TableCell>
                     <TableCell>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${natureColors[l.nature]}`}>
-                        {l.nature === "dr" ? "Dr (Debit)" : "Cr (Credit)"}
-                      </span>
+                      {u.kind === "ledger" ? (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-sky-200 text-sky-700 bg-sky-50">
+                          <BookOpen className="h-2.5 w-2.5" />Ledger
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-violet-200 text-violet-700 bg-violet-50">
+                          <Users className="h-2.5 w-2.5" />Party
+                        </Badge>
+                      )}
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(l.openingBalance)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{u.group}</TableCell>
+                    <TableCell>
+                      {u.kind === "ledger" ? (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${natureColors[u.nature]}`}>
+                          {u.nature === "dr" ? "Dr (Debit)" : "Cr (Credit)"}
+                        </span>
+                      ) : (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded border capitalize ${gstBadge[u.gstType] || ""}`}>
+                          {u.gstType}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(u.openingBalance)}
+                      {u.kind === "party" && (
+                        <span className="text-muted-foreground text-xs ml-1 uppercase">{u.balanceType}</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(l.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        {u.kind === "ledger" ? (
+                          <>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </>
+                        ) : (
+                          <Link href={`/accounts/parties/${u.id}/edit`}>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit in Ledger"><Pencil className="h-3.5 w-3.5" /></Button>
+                          </Link>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -210,11 +327,11 @@ export default function LedgerAccounts() {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
+      {/* Add/Edit Ledger Account Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Account" : "New Ledger Account"}</DialogTitle>
+            <DialogTitle>{editItem ? "Edit Ledger Account" : "New Ledger Account"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-1">
             <div className="space-y-1">
