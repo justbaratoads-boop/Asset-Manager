@@ -34,6 +34,11 @@ interface GstHistoryData {
   invoicedByRate: InvoicedByRate[];
 }
 
+const txTypeStyle: Record<string, string> = {
+  sale: "bg-red-100 text-red-700",
+  purchase: "bg-green-100 text-green-700",
+};
+
 export default function ItemDetail() {
   const [, params] = useRoute("/inventory/items/:id");
   const id = Number(params?.id);
@@ -86,37 +91,63 @@ export default function ItemDetail() {
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader><DialogTitle>GST History — {it.name}</DialogTitle></DialogHeader>
-              <div className="space-y-5">
+              <div className="space-y-5 max-h-[65vh] overflow-y-auto pr-1">
                 {/* Invoiced amounts by rate */}
                 <div>
                   <p className="text-sm font-semibold mb-2">Invoiced Amount by GST Rate</p>
                   {(!gstHistory?.invoicedByRate || gstHistory.invoicedByRate.length === 0) ? (
                     <p className="text-sm text-muted-foreground py-2">No bills found for this item.</p>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>GST Rate</TableHead>
-                          <TableHead className="text-right">Sale Invoices</TableHead>
-                          <TableHead className="text-right">Sale Amount</TableHead>
-                          <TableHead className="text-right">Purchase Invoices</TableHead>
-                          <TableHead className="text-right">Purchase Amount</TableHead>
-                          <TableHead className="text-right">Total Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                    <>
+                      {/* Mobile cards */}
+                      <div className="md:hidden space-y-2">
                         {gstHistory.invoicedByRate.map(r => (
-                          <TableRow key={r.rate}>
-                            <TableCell><Badge variant="secondary">{r.rate}%</Badge></TableCell>
-                            <TableCell className="text-right text-sm">{r.saleCount}</TableCell>
-                            <TableCell className="text-right text-sm">{formatCurrency(r.saleAmount)}</TableCell>
-                            <TableCell className="text-right text-sm">{r.purchaseCount}</TableCell>
-                            <TableCell className="text-right text-sm">{formatCurrency(r.purchaseAmount)}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(r.saleAmount + r.purchaseAmount)}</TableCell>
-                          </TableRow>
+                          <div key={r.rate} className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="secondary">{r.rate}%</Badge>
+                              <span className="text-xs font-semibold">{formatCurrency(r.saleAmount + r.purchaseAmount)}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <p className="text-muted-foreground">Sale ({r.saleCount})</p>
+                                <p className="font-medium">{formatCurrency(r.saleAmount)}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Purchase ({r.purchaseCount})</p>
+                                <p className="font-medium">{formatCurrency(r.purchaseAmount)}</p>
+                              </div>
+                            </div>
+                          </div>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </div>
+                      {/* Desktop table */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>GST Rate</TableHead>
+                              <TableHead className="text-right">Sale Invoices</TableHead>
+                              <TableHead className="text-right">Sale Amount</TableHead>
+                              <TableHead className="text-right">Purchase Invoices</TableHead>
+                              <TableHead className="text-right">Purchase Amount</TableHead>
+                              <TableHead className="text-right">Total Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {gstHistory.invoicedByRate.map(r => (
+                              <TableRow key={r.rate}>
+                                <TableCell><Badge variant="secondary">{r.rate}%</Badge></TableCell>
+                                <TableCell className="text-right text-sm">{r.saleCount}</TableCell>
+                                <TableCell className="text-right text-sm">{formatCurrency(r.saleAmount)}</TableCell>
+                                <TableCell className="text-right text-sm">{r.purchaseCount}</TableCell>
+                                <TableCell className="text-right text-sm">{formatCurrency(r.purchaseAmount)}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(r.saleAmount + r.purchaseAmount)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -126,33 +157,56 @@ export default function ItemDetail() {
                   {(!gstHistory?.history || gstHistory.history.length === 0) ? (
                     <p className="text-sm text-muted-foreground py-2">No GST rate changes recorded yet.</p>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date & Time</TableHead>
-                          <TableHead className="text-right">Previous Rate</TableHead>
-                          <TableHead className="text-right">New Rate</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                    <>
+                      {/* Mobile cards */}
+                      <div className="md:hidden space-y-2">
                         {gstHistory.history.map(h => (
-                          <TableRow key={h.id}>
-                            <TableCell className="text-sm">
+                          <div key={h.id} className="border rounded-lg p-3 flex items-center justify-between gap-3 bg-muted/30">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(h.changedAt).toLocaleString("en-IN", {
                                 day: "2-digit", month: "short", year: "numeric",
                                 hour: "2-digit", minute: "2-digit",
                               })}
-                            </TableCell>
-                            <TableCell className="text-right">
+                            </span>
+                            <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-muted-foreground">{h.oldRate}%</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
+                              <span className="text-muted-foreground text-xs">→</span>
                               <Badge variant="secondary">{h.newRate}%</Badge>
-                            </TableCell>
-                          </TableRow>
+                            </div>
+                          </div>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </div>
+                      {/* Desktop table */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date & Time</TableHead>
+                              <TableHead className="text-right">Previous Rate</TableHead>
+                              <TableHead className="text-right">New Rate</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {gstHistory.history.map(h => (
+                              <TableRow key={h.id}>
+                                <TableCell className="text-sm">
+                                  {new Date(h.changedAt).toLocaleString("en-IN", {
+                                    day: "2-digit", month: "short", year: "numeric",
+                                    hour: "2-digit", minute: "2-digit",
+                                  })}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge variant="outline" className="text-muted-foreground">{h.oldRate}%</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge variant="secondary">{h.newRate}%</Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -185,21 +239,64 @@ export default function ItemDetail() {
       <Card>
         <CardHeader><CardTitle className="text-base">Transaction History</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Balance</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {(txs as any[]).length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions</TableCell></TableRow>
-                : (txs as any[]).map((t: any) => (
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {(txs as any[]).length === 0 ? (
+              <p className="text-center text-muted-foreground py-6 text-sm">No transactions</p>
+            ) : (txs as any[]).map((t: any) => (
+              <div key={t.id} className="border rounded-lg p-3 space-y-1.5 bg-muted/20">
+                <div className="flex items-center justify-between gap-2">
+                  <Badge variant="outline" className={`capitalize text-xs ${txTypeStyle[t.type] || "bg-blue-100 text-blue-700"}`}>
+                    {t.type.replace("_", " ")}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(t.createdAt).toLocaleDateString("en-IN")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground font-mono text-xs truncate max-w-[160px]">
+                    {t.reference || t.reason || "—"}
+                  </span>
+                  <div className="text-right shrink-0">
+                    <p className="font-semibold">{t.quantity > 0 ? "+" : ""}{t.quantity} {it.unit}</p>
+                    <p className="text-xs text-muted-foreground">Bal: {t.balanceAfter} {it.unit}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(txs as any[]).length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions</TableCell></TableRow>
+                ) : (txs as any[]).map((t: any) => (
                   <TableRow key={t.id}>
                     <TableCell className="text-sm">{new Date(t.createdAt).toLocaleDateString("en-IN")}</TableCell>
-                    <TableCell><Badge variant="outline" className={`capitalize text-xs ${t.type === "sale" ? "bg-red-100 text-red-700" : t.type === "purchase" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>{t.type.replace("_", " ")}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`capitalize text-xs ${txTypeStyle[t.type] || "bg-blue-100 text-blue-700"}`}>
+                        {t.type.replace("_", " ")}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{t.reference || t.reason || "-"}</TableCell>
                     <TableCell className="text-right">{t.quantity} {it.unit}</TableCell>
                     <TableCell className="text-right font-medium">{t.balanceAfter} {it.unit}</TableCell>
                   </TableRow>
                 ))}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

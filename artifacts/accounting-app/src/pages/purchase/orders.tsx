@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useListPurchaseOrders, useDeletePurchaseOrder, useReceivePurchaseOrder, getListPurchaseOrdersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Search, Pencil, Trash2, CheckCircle, Calendar, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 const statusStyles: Record<string, string> = {
   open: "bg-blue-100 text-blue-700",
@@ -26,11 +29,14 @@ export default function PurchaseOrderList() {
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const { data: orders = [], isLoading } = useListPurchaseOrders({});
   const deleteMutation = useDeletePurchaseOrder();
   const receiveMutation = useReceivePurchaseOrder();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo, statusFilter]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -55,6 +61,7 @@ export default function PurchaseOrderList() {
     if (statusFilter !== "all" && o.status !== statusFilter) return false;
     return true;
   });
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -105,7 +112,7 @@ export default function PurchaseOrderList() {
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No purchase orders</div>
-        ) : list.map((o: any) => (
+        ) : paginated.map((o: any) => (
           <Card key={o.id}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -136,6 +143,9 @@ export default function PurchaseOrderList() {
           </Card>
         ))}
       </div>
+      <div className="md:hidden">
+        <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      </div>
 
       {/* Desktop table */}
       <Card className="hidden md:block">
@@ -157,7 +167,7 @@ export default function PurchaseOrderList() {
                 <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No purchase orders</TableCell></TableRow>
-              ) : list.map((o: any) => (
+              ) : paginated.map((o: any) => (
                 <TableRow key={o.id}>
                   <TableCell className="font-mono text-sm">{o.poNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(o.date)}</TableCell>
@@ -176,6 +186,7 @@ export default function PurchaseOrderList() {
               ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />

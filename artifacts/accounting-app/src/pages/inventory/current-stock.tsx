@@ -1,14 +1,21 @@
+import { useState } from "react";
 import { useGetCurrentStock } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/pagination";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+const PAGE_SIZE = 20;
+
 export default function CurrentStock() {
   const { data: items = [], isLoading } = useGetCurrentStock();
+  const [page, setPage] = useState(1);
 
-  const total = (items as any[]).reduce((s: number, i: any) => s + i.value, 0);
+  const list = items as any[];
+  const total = list.reduce((s: number, i: any) => s + i.value, 0);
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -33,8 +40,8 @@ export default function CurrentStock() {
             </TableHeader>
             <TableBody>
               {isLoading ? <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                : (items as any[]).length === 0 ? <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No items found</TableCell></TableRow>
-                  : (items as any[]).map((item: any) => (
+                : list.length === 0 ? <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No items found</TableCell></TableRow>
+                  : paginated.map((item: any) => (
                     <TableRow key={item.id} className={cn(item.isLow && "bg-amber-50")}>
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell className="text-xs font-mono">{item.hsnCode || "-"}</TableCell>
@@ -54,6 +61,7 @@ export default function CurrentStock() {
                   ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
     </div>

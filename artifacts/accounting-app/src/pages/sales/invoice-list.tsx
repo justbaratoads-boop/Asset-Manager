@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListSaleInvoices, useDeleteSaleInvoice, getListSaleInvoicesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -10,7 +10,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Search, Eye, Pencil, Trash2, Calendar, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 const statusStyles: Record<string, string> = {
   confirmed: "bg-blue-100 text-blue-700",
@@ -31,10 +34,13 @@ export default function SaleInvoiceList() {
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const { data: invoices = [], isLoading } = useListSaleInvoices({ search: search || undefined });
   const deleteMutation = useDeleteSaleInvoice();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo, statusFilter]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -53,6 +59,7 @@ export default function SaleInvoiceList() {
     if (statusFilter !== "all" && inv.status !== statusFilter) return false;
     return true;
   });
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -105,7 +112,7 @@ export default function SaleInvoiceList() {
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No invoices found</div>
-        ) : list.map((inv: any) => (
+        ) : paginated.map((inv: any) => (
           <Card key={inv.id}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -144,6 +151,9 @@ export default function SaleInvoiceList() {
           </Card>
         ))}
       </div>
+      <div className="md:hidden">
+        <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      </div>
 
       {/* Desktop table */}
       <Card className="hidden md:block">
@@ -166,7 +176,7 @@ export default function SaleInvoiceList() {
                 <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No invoices found</TableCell></TableRow>
-              ) : list.map((inv: any) => (
+              ) : paginated.map((inv: any) => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>
@@ -186,6 +196,7 @@ export default function SaleInvoiceList() {
               ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
 

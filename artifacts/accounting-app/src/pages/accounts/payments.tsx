@@ -8,10 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 export default function PaymentList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const { data: payments = [], isLoading } = useListPayments({});
   const deleteMutation = useDeletePayment();
   const queryClient = useQueryClient();
@@ -25,6 +29,7 @@ export default function PaymentList() {
   };
 
   const list = payments as any[];
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -42,7 +47,7 @@ export default function PaymentList() {
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No payments found</div>
-        ) : list.map((p: any) => (
+        ) : paginated.map((p: any) => (
           <Card key={p.id}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -65,6 +70,9 @@ export default function PaymentList() {
           </Card>
         ))}
       </div>
+      <div className="md:hidden">
+        <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      </div>
 
       {/* Desktop table */}
       <Card className="hidden md:block">
@@ -85,7 +93,7 @@ export default function PaymentList() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No payments</TableCell></TableRow>
-              ) : list.map((p: any) => (
+              ) : paginated.map((p: any) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-sm">{p.voucherNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
@@ -102,6 +110,7 @@ export default function PaymentList() {
               ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />

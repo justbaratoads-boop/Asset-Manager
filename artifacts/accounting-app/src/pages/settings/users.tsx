@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 
+const PAGE_SIZE = 20;
 const roleColors: Record<string, string> = { admin: "bg-red-100 text-red-700", accountant: "bg-blue-100 text-blue-700", sales_staff: "bg-green-100 text-green-700", view_only: "bg-gray-100 text-gray-700" };
 
 export default function UsersSettings() {
@@ -21,6 +23,7 @@ export default function UsersSettings() {
   const [open, setOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "accountant" });
+  const [page, setPage] = useState(1);
   const { data: users = [], isLoading } = useListUsers({});
   const createMutation = useCreateUser();
   const updateRoleMutation = useUpdateUser();
@@ -51,10 +54,16 @@ export default function UsersSettings() {
     toast({ title: "User deleted" });
   };
 
+  const list = users as any[];
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">User Management</h1>
+        <div>
+          <h1 className="text-xl font-bold">User Management</h1>
+          <p className="text-sm text-muted-foreground">{list.length} users</p>
+        </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New User</Button></DialogTrigger>
           <DialogContent>
@@ -75,7 +84,7 @@ export default function UsersSettings() {
             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead></TableHead></TableRow></TableHeader>
             <TableBody>
               {isLoading ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                : (users as any[]).map((u: any) => (
+                : paginated.map((u: any) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
@@ -96,6 +105,7 @@ export default function UsersSettings() {
                 ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />

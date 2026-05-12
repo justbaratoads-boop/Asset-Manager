@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useListOrders, useDeleteOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Search, Pencil, Trash2, FileText, Calendar, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
@@ -28,11 +31,14 @@ export default function OrderList() {
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const [, setLocation] = useLocation();
   const { data: orders = [], isLoading } = useListOrders({ search: search || undefined });
   const deleteMutation = useDeleteOrder();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo, statusFilter]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -51,6 +57,7 @@ export default function OrderList() {
     if (statusFilter !== "all" && order.status !== statusFilter) return false;
     return true;
   });
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -101,7 +108,7 @@ export default function OrderList() {
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No orders found</div>
-        ) : list.map((order: any) => (
+        ) : paginated.map((order: any) => (
           <Card key={order.id}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -131,6 +138,9 @@ export default function OrderList() {
           </Card>
         ))}
       </div>
+      <div className="md:hidden">
+        <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      </div>
 
       {/* Desktop table */}
       <Card className="hidden md:block">
@@ -151,7 +161,7 @@ export default function OrderList() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No orders found</TableCell></TableRow>
-              ) : list.map((order: any) => (
+              ) : paginated.map((order: any) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono text-sm">{order.orderNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(order.date)}</TableCell>
@@ -173,6 +183,7 @@ export default function OrderList() {
               ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useListPurchaseInvoices, useDeletePurchaseInvoice, getListPurchaseInvoicesQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,7 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Search, Pencil, Trash2, Calendar, X, IndianRupee } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 const statusStyles: Record<string, string> = {
   confirmed: "bg-blue-100 text-blue-700",
@@ -134,10 +137,13 @@ export default function PurchaseInvoiceList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [payInvoice, setPayInvoice] = useState<any | null>(null);
+  const [page, setPage] = useState(1);
   const { data: invoices = [], isLoading } = useListPurchaseInvoices({ search: search || undefined });
   const deleteMutation = useDeletePurchaseInvoice();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo, statusFilter]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -156,6 +162,7 @@ export default function PurchaseInvoiceList() {
     if (statusFilter !== "all" && (inv.status || "confirmed") !== statusFilter) return false;
     return true;
   });
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -206,7 +213,7 @@ export default function PurchaseInvoiceList() {
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No purchase invoices</div>
-        ) : list.map((inv: any) => (
+        ) : paginated.map((inv: any) => (
           <Card key={inv.id}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -241,6 +248,9 @@ export default function PurchaseInvoiceList() {
           </Card>
         ))}
       </div>
+      <div className="md:hidden">
+        <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      </div>
 
       {/* Desktop table */}
       <Card className="hidden md:block">
@@ -264,7 +274,7 @@ export default function PurchaseInvoiceList() {
                 <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No purchase invoices</TableCell></TableRow>
-              ) : list.map((inv: any) => (
+              ) : paginated.map((inv: any) => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>
@@ -289,6 +299,7 @@ export default function PurchaseInvoiceList() {
               ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
 

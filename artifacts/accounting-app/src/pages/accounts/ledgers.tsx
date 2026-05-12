@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListLedgers, useCreateLedger, useUpdateLedger, useDeleteLedger, getListLedgersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { formatCurrency } from "@/lib/format";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 
+const PAGE_SIZE = 20;
 const BLANK = { name: "", group: "", nature: "dr", openingBalance: "" };
 
 function useAccountGroups() {
@@ -37,6 +39,7 @@ export default function LedgerAccounts() {
   const [editItem, setEditItem] = useState<any>(null);
   const [form, setForm] = useState(BLANK);
   const [isSaving, setIsSaving] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data: ledgers = [], isLoading } = useListLedgers({});
   const { data: accountGroups = [] } = useAccountGroups();
@@ -44,10 +47,13 @@ export default function LedgerAccounts() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  useEffect(() => { setPage(1); }, [search, groupFilter]);
+
   const filtered = (ledgers as any[]).filter((l: any) =>
     (groupFilter === "all" || l.group === groupFilter) &&
     (!search || l.name.toLowerCase().includes(search.toLowerCase()))
   );
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const openNew = () => {
     setEditItem(null);
@@ -137,7 +143,7 @@ export default function LedgerAccounts() {
               <div className="text-center py-8 text-muted-foreground">Loading...</div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">No accounts found</div>
-            ) : filtered.map((l: any) => (
+            ) : paginated.map((l: any) => (
               <div key={l.id} className="border rounded-lg p-3 bg-card">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -158,6 +164,9 @@ export default function LedgerAccounts() {
               </div>
             ))}
           </div>
+          <div className="md:hidden">
+            <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          </div>
 
           {/* Desktop table */}
           <div className="hidden md:block">
@@ -176,7 +185,7 @@ export default function LedgerAccounts() {
                   <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No accounts found</TableCell></TableRow>
-                ) : filtered.map((l: any) => (
+                ) : paginated.map((l: any) => (
                   <TableRow key={l.id}>
                     <TableCell className="font-medium">{l.name}</TableCell>
                     <TableCell className="text-muted-foreground">{l.group}</TableCell>
@@ -196,6 +205,7 @@ export default function LedgerAccounts() {
                 ))}
               </TableBody>
             </Table>
+            <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </div>
         </CardContent>
       </Card>

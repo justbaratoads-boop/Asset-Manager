@@ -10,7 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Trash2, Pencil, Check, X, Lock } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 export default function Categories() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -19,6 +22,7 @@ export default function Categories() {
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data: categories = [], isLoading } = useListStockCategories({});
   const createMutation = useCreateStockCategory();
@@ -80,10 +84,16 @@ export default function Categories() {
     setDeleteId(null);
   };
 
+  const list = categories as any[];
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Stock Categories</h1>
+        <div>
+          <h1 className="text-xl font-bold">Stock Categories</h1>
+          <p className="text-sm text-muted-foreground">{list.length} categories</p>
+        </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />New Category</Button>
@@ -116,9 +126,9 @@ export default function Categories() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Loading...</TableCell></TableRow>
-              ) : (categories as any[]).length === 0 ? (
+              ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">No categories yet</TableCell></TableRow>
-              ) : (categories as any[]).map((c: any) => {
+              ) : paginated.map((c: any) => {
                 const inUse = c.itemCount > 0;
                 const isEditing = editId === c.id;
 
@@ -195,6 +205,7 @@ export default function Categories() {
               })}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
 

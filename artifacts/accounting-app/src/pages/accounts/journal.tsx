@@ -8,10 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 export default function JournalList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const { data: journals = [], isLoading } = useListJournals({});
   const deleteMutation = useDeleteJournal();
   const queryClient = useQueryClient();
@@ -26,6 +30,7 @@ export default function JournalList() {
   };
 
   const list = journals as any[];
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -43,7 +48,7 @@ export default function JournalList() {
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No journal entries</div>
-        ) : list.map((j: any) => (
+        ) : paginated.map((j: any) => (
           <Card key={j.id}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -74,6 +79,9 @@ export default function JournalList() {
           </Card>
         ))}
       </div>
+      <div className="md:hidden">
+        <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      </div>
 
       {/* Desktop table */}
       <Card className="hidden md:block">
@@ -94,7 +102,7 @@ export default function JournalList() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No journal entries</TableCell></TableRow>
-              ) : list.map((j: any) => (
+              ) : paginated.map((j: any) => (
                 <TableRow key={j.id}>
                   <TableCell className="font-mono text-sm">{j.voucherNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(j.date)}</TableCell>
@@ -111,6 +119,7 @@ export default function JournalList() {
               ))}
             </TableBody>
           </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
