@@ -68,7 +68,7 @@ export default function DebitNoteForm() {
   const [date, setDate] = useState(today());
   const [reason, setReason] = useState("");
   const [isInterstate, setIsInterstate] = useState(false);
-  const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0 }, false)]);
+  const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0 }, false)]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -230,7 +230,7 @@ export default function DebitNoteForm() {
                   </div>
                 </div>
               ))}
-              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0 }, isInterstate)])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0 }, isInterstate)])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
             </div>
 
             {/* Desktop table layout */}
@@ -268,7 +268,7 @@ export default function DebitNoteForm() {
                   ))}
                 </TableBody>
               </Table>
-              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0 }, isInterstate)])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0 }, isInterstate)])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
             </div>
           </CardContent>
         </Card>

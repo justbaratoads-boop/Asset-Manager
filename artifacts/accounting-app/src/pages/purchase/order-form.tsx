@@ -72,7 +72,7 @@ export default function PurchaseOrderForm() {
   const [date, setDate] = useState(today());
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<POItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })]);
+  const [items, setItems] = useState<POItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -229,7 +229,7 @@ export default function PurchaseOrderForm() {
                 </div>
               </div>
             ))}
-            <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+            <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
             <div className="font-bold text-right text-base">Total: {formatCurrency(grandTotal)}</div>
           </div>
 
@@ -292,7 +292,7 @@ export default function PurchaseOrderForm() {
               </TableBody>
             </Table>
             <div className="flex items-center justify-between mt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
               <div className="font-bold">Total: {formatCurrency(grandTotal)}</div>
             </div>
           </div>

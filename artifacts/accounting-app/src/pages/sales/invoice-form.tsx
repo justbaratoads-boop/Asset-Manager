@@ -160,7 +160,7 @@ export default function SaleInvoiceForm() {
   const [manualName, setManualName] = useState("");
   const [date, setDate] = useState(today());
   const [isInterstate, setIsInterstate] = useState(false);
-  const [items, setItems] = useState<InvoiceItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0, gstInclusive: false }, false)]);
+  const [items, setItems] = useState<InvoiceItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }, false)]);
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -485,7 +485,7 @@ export default function SaleInvoiceForm() {
                   </div>
                 </div>
               ))}
-              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0, gstInclusive: false }, isInterstate)])}>
+              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }, isInterstate)])}>
                 <Plus className="h-4 w-4 mr-2" />Add Item
               </Button>
             </div>
@@ -551,7 +551,7 @@ export default function SaleInvoiceForm() {
                   ))}
                 </TableBody>
               </Table>
-              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 0, gstInclusive: false }, isInterstate)])}>
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }, isInterstate)])}>
                 <Plus className="h-3.5 w-3.5 mr-1" />Add Item
               </Button>
             </div>

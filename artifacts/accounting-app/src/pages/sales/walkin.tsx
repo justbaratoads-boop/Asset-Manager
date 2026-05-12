@@ -31,7 +31,7 @@ export default function WalkinSale() {
   const { data: stockItems = [] } = useListStockItems({});
   const [date, setDate] = useState(today());
   const [customerName, setCustomerName] = useState("");
-  const [items, setItems] = useState<Item[]>([calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })]);
+  const [items, setItems] = useState<Item[]>([calc({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18 })]);
   const [paymentMode, setPaymentMode] = useState("cash");
   const grand = items.reduce((s, i) => s + i.total, 0);
 
@@ -109,7 +109,7 @@ export default function WalkinSale() {
               ))}
             </TableBody>
           </Table>
-          <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18 })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18 })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
           <div className="flex items-center gap-4 pt-4 border-t">
             <div className="space-y-1 flex-1">
               <Label>Payment Mode</Label>

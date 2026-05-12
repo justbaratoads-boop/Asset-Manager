@@ -135,7 +135,7 @@ export default function OrderForm() {
   const [vehicleName, setVehicleName] = useState("");
   const [vehicleNo, setVehicleNo] = useState("");
   const [dispatchNotes, setDispatchNotes] = useState("");
-  const [items, setItems] = useState<OrderItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })]);
+  const [items, setItems] = useState<OrderItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
@@ -317,7 +317,7 @@ export default function OrderForm() {
               </div>
             ))}
             <div className="flex items-center justify-between">
-              <Button type="button" variant="outline" className="h-10 flex-1" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+              <Button type="button" variant="outline" className="h-10 flex-1" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
             </div>
             <div className="font-bold text-right text-base pt-1">Total: {formatCurrency(grandTotal)}</div>
           </div>
@@ -381,7 +381,7 @@ export default function OrderForm() {
               </TableBody>
             </Table>
             <div className="flex items-center justify-between mt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
               <div className="font-bold">Total: {formatCurrency(grandTotal)}</div>
             </div>
           </div>

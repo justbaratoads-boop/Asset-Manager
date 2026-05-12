@@ -122,7 +122,7 @@ export default function PurchaseInvoiceForm() {
   const [date, setDate] = useState(today());
   const [supplierInvNumber, setSupplierInvNumber] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<Item[]>([calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false }, false)]);
+  const [items, setItems] = useState<Item[]>([calc({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false }, false)]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -333,7 +333,7 @@ export default function PurchaseInvoiceForm() {
                     </div>
                   </div>
                 ))}
-                <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false }, isInterstate)])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+                <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false }, isInterstate)])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
               </div>
 
               {/* Desktop table layout */}
@@ -389,7 +389,7 @@ export default function PurchaseInvoiceForm() {
                     ))}
                   </TableBody>
                 </Table>
-                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 1, rate: 0, gstPct: 18, gstInclusive: false }, isInterstate)])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, calc({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false }, isInterstate)])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
               </div>
             </CardContent>
           </Card>
