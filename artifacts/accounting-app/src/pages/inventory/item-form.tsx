@@ -11,7 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { GST_RATES } from "@/lib/format";
-import { useFetch } from "@/hooks/use-fetch";
 
 export default function ItemForm() {
   const [, setLocation] = useLocation();
@@ -23,11 +22,10 @@ export default function ItemForm() {
   const queryClient = useQueryClient();
   const createMutation = useCreateStockItem();
   const { data: categories = [] } = useListStockCategories({});
-  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetStockItem(editId!, { query: { enabled: isEdit } });
 
   const [form, setForm] = useState({
-    name: "", categoryId: "", batchId: "none", hsnCode: "", unit: "pcs",
+    name: "", categoryId: "", hsnCode: "", unit: "pcs",
     purchaseRate: "", saleRate: "", minStockLevel: "", physicalStock: "", barcode: "",
     gstApplicable: false, gstRate: "18",
   });
@@ -39,7 +37,6 @@ export default function ItemForm() {
     setForm({
       name: e.name || "",
       categoryId: e.categoryId ? String(e.categoryId) : "",
-      batchId: e.batchId ? String(e.batchId) : "none",
       hsnCode: e.hsnCode || "",
       unit: e.unit || "pcs",
       purchaseRate: String(e.purchaseRate || ""),
@@ -57,7 +54,6 @@ export default function ItemForm() {
     const payload = {
       name: form.name,
       categoryId: form.categoryId ? Number(form.categoryId) : undefined,
-      batchId: form.batchId && form.batchId !== "none" ? Number(form.batchId) : undefined,
       hsnCode: form.hsnCode,
       unit: form.unit,
       purchaseRate: Number(form.purchaseRate) || 0,
@@ -106,16 +102,6 @@ export default function ItemForm() {
             <Select value={form.categoryId} onValueChange={v => set("categoryId", v)}>
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>{(categories as any[]).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Batch</Label>
-            <Select value={form.batchId} onValueChange={v => set("batchId", v)}>
-              <SelectTrigger><SelectValue placeholder="Select batch (optional)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {(batches as any[]).map((b: any) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
-              </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
