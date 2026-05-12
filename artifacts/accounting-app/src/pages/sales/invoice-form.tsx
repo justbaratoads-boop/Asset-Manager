@@ -28,7 +28,9 @@ interface InvoiceItem {
   gstPct: number;
   gstLocked: boolean;
   gstInclusive: boolean;
+  discountAmount: number;
   taxableAmount: number;
+  gstAmount: number;
   cgst: number;
   sgst: number;
   igst: number;
@@ -42,13 +44,18 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
   const gstPct = Number(item.gstPct) || 0;
   const gstInclusive = item.gstInclusive ?? false;
   const subtotal = qty * rate;
-  const discount = subtotal * (discPct / 100);
-  const grossAmount = subtotal - discount;
+  // Actual user-entered discount only
+  const discountAmount = subtotal * (discPct / 100);
+  const grossAmount = subtotal - discountAmount;
+  // Inclusive: rate already contains GST — extract base and GST from grossAmount
+  // Exclusive: grossAmount is the base, GST is added on top
   const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
   const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   const cgst = isInterstate ? 0 : gstAmount / 2;
   const sgst = isInterstate ? 0 : gstAmount / 2;
   const igst = isInterstate ? gstAmount : 0;
+  // Inclusive total = grossAmount (GST already inside); Exclusive total = grossAmount + GST
+  const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
   return {
     stockItemId: item.stockItemId,
     itemName: item.itemName || "",
@@ -60,9 +67,11 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
     gstPct,
     gstLocked: item.gstLocked ?? false,
     gstInclusive,
+    discountAmount,
     taxableAmount: taxable,
+    gstAmount,
     cgst, sgst, igst,
-    total: taxable + gstAmount,
+    total,
   };
 }
 
@@ -176,13 +185,14 @@ export default function SaleInvoiceForm() {
 
   const totals = items.reduce((acc, item) => ({
     subtotal: acc.subtotal + item.quantity * item.rate,
-    discount: acc.discount + (item.quantity * item.rate - item.taxableAmount),
+    discount: acc.discount + item.discountAmount,
     taxable: acc.taxable + item.taxableAmount,
+    gst: acc.gst + item.gstAmount,
     cgst: acc.cgst + item.cgst,
     sgst: acc.sgst + item.sgst,
     igst: acc.igst + item.igst,
     grand: acc.grand + item.total,
-  }), { subtotal: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, grand: 0 });
+  }), { subtotal: 0, discount: 0, taxable: 0, gst: 0, cgst: 0, sgst: 0, igst: 0, grand: 0 });
 
   const amountPaid = payType === "none" ? 0
     : payType === "full" ? totals.grand
@@ -457,17 +467,17 @@ export default function SaleInvoiceForm() {
                     </div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Rate *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="0.00" /></div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Disc%</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></div>
-                    {/* Per-item GST Type toggle */}
-                    <div className="col-span-2 space-y-1">
+                    {/* GST Type + Rate */}
+                    <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">GST Type</Label>
                       <div className="flex rounded-md overflow-hidden border text-sm font-medium h-10">
                         <button type="button" onClick={() => updateItem(index, "gstInclusive", false)}
                           className={`flex-1 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
-                          Exclusive
+                          Excl.
                         </button>
                         <button type="button" onClick={() => updateItem(index, "gstInclusive", true)}
                           className={`flex-1 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
-                          Inclusive
+                          Incl.
                         </button>
                       </div>
                     </div>
@@ -481,8 +491,32 @@ export default function SaleInvoiceForm() {
                         </Select>
                       )}
                     </div>
-                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div></div>
                   </div>
+                  {/* Per-item amount breakdown */}
+                  {item.quantity > 0 && item.rate > 0 && (
+                    <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-xs space-y-0.5">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Base amount</span>
+                        <span>{formatCurrency(item.taxableAmount)}</span>
+                      </div>
+                      {item.gstPct > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>GST ({item.gstPct}%{item.gstInclusive ? " incl." : ""})</span>
+                          <span>+ {formatCurrency(item.gstAmount)}</span>
+                        </div>
+                      )}
+                      {item.discountAmount > 0 && (
+                        <div className="flex justify-between text-red-600">
+                          <span>Discount ({item.discountPct}%)</span>
+                          <span>− {formatCurrency(item.discountAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold border-t border-border/60 pt-1 mt-1">
+                        <span>Total</span>
+                        <span>{formatCurrency(item.total)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }, isInterstate)])}>
@@ -541,7 +575,17 @@ export default function SaleInvoiceForm() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
+                      <TableCell className="text-right">
+                        {item.quantity > 0 && item.rate > 0 ? (
+                          <div className="space-y-0.5 text-xs leading-tight">
+                            <div className="text-muted-foreground">{formatCurrency(item.taxableAmount)} base</div>
+                            {item.gstPct > 0 && <div className="text-muted-foreground">+ {formatCurrency(item.gstAmount)} GST{item.gstInclusive ? " (incl.)" : ""}</div>}
+                            <div className="font-bold text-sm text-foreground border-t pt-0.5">{formatCurrency(item.total)}</div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, i) => i !== index))}>
                           <Trash2 className="h-4 w-4" />
@@ -568,14 +612,15 @@ export default function SaleInvoiceForm() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Totals</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatCurrency(totals.subtotal)}</span></div>
-              {totals.discount > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(totals.discount)}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Taxable</span><span>{formatCurrency(totals.taxable)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal (at rate)</span><span>{formatCurrency(totals.subtotal)}</span></div>
+              {totals.discount > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>− {formatCurrency(totals.discount)}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Taxable (base)</span><span>{formatCurrency(totals.taxable)}</span></div>
               {!isInterstate && totals.cgst > 0 && <>
-                <div className="flex justify-between"><span className="text-muted-foreground">CGST</span><span>{formatCurrency(totals.cgst)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>{formatCurrency(totals.sgst)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">CGST</span><span>+ {formatCurrency(totals.cgst)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>+ {formatCurrency(totals.sgst)}</span></div>
               </>}
-              {isInterstate && totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>{formatCurrency(totals.igst)}</span></div>}
+              {isInterstate && totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>+ {formatCurrency(totals.igst)}</span></div>}
+              {totals.gst === 0 && <div className="flex justify-between text-muted-foreground/60 text-xs"><span>GST</span><span>Nil</span></div>}
               <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(totals.grand)}</span></div>
             </CardContent>
           </Card>
