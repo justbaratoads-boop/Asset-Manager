@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Send, Save, Lock } from "lucide-react";
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
+import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 
@@ -111,7 +112,7 @@ function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose
         <div className="space-y-3">
           <div className="space-y-1"><Label>Item Name *</Label><Input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="e.g. Cement 50kg" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={e => setUnit(e.target.value)} placeholder="pcs" /></div>
+            <div className="space-y-1"><Label>Unit</Label><UnitSelect value={unit} onChange={setUnit} className="h-9" /></div>
             <div className="space-y-1"><Label>GST %</Label>
               <Select value={gstRate} onValueChange={setGstRate}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -451,7 +452,7 @@ export default function SaleInvoiceForm() {
                       {item.stockItemId ? (
                         <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                       ) : (
-                        <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} />
+                        <UnitSelect value={item.unit} onChange={v => updateItem(index, "unit", v)} className="h-10" />
                       )}
                     </div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Rate *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="0.00" /></div>
@@ -523,7 +524,7 @@ export default function SaleInvoiceForm() {
                       <TableCell>{item.stockItemId ? (
                         <div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                       ) : (
-                        <Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} />
+                        <UnitSelect value={item.unit} onChange={v => updateItem(index, "unit", v)} className="h-9" />
                       )}</TableCell>
                       <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="Rate" /></TableCell>
                       <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></TableCell>

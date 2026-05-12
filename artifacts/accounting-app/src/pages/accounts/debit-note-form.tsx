@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft } from "lucide-react";
+import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 
 interface NoteItem {
@@ -207,7 +208,7 @@ export default function DebitNoteForm() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Unit</Label>
-                      <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
+                      <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Rate</Label>
@@ -258,7 +259,7 @@ export default function DebitNoteForm() {
                         {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
                       </TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                      <TableCell><Input className="h-7 text-xs" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} /></TableCell>
+                      <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" /></TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                       <TableCell><Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select></TableCell>
                       <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>

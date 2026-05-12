@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
+import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 
 interface POItem {
@@ -195,7 +196,7 @@ export default function PurchaseOrderForm() {
                     {item.stockItemId ? (
                       <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                     ) : (
-                      <Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
+                      <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" />
                     )}
                   </div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Rate</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} placeholder="0.00" /></div>
@@ -262,7 +263,7 @@ export default function PurchaseOrderForm() {
                     <TableCell>{item.stockItemId ? (
                       <div className="h-7 flex items-center gap-1 px-2 bg-muted rounded border text-xs text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                     ) : (
-                      <Input className="h-7 text-xs" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />
+                      <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" />
                     )}</TableCell>
                     <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                     <TableCell><Input className="h-7 text-xs" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(i, "discountPct", e.target.value)} /></TableCell>

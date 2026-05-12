@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UnitSelect } from "@/components/unit-select";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -110,10 +111,7 @@ export default function ItemForm() {
           </div>
           <div className="space-y-1">
             <Label>Unit</Label>
-            <Select value={form.unit} onValueChange={v => set("unit", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["pcs", "kg", "g", "ltr", "ml", "mtr", "cm", "box", "pack", "dozen", "set"].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
-            </Select>
+            <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" />
           </div>
           <div className="space-y-1">
             <Label>Barcode</Label>
