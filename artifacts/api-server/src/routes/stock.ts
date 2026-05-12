@@ -38,7 +38,18 @@ router.delete("/stock-batches/:id", authMiddleware, async (req, res) => {
 
 // ---- CATEGORIES ----
 router.get("/stock-categories", authMiddleware, async (_req, res) => {
-  const cats = await db.select().from(stockCategoriesTable).orderBy(stockCategoriesTable.name);
+  const cats = await db.select({
+    id: stockCategoriesTable.id,
+    name: stockCategoriesTable.name,
+    parentId: stockCategoriesTable.parentId,
+    createdAt: stockCategoriesTable.createdAt,
+    updatedAt: stockCategoriesTable.updatedAt,
+    itemCount: sql<number>`count(${stockItemsTable.id})::int`,
+  })
+    .from(stockCategoriesTable)
+    .leftJoin(stockItemsTable, eq(stockItemsTable.categoryId, stockCategoriesTable.id))
+    .groupBy(stockCategoriesTable.id)
+    .orderBy(stockCategoriesTable.name);
   res.json(cats);
 });
 
@@ -51,16 +62,34 @@ router.post("/stock-categories", authMiddleware, async (req, res) => {
 });
 
 router.put("/stock-categories/:id", authMiddleware, async (req, res) => {
+  const id = Number(req.params.id);
+  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+    .from(stockItemsTable)
+    .where(eq(stockItemsTable.categoryId, id));
+  if (count > 0) {
+    return res.status(400).json({
+      error: `Cannot rename: ${count} item${count !== 1 ? "s are" : " is"} assigned to this category`,
+    });
+  }
   const [cat] = await db.update(stockCategoriesTable).set({
     name: req.body.name,
     parentId: req.body.parentId,
-  }).where(eq(stockCategoriesTable.id, Number(req.params.id))).returning();
+  }).where(eq(stockCategoriesTable.id, id)).returning();
   if (!cat) return res.status(404).json({ error: "Not found" });
   res.json(cat);
 });
 
 router.delete("/stock-categories/:id", authMiddleware, async (req, res) => {
-  await db.delete(stockCategoriesTable).where(eq(stockCategoriesTable.id, Number(req.params.id)));
+  const id = Number(req.params.id);
+  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+    .from(stockItemsTable)
+    .where(eq(stockItemsTable.categoryId, id));
+  if (count > 0) {
+    return res.status(400).json({
+      error: `Cannot delete: ${count} item${count !== 1 ? "s are" : " is"} assigned to this category`,
+    });
+  }
+  await db.delete(stockCategoriesTable).where(eq(stockCategoriesTable.id, id));
   res.json({ ok: true });
 });
 
