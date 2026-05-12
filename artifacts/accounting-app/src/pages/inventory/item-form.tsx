@@ -125,10 +125,20 @@ export default function ItemForm() {
           </div>
           <div className="space-y-1">
             <Label>GST Rate</Label>
-            <Select value={form.gstRate} onValueChange={v => set("gstRate", v)} disabled={!form.gstApplicable}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
-            </Select>
+            <div className="relative">
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={form.gstRate}
+                onChange={e => set("gstRate", e.target.value)}
+                disabled={!form.gstApplicable}
+                className="pr-7"
+                placeholder="0"
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+            </div>
           </div>
         </CardContent>
       </Card>
