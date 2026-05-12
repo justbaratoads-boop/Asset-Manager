@@ -36,7 +36,7 @@ const navigation = [
       { name: "Journal Entries", href: "/accounts/journal" },
       { name: "Payments", href: "/accounts/payments" },
       { name: "Receipts", href: "/accounts/receipts" },
-      { name: "Parties", href: "/accounts/parties" },
+      { name: "Ledger", href: "/accounts/parties" },
       { name: "Credit Notes", href: "/accounts/credit-notes" },
       { name: "Debit Notes", href: "/accounts/debit-notes" },
     ],
