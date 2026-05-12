@@ -273,9 +273,110 @@ router.delete("/purchase-orders/:id", authMiddleware, async (req, res) => {
 });
 
 router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => {
-  const [order] = await db.update(purchaseOrdersTable).set({ status: "received" }).where(eq(purchaseOrdersTable.id, Number(req.params.id))).returning();
+  const { items: receivedItems } = req.body;
+  // receivedItems: Array<{ itemId: number; receivedQty: number }>
+
+  const [order] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Not found" });
-  res.json({ ok: true });
+
+  const orderItems = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.orderId, order.id));
+
+  const receivedMap = new Map((receivedItems || []).map((r: any) => [Number(r.itemId), Number(r.receivedQty) || 0]));
+
+  let anyReceived = false;
+  let allReceived = true;
+  for (const item of orderItems) {
+    const rqty = receivedMap.get(item.id) || 0;
+    if (rqty > 0) anyReceived = true;
+    if (rqty < Number(item.quantity)) allReceived = false;
+  }
+  if (!anyReceived) return res.status(400).json({ error: "At least one item must have a received quantity > 0" });
+
+  const newStatus = allReceived ? "received" : "partially_received";
+  await db.update(purchaseOrdersTable).set({ status: newStatus }).where(eq(purchaseOrdersTable.id, order.id));
+
+  // Auto-create purchase invoice for received items only
+  const invoiceNumber = await makeInvoiceNumber("PUR");
+  let grandTotal = 0, totalTaxable = 0, totalCgst = 0, totalSgst = 0, totalIgst = 0;
+
+  const invoiceItemsToInsert = [];
+  for (const item of orderItems) {
+    const rqty = receivedMap.get(item.id) || 0;
+    if (rqty <= 0) continue;
+
+    const orderedQty = Number(item.quantity);
+    const ratio = orderedQty > 0 ? rqty / orderedQty : 1;
+    const rate = Number(item.rate);
+    const discPct = Number(item.discountPct) || 0;
+    const gstPct = Number(item.gstPct) || 0;
+    const taxable = Number(item.taxableAmount) * ratio;
+    const cgst = Number(item.cgst) * ratio;
+    const sgst = Number(item.sgst) * ratio;
+    const igst = Number(item.igst) * ratio;
+    const total = Number(item.total) * ratio;
+
+    totalTaxable += taxable;
+    totalCgst += cgst;
+    totalSgst += sgst;
+    totalIgst += igst;
+    grandTotal += total;
+
+    invoiceItemsToInsert.push({
+      stockItemId: item.stockItemId,
+      itemName: item.itemName,
+      hsnCode: item.hsnCode,
+      quantity: rqty,
+      unit: item.unit,
+      rate: String(rate),
+      discountPct: String(discPct),
+      gstPct: String(gstPct),
+      taxableAmount: String(taxable.toFixed(2)),
+      cgst: String(cgst.toFixed(2)),
+      sgst: String(sgst.toFixed(2)),
+      igst: String(igst.toFixed(2)),
+      total: String(total.toFixed(2)),
+    });
+  }
+
+  const [invoice] = await db.insert(purchaseInvoicesTable).values({
+    invoiceNumber,
+    date: new Date().toISOString().slice(0, 10),
+    partyId: order.partyId,
+    partyName: order.partyName,
+    isGst: true,
+    isInterstate: false,
+    isReverseCharge: false,
+    subtotal: String(totalTaxable.toFixed(2)),
+    totalTaxable: String(totalTaxable.toFixed(2)),
+    totalCgst: String(totalCgst.toFixed(2)),
+    totalSgst: String(totalSgst.toFixed(2)),
+    totalIgst: String(totalIgst.toFixed(2)),
+    grandTotal: String(grandTotal.toFixed(2)),
+    amountPaid: "0",
+    balanceDue: String(grandTotal.toFixed(2)),
+    notes: `Auto-generated from PO ${order.poNumber}`,
+  }).returning();
+
+  for (const item of invoiceItemsToInsert) {
+    await db.insert(purchaseInvoiceItemsTable).values({ invoiceId: invoice.id, ...item });
+
+    if (item.stockItemId) {
+      const [si] = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, item.stockItemId)).limit(1);
+      if (si) {
+        const newStock = Number(si.physicalStock) + item.quantity;
+        await db.update(stockItemsTable).set({ physicalStock: String(newStock) }).where(eq(stockItemsTable.id, item.stockItemId));
+        await db.insert(stockTransactionsTable).values({
+          itemId: item.stockItemId,
+          type: "purchase",
+          quantity: String(item.quantity),
+          balanceAfter: String(newStock),
+          reference: invoiceNumber,
+        });
+      }
+    }
+  }
+
+  res.json({ ok: true, status: newStatus, invoiceId: invoice.id, invoiceNumber });
 });
 
 export default router;

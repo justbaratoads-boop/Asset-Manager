@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Pencil, Trash2, Calendar, X, IndianRupee } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Calendar, X, IndianRupee, Eye, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,191 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className={`capitalize text-xs ${statusStyles[status] || ""}`}>{status || "confirmed"}</Badge>;
 }
 
+// ─── View Sheet ────────────────────────────────────────────────────────────────
+function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
+  id: number | null;
+  onClose: () => void;
+  onPayClick: (inv: any) => void;
+}) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [lastId, setLastId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!id) { setData(null); return; }
+    if (id === lastId) return;
+    setLastId(id);
+    setLoading(true);
+    setData(null);
+    customFetch<any>(`/api/purchase-invoices/${id}`)
+      .then(d => setData(d))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  const items: any[] = data?.items || [];
+  const payments: any[] = data?.payments || [];
+
+  return (
+    <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Purchase Invoice
+          </SheetTitle>
+        </SheetHeader>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Loading...</div>
+        ) : !data ? (
+          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Not found</div>
+        ) : (
+          <div className="mt-6 space-y-5">
+            {/* Header info */}
+            <div className="rounded-lg border bg-muted/30 divide-y">
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">Invoice #</span>
+                <span className="font-mono font-semibold text-sm">{data.invoiceNumber}</span>
+              </div>
+              {data.supplierInvoiceNumber && (
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Supplier Inv#</span>
+                  <span className="text-sm font-medium">{data.supplierInvoiceNumber}</span>
+                </div>
+              )}
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">Date</span>
+                <span className="text-sm font-medium">{formatDate(data.date)}</span>
+              </div>
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">Supplier</span>
+                <span className="text-sm font-semibold">{data.partyName}</span>
+              </div>
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">Status</span>
+                <StatusBadge status={data.status} />
+              </div>
+              {data.notes && (
+                <div className="px-4 py-2.5">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
+                  <p className="text-sm">{data.notes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Items */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Items</p>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/40 border-b">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Item</th>
+                      <th className="text-right px-2 py-2 text-xs font-semibold text-muted-foreground">Qty</th>
+                      <th className="text-right px-2 py-2 text-xs font-semibold text-muted-foreground">Rate</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {items.map((item: any, i: number) => (
+                      <tr key={i} className="hover:bg-muted/20">
+                        <td className="px-3 py-2.5">
+                          <p className="font-medium">{item.itemName}</p>
+                          {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
+                        <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(Number(item.rate))}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(Number(item.total))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Totals */}
+            <div className="rounded-lg border bg-muted/30 divide-y text-sm">
+              {Number(data.totalTaxable) > 0 && (
+                <div className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">Taxable</span>
+                  <span>{formatCurrency(Number(data.totalTaxable))}</span>
+                </div>
+              )}
+              {Number(data.totalCgst) > 0 && (
+                <div className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">CGST</span>
+                  <span>+ {formatCurrency(Number(data.totalCgst))}</span>
+                </div>
+              )}
+              {Number(data.totalSgst) > 0 && (
+                <div className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">SGST</span>
+                  <span>+ {formatCurrency(Number(data.totalSgst))}</span>
+                </div>
+              )}
+              {Number(data.totalIgst) > 0 && (
+                <div className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">IGST</span>
+                  <span>+ {formatCurrency(Number(data.totalIgst))}</span>
+                </div>
+              )}
+              <div className="flex justify-between px-4 py-2.5 font-bold text-base">
+                <span>Grand Total</span>
+                <span>{formatCurrency(Number(data.grandTotal))}</span>
+              </div>
+              <div className="flex justify-between px-4 py-2 text-green-700">
+                <span>Amount Paid</span>
+                <span className="font-semibold">{formatCurrency(Number(data.amountPaid))}</span>
+              </div>
+              <div className="flex justify-between px-4 py-2 font-bold text-red-700">
+                <span>Balance Due</span>
+                <span>{formatCurrency(Number(data.balanceDue))}</span>
+              </div>
+            </div>
+
+            {/* Payment history */}
+            {payments.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Payment History</p>
+                <div className="rounded-lg border divide-y">
+                  {payments.map((p: any, i: number) => (
+                    <div key={i} className="flex justify-between items-center px-3 py-2 text-sm">
+                      <div>
+                        <span className="font-medium capitalize">{p.mode?.replace("_", " ")}</span>
+                        {p.reference && <span className="text-xs text-muted-foreground ml-2">Ref: {p.reference}</span>}
+                      </div>
+                      <span className="font-semibold text-green-700">{formatCurrency(Number(p.amount))}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 border-t pt-4">
+              <Button variant="outline" className="flex-1" onClick={onClose}>Close</Button>
+              {Number(data.balanceDue) > 0 && (
+                <Button
+                  variant="outline"
+                  className="flex-1 text-green-700 border-green-300 hover:bg-green-50 gap-1"
+                  onClick={() => { onClose(); onPayClick(data); }}
+                >
+                  <IndianRupee className="h-4 w-4" />Pay
+                </Button>
+              )}
+              <Link href={`/purchase/invoices/${data.id}/edit`} className="flex-1">
+                <Button className="w-full gap-2"><Pencil className="h-4 w-4" />Edit</Button>
+              </Link>
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ─── Pay Dialog ────────────────────────────────────────────────────────────────
 interface PayDialogProps {
   invoice: any;
   onClose: () => void;
@@ -93,7 +279,6 @@ function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
             <span className="text-red-600">{formatCurrency(balance)}</span>
           </div>
         </div>
-
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Amount Paying *</Label>
@@ -106,7 +291,7 @@ function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => setAmount(String(balance.toFixed(2)))}
-              className="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/70 transition-colors">Full Amount</button>
+              className="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/70">Full Amount</button>
           </div>
           <div className="space-y-1">
             <Label>Payment Mode</Label>
@@ -120,7 +305,6 @@ function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
             <Input className="h-9 text-sm" placeholder="e.g. UTR, Cheque no." value={reference} onChange={e => setReference(e.target.value)} />
           </div>
         </div>
-
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handlePay} disabled={loading}>{loading ? "Processing..." : "Record Payment"}</Button>
@@ -130,6 +314,7 @@ function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
   );
 }
 
+// ─── Main List ─────────────────────────────────────────────────────────────────
 export default function PurchaseInvoiceList() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -137,7 +322,9 @@ export default function PurchaseInvoiceList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [payInvoice, setPayInvoice] = useState<any | null>(null);
+  const [viewId, setViewId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
+
   const { data: invoices = [], isLoading } = useListPurchaseInvoices({ search: search || undefined });
   const deleteMutation = useDeletePurchaseInvoice();
   const queryClient = useQueryClient();
@@ -174,13 +361,11 @@ export default function PurchaseInvoiceList() {
         <Link href="/purchase/invoices/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Invoice</Button></Link>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input className="pl-9" placeholder="Search by supplier..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5 bg-muted/50 border rounded-lg px-3 py-1.5">
           <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -201,7 +386,7 @@ export default function PurchaseInvoiceList() {
           ))}
         </div>
         {hasFilters && (
-          <button type="button" onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">
+          <button type="button" onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted">
             <X className="h-3.5 w-3.5" />Clear
           </button>
         )}
@@ -232,6 +417,9 @@ export default function PurchaseInvoiceList() {
                 <div><p className="text-xs text-muted-foreground">Balance Due</p><p className="font-semibold text-red-600">{formatCurrency(inv.balanceDue)}</p></div>
               </div>
               <div className="flex gap-2 border-t pt-3">
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewId(inv.id)}>
+                  <Eye className="h-3.5 w-3.5 mr-1" />View
+                </Button>
                 <Link href={`/purchase/invoices/${inv.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
@@ -275,7 +463,7 @@ export default function PurchaseInvoiceList() {
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No purchase invoices</TableCell></TableRow>
               ) : paginated.map((inv: any) => (
-                <TableRow key={inv.id}>
+                <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setViewId(inv.id)}>
                   <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>
                   <TableCell className="font-medium">{inv.partyName}</TableCell>
@@ -284,15 +472,22 @@ export default function PurchaseInvoiceList() {
                   <TableCell className="text-right text-green-600">{formatCurrency(inv.amountPaid)}</TableCell>
                   <TableCell className="text-right text-red-600">{formatCurrency(inv.balanceDue)}</TableCell>
                   <TableCell><StatusBadge status={inv.status} /></TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Link href={`/purchase/invoices/${inv.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
+                  <TableCell onClick={e => e.stopPropagation()}>
+                    <div className="flex gap-1 justify-end">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewId(inv.id)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Link href={`/purchase/invoices/${inv.id}/edit`}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                      </Link>
                       {Number(inv.balanceDue) > 0 && (
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" title="Record Payment" onClick={() => setPayInvoice(inv)}>
                           <IndianRupee className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(inv.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(inv.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -310,6 +505,12 @@ export default function PurchaseInvoiceList() {
           onPaid={() => queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() })}
         />
       )}
+
+      <PurchaseInvoiceViewSheet
+        id={viewId}
+        onClose={() => setViewId(null)}
+        onPayClick={inv => setPayInvoice(inv)}
+      />
 
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
     </div>
