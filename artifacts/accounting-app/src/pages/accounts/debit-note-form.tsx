@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
-import { Plus, Trash2, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Printer, Lock } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,6 +23,7 @@ interface NoteItem {
   rate: number;
   discountPct: number;
   gstPct: number;
+  gstLocked: boolean;
   taxableAmount: number;
   cgst: number;
   sgst: number;
@@ -43,6 +44,7 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
     hsnCode: item.hsnCode || "",
     quantity: qty, unit: item.unit || "pcs", rate,
     discountPct: discPct, gstPct,
+    gstLocked: item.gstLocked || false,
     taxableAmount: taxable,
     cgst: isInterstate ? 0 : gst / 2,
     sgst: isInterstate ? 0 : gst / 2,
@@ -68,8 +70,9 @@ export default function DebitNoteForm() {
   const [date, setDate] = useState(today());
   const [reason, setReason] = useState("");
   const [isInterstate, setIsInterstate] = useState(false);
-  const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0 }, false)]);
+  const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstLocked: false }, false)]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
@@ -89,11 +92,20 @@ export default function DebitNoteForm() {
         rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0,
         gstPct: Number(i.gstPct) || 0,
+        gstLocked: !!i.stockItemId,
       }, interstate)));
     }
   }, [existing]);
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
+
+  useEffect(() => {
+    if (selectedParty) {
+      const interstate = selectedParty.isOutOfState === "true" || selectedParty.isOutOfState === true;
+      setIsInterstate(interstate);
+      setItems(prev => prev.map(it => calcItem(it, interstate)));
+    }
+  }, [partyId]);
 
   const totals = {
     taxable: items.reduce((s, i) => s + i.taxableAmount, 0),
@@ -110,8 +122,8 @@ export default function DebitNoteForm() {
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
-      const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct }, isInterstate); return u; });
+      const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? Number(si.gstRate) || 0 : 0;
+      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: true }, isInterstate); return u; });
     }
   };
 
@@ -124,10 +136,10 @@ export default function DebitNoteForm() {
     return e;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (afterSave?: (note: any) => void) => {
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    setIsSaving(true);
     const payload = {
       date, partyId, partyName: selectedParty?.name || "",
       reason, amount: totals.grand, items,
@@ -135,24 +147,43 @@ export default function DebitNoteForm() {
       totalSgst: totals.sgst, totalIgst: totals.igst, isInterstate,
     };
     try {
+      let saved: any;
       if (isEdit) {
-        await customFetch(`/api/debit-notes/${editId}`, {
+        saved = await customFetch(`/api/debit-notes/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
         toast({ title: "Debit note updated" });
       } else {
-        await createMutation.mutateAsync({ data: payload as any });
+        saved = await createMutation.mutateAsync({ data: payload as any });
         toast({ title: "Debit note created", description: "Stock has been updated (removed from inventory)" });
       }
       queryClient.invalidateQueries({ queryKey: getListDebitNotesQueryKey() });
-      setLocation("/accounts/debit-notes");
+      if (afterSave) afterSave(saved);
+      else setLocation("/accounts/debit-notes");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to save";
+      const msg = err?.data?.error || err.message || "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSave();
+  };
+
+  const handleSaveAndPrint = async () => {
+    await handleSave((saved: any) => {
+      const id = saved?.id || editId;
+      if (id) setLocation(`/accounts/debit-notes/${id}?print=1`);
+      else setLocation("/accounts/debit-notes");
+    });
+  };
+
+  const blankItem = () => calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstLocked: false }, isInterstate);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -185,6 +216,8 @@ export default function DebitNoteForm() {
               </div>
             </div>
 
+            {isInterstate && <div className="text-xs text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded">Interstate supplier — IGST will apply</div>}
+
             {errors.items && <p className="text-xs text-destructive">{errors.items}</p>}
 
             {/* Mobile card layout */}
@@ -215,8 +248,8 @@ export default function DebitNoteForm() {
                       <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} placeholder="0.00" />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">GST%</Label>
-                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">GST% {item.gstLocked && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
+                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)} disabled={item.gstLocked}>
                         <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
                       </Select>
@@ -230,7 +263,7 @@ export default function DebitNoteForm() {
                   </div>
                 </div>
               ))}
-              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0 }, isInterstate)])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
+              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, blankItem()])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
             </div>
 
             {/* Desktop table layout */}
@@ -258,17 +291,25 @@ export default function DebitNoteForm() {
                         {!item.stockItemId && <Input className="h-7 mt-1 text-xs" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
                         {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
                       </TableCell>
-                      <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
+                      <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                       <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" /></TableCell>
-                      <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
-                      <TableCell><Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select></TableCell>
+                      <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)} disabled={item.gstLocked}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                          </Select>
+                          {item.gstLocked && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>
                       <TableCell><Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0 }, isInterstate)])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, blankItem()])}><Plus className="h-3.5 w-3.5 mr-1" />Add Item</Button>
             </div>
           </CardContent>
         </Card>
@@ -285,9 +326,12 @@ export default function DebitNoteForm() {
         </Card>
       </div>
 
-      <div className="pt-2 border-t">
-        <Button type="submit" disabled={createMutation.isPending}>
-          {createMutation.isPending ? "Saving..." : isEdit ? "Update Debit Note" : "Save Debit Note"}
+      <div className="flex flex-wrap gap-3 pt-2 border-t">
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? "Saving..." : isEdit ? "Update Debit Note" : "Save Debit Note"}
+        </Button>
+        <Button type="button" variant="outline" disabled={isSaving} onClick={handleSaveAndPrint} className="gap-2">
+          <Printer className="h-4 w-4" />Save &amp; Print
         </Button>
       </div>
     </form>

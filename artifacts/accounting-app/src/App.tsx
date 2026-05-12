@@ -40,8 +40,10 @@ import ReceiptList from "@/pages/accounts/receipts";
 import ReceiptForm from "@/pages/accounts/receipt-form";
 import CreditNotesList from "@/pages/accounts/credit-notes";
 import CreditNoteForm from "@/pages/accounts/credit-note-form";
+import CreditNoteView from "@/pages/accounts/credit-note-view";
 import DebitNotesList from "@/pages/accounts/debit-notes";
 import DebitNoteForm from "@/pages/accounts/debit-note-form";
+import DebitNoteView from "@/pages/accounts/debit-note-view";
 
 // Inventory
 import StockItemList from "@/pages/inventory/items";
@@ -153,9 +155,11 @@ function Router() {
       <PR path="/accounts/credit-notes" component={CreditNotesList} />
       <PR path="/accounts/credit-notes/new" component={CreditNoteForm} />
       <PR path="/accounts/credit-notes/:id/edit" component={CreditNoteForm} />
+      <PR path="/accounts/credit-notes/:id" component={CreditNoteView} />
       <PR path="/accounts/debit-notes" component={DebitNotesList} />
       <PR path="/accounts/debit-notes/new" component={DebitNoteForm} />
       <PR path="/accounts/debit-notes/:id/edit" component={DebitNoteForm} />
+      <PR path="/accounts/debit-notes/:id" component={DebitNoteView} />
 
       {/* Inventory */}
       <PR path="/inventory/items" component={StockItemList} />
