@@ -49,7 +49,7 @@ router.post("/parties", authMiddleware, async (req, res) => {
   const data = req.body;
   const existing = await db.select({ id: partiesTable.id }).from(partiesTable)
     .where(and(eq(partiesTable.name, data.name), eq(partiesTable.isDeleted, "false"))).limit(1);
-  if (existing.length > 0) return res.status(409).json({ error: `A party named "${data.name}" already exists` });
+  if (existing.length > 0) return res.status(409).json({ error: `A ledger named "${data.name}" already exists`, code: "DUPLICATE_NAME" });
 
   const accountGroup = data.accountGroup || "Sundry Debtors";
   const companyState = await getCompanyState();
@@ -96,10 +96,20 @@ router.get("/parties/:id", authMiddleware, async (req, res) => {
 router.put("/parties/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const data = req.body;
+
+  // Block edit if invoices exist for this party
+  const [saleInv] = await db.select({ id: saleInvoicesTable.id }).from(saleInvoicesTable)
+    .where(and(eq(saleInvoicesTable.partyId, Number(id)), eq(saleInvoicesTable.isDeleted, "false"))).limit(1);
+  const [purchInv] = await db.select({ id: purchaseInvoicesTable.id }).from(purchaseInvoicesTable)
+    .where(and(eq(purchaseInvoicesTable.partyId, Number(id)), eq(purchaseInvoicesTable.isDeleted, "false"))).limit(1);
+  if (saleInv || purchInv) {
+    return res.status(400).json({ error: "This ledger has invoices and cannot be edited.", code: "HAS_INVOICES" });
+  }
+
   if (data.name) {
     const existing = await db.select({ id: partiesTable.id }).from(partiesTable)
       .where(and(eq(partiesTable.name, data.name), eq(partiesTable.isDeleted, "false"), ne(partiesTable.id, Number(id)))).limit(1);
-    if (existing.length > 0) return res.status(409).json({ error: `A party named "${data.name}" already exists` });
+    if (existing.length > 0) return res.status(409).json({ error: `A ledger named "${data.name}" already exists`, code: "DUPLICATE_NAME" });
   }
 
   const accountGroup = data.accountGroup || "Sundry Debtors";
@@ -135,6 +145,16 @@ router.put("/parties/:id", authMiddleware, async (req, res) => {
 
 router.delete("/parties/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
+
+  // Block delete if invoices exist for this party
+  const [saleInv] = await db.select({ id: saleInvoicesTable.id }).from(saleInvoicesTable)
+    .where(and(eq(saleInvoicesTable.partyId, Number(id)), eq(saleInvoicesTable.isDeleted, "false"))).limit(1);
+  const [purchInv] = await db.select({ id: purchaseInvoicesTable.id }).from(purchaseInvoicesTable)
+    .where(and(eq(purchaseInvoicesTable.partyId, Number(id)), eq(purchaseInvoicesTable.isDeleted, "false"))).limit(1);
+  if (saleInv || purchInv) {
+    return res.status(400).json({ error: "This ledger has invoices and cannot be deleted.", code: "HAS_INVOICES" });
+  }
+
   await db.update(partiesTable).set({ isDeleted: "true" }).where(eq(partiesTable.id, Number(id)));
   res.json({ ok: true });
 });

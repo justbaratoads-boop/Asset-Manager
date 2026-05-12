@@ -39,21 +39,27 @@ export default function PartiesList() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteMutation.mutateAsync({ id: deleteId });
-    queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-    setDeleteId(null);
-    toast({ title: "Party deleted" });
+    try {
+      await deleteMutation.mutateAsync({ id: deleteId });
+      queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+      toast({ title: "Ledger deleted" });
+    } catch (err: any) {
+      const msg = err?.data?.error || err?.message || "Failed to delete";
+      toast({ title: "Cannot delete", description: msg, variant: "destructive" });
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Parties</h1>
-          <p className="text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "party" : "parties"}</p>
+          <h1 className="text-xl font-bold">Ledger</h1>
+          <p className="text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "ledger" : "ledgers"}</p>
         </div>
         <Link href="/accounts/parties/new">
-          <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Party</Button>
+          <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Ledger</Button>
         </Link>
       </div>
 
