@@ -2,7 +2,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable,
-  creditNotesTable, creditNoteItemsTable, debitNotesTable, debitNoteItemsTable
+  creditNotesTable, creditNoteItemsTable, debitNotesTable, debitNoteItemsTable,
+  ledgersTable
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -59,10 +60,13 @@ router.get("/journals/:id", authMiddleware, async (req, res) => {
     id: journalLinesTable.id,
     entryId: journalLinesTable.entryId,
     ledgerId: journalLinesTable.ledgerId,
+    ledgerName: ledgersTable.name,
     partyId: journalLinesTable.partyId,
     type: journalLinesTable.type,
     amount: journalLinesTable.amount,
-  }).from(journalLinesTable).where(eq(journalLinesTable.entryId, Number(req.params.id)));
+  }).from(journalLinesTable)
+    .leftJoin(ledgersTable, eq(journalLinesTable.ledgerId, ledgersTable.id))
+    .where(eq(journalLinesTable.entryId, Number(req.params.id)));
   res.json({ ...entry, totalDebit: Number(entry.totalDebit), totalCredit: Number(entry.totalCredit), lines });
 });
 
