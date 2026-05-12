@@ -113,10 +113,6 @@ export default function ItemForm() {
             <Label>Unit</Label>
             <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" />
           </div>
-          <div className="space-y-1">
-            <Label>Barcode</Label>
-            <Input value={form.barcode} onChange={e => set("barcode", e.target.value)} />
-          </div>
         </CardContent>
       </Card>
 
