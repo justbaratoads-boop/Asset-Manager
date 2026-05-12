@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +60,9 @@ export default function CreditNotesList() {
                 <p className="font-bold text-base text-green-600 shrink-0">{formatCurrency(n.amount)}</p>
               </div>
               <div className="flex gap-2 border-t pt-3">
+                <Link href={`/accounts/credit-notes/${n.id}`} className="flex-1">
+                  <Button size="sm" variant="outline" className="w-full"><Eye className="h-3.5 w-3.5 mr-1" />View</Button>
+                </Link>
                 <Link href={`/accounts/credit-notes/${n.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
@@ -103,6 +106,7 @@ export default function CreditNotesList() {
                   <TableCell className="text-right text-green-600 font-medium">{formatCurrency(n.amount)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Link href={`/accounts/credit-notes/${n.id}`}><Button size="icon" variant="ghost" className="h-7 w-7" title="View"><Eye className="h-3.5 w-3.5" /></Button></Link>
                       <Link href={`/accounts/credit-notes/${n.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(n.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>

@@ -180,10 +180,7 @@ export default function SaleInvoiceForm() {
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
   const [charges, setCharges] = useState<OtherCharge[]>([]);
-  const [payType, setPayType] = useState<"none" | "partial" | "full">("none");
-  const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState("cash");
-  const [payRef, setPayRef] = useState("");
+  const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
 
@@ -201,24 +198,19 @@ export default function SaleInvoiceForm() {
   const chargesTotal = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
   const grandTotal = totals.grand + chargesTotal;
 
-  const amountPaid = payType === "none" ? 0
-    : payType === "full" ? grandTotal
-    : Math.min(Number(payAmount) || 0, grandTotal);
+  const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const balanceDue = grandTotal - amountPaid;
 
-  useEffect(() => {
-    if (payType === "full") setPayAmount(grandTotal > 0 ? String(grandTotal.toFixed(2)) : "");
-  }, [payType, grandTotal]);
+  const updatePayRow = (i: number, field: string, value: string) => {
+    setPayRows(prev => { const u = [...prev]; u[i] = { ...u[i], [field]: value }; return u; });
+  };
 
   const handleBillTypeChange = (type: "credit" | "cash") => {
     setBillType(type);
     if (type === "cash") {
-      setPayType("full");
-      setPayAmount(String(grandTotal.toFixed(2)));
-      setPayMethod("cash");
+      setPayRows([{ mode: "cash", amount: grandTotal > 0 ? String(grandTotal.toFixed(2)) : "", reference: "" }]);
     } else {
-      setPayType("none");
-      setPayAmount("");
+      setPayRows([]);
     }
   };
 
@@ -239,14 +231,10 @@ export default function SaleInvoiceForm() {
     const interstate = inv.isInterstate === "true" || inv.isInterstate === true;
     setIsInterstate(interstate);
     setNotes(inv.notes || "");
-    const paid = Number(inv.amountPaid) || 0;
-    const grand = Number(inv.grandTotal) || 0;
-    if (paid <= 0) { setPayType("none"); }
-    else if (paid >= grand) { setPayType("full"); setPayAmount(String(paid.toFixed(2))); }
-    else { setPayType("partial"); setPayAmount(String(paid.toFixed(2))); }
     if (inv.payments?.length) {
-      setPayMethod(inv.payments[0].mode || "cash");
-      setPayRef(inv.payments[0].reference || "");
+      setPayRows(inv.payments.map((p: any) => ({ mode: p.mode || "cash", amount: String(p.amount || ""), reference: p.reference || "" })));
+    } else {
+      setPayRows([]);
     }
     if (inv.otherCharges) {
       try { setCharges(JSON.parse(inv.otherCharges)); } catch { setCharges([]); }
@@ -328,19 +316,13 @@ export default function SaleInvoiceForm() {
       if (!items[i].rate || items[i].rate <= 0) { e.items = `Row ${i + 1}: Rate must be > 0`; break; }
     }
     if (items.length === 0) e.items = "Add at least one item";
-    if (payType === "partial") {
-      const amt = Number(payAmount);
-      if (!amt || amt <= 0) e.payment = "Enter a valid partial payment amount";
-      else if (amt > grandTotal) e.payment = `Amount cannot exceed total (${formatCurrency(grandTotal)})`;
-    }
+    if (amountPaid > grandTotal + 0.01) e.payment = `Total payments (${formatCurrency(amountPaid)}) cannot exceed invoice total (${formatCurrency(grandTotal)})`;
     return e;
   };
 
   const buildPayload = () => {
     const partyName = billType === "credit" ? (selectedParty?.name || "") : (manualName || "Cash Sale");
-    const payments = payType !== "none" && amountPaid > 0
-      ? [{ mode: payMethod, amount: amountPaid, reference: payRef }]
-      : [];
+    const payments = payRows.filter(r => Number(r.amount) > 0).map(r => ({ mode: r.mode, amount: Number(r.amount), reference: r.reference }));
     return {
       date,
       partyId: billType === "credit" ? partyId : undefined,
@@ -690,50 +672,40 @@ export default function SaleInvoiceForm() {
 
           <Card className="border-primary/20">
             <CardHeader className="pb-2"><CardTitle className="text-sm text-primary">Payment Entry</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-3 gap-1 bg-muted/50 p-1 rounded-lg">
-                {(["none", "partial", "full"] as const).map(t => (
-                  <button key={t} type="button"
-                    onClick={() => {
-                      setPayType(t);
-                      setErrors(p => { const n = { ...p }; delete n.payment; return n; });
-                      if (t === "full") setPayAmount(String(grandTotal.toFixed(2)));
-                      if (t === "none") setPayAmount("");
-                    }}
-                    className={`py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${payType === t ? "bg-white dark:bg-zinc-800 shadow text-primary" : "text-muted-foreground hover:text-foreground"}`}>
-                    {t === "none" ? "No Payment" : t === "partial" ? "Partial" : "Full"}
-                  </button>
-                ))}
+            <CardContent className="space-y-2 px-4 pb-4 pt-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted-foreground">Add one or more payment rows</span>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1"
+                  onClick={() => setPayRows(p => [...p, { mode: "cash", amount: "", reference: "" }])}>
+                  <Plus className="h-3.5 w-3.5" />Add Payment
+                </Button>
               </div>
-
-              {payType !== "none" && (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Amount Received *</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
-                      <Input className="pl-7 h-10 text-base font-semibold" type="number" inputMode="decimal" min="0" step="any"
-                        value={payAmount}
-                        onChange={e => { setPayAmount(e.target.value); if (payType === "full") setPayType("partial"); setErrors(p => { const n = { ...p }; delete n.payment; return n; }); }}
-                        placeholder="0.00" readOnly={payType === "full"} />
-                    </div>
-                    {errors.payment && <p className="text-xs text-destructive">{errors.payment}</p>}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Payment Mode</Label>
-                    <Select value={payMethod} onValueChange={setPayMethod}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Reference / Cheque No. (optional)</Label>
-                    <Input className="h-9 text-sm" placeholder="e.g. UTR, Cheque no." value={payRef} onChange={e => setPayRef(e.target.value)} />
-                  </div>
-                </div>
+              {payRows.length === 0 && (
+                <p className="text-xs text-muted-foreground py-1 italic">No payment recorded — balance will be due.</p>
               )}
-
-              <div className="border-t pt-3 space-y-1 text-sm">
+              {payRows.map((row, i) => (
+                <div key={i} className="flex gap-1.5 items-center">
+                  <Select value={row.mode} onValueChange={v => updatePayRow(i, "mode", v)}>
+                    <SelectTrigger className="h-8 text-xs w-[112px] shrink-0"><SelectValue /></SelectTrigger>
+                    <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <div className="relative flex-1 min-w-[80px]">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
+                    <Input className="pl-5 h-8 text-sm" type="number" inputMode="decimal" min="0" step="any"
+                      value={row.amount}
+                      onChange={e => { updatePayRow(i, "amount", e.target.value); setErrors(p => { const n = { ...p }; delete n.payment; return n; }); }}
+                      placeholder="0.00" />
+                  </div>
+                  <Input className="h-8 text-xs flex-1 min-w-[72px]" placeholder="Ref / UTR" value={row.reference}
+                    onChange={e => updatePayRow(i, "reference", e.target.value)} />
+                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0"
+                    onClick={() => setPayRows(p => p.filter((_, j) => j !== i))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              {errors.payment && <p className="text-xs text-destructive">{errors.payment}</p>}
+              <div className="border-t pt-2 space-y-1 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Amount Paid</span><span className="font-semibold text-green-600">{formatCurrency(amountPaid)}</span></div>
                 <div className="flex justify-between font-bold"><span>Balance Due</span><span className={balanceDue > 0 ? "text-red-600" : "text-green-600"}>{formatCurrency(balanceDue)}</span></div>
               </div>
