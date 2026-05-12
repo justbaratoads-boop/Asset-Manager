@@ -3,10 +3,37 @@ import { db } from "@workspace/db";
 import {
   saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockItemsTable, stockTransactionsTable
 } from "@workspace/db/schema";
-import { eq, and, like, gte, lte, sql } from "drizzle-orm";
+import { partiesTable } from "@workspace/db/schema";
+import { eq, and, like, gte, lte, sql, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber } from "../lib/counter";
 import { companySettingsTable } from "@workspace/db/schema";
+
+async function checkCreditLimit(partyId: number, newBalanceDue: number, excludeInvoiceId?: number): Promise<string | null> {
+  const [party] = await db.select().from(partiesTable).where(eq(partiesTable.id, partyId)).limit(1);
+  if (!party || party.creditLimitEnabled !== "true" || !party.creditLimit) return null;
+
+  const limit = Number(party.creditLimit);
+  if (limit <= 0) return null;
+
+  const conditions: any[] = [
+    eq(saleInvoicesTable.partyId, partyId),
+    eq(saleInvoicesTable.isDeleted, "false"),
+  ];
+  if (excludeInvoiceId) conditions.push(ne(saleInvoicesTable.id, excludeInvoiceId));
+
+  const rows = await db.select({ balanceDue: saleInvoicesTable.balanceDue })
+    .from(saleInvoicesTable)
+    .where(and(...conditions));
+
+  const outstanding = rows.reduce((sum, r) => sum + Number(r.balanceDue), 0);
+  const projected = outstanding + newBalanceDue;
+
+  if (projected > limit) {
+    return `Credit limit of ₹${limit.toLocaleString("en-IN")} reached. Current outstanding: ₹${outstanding.toLocaleString("en-IN")}. This invoice would take it to ₹${projected.toLocaleString("en-IN")}.`;
+  }
+  return null;
+}
 
 const router = Router();
 
@@ -39,6 +66,13 @@ router.get("/sale-invoices", authMiddleware, async (req, res) => {
 
 router.post("/sale-invoices", authMiddleware, async (req, res) => {
   const data = req.body;
+
+  // Credit limit check — only for credit invoices with a party
+  if (data.partyId && Number(data.balanceDue) > 0) {
+    const limitError = await checkCreditLimit(Number(data.partyId), Number(data.balanceDue));
+    if (limitError) return res.status(400).json({ error: limitError, code: "CREDIT_LIMIT_REACHED" });
+  }
+
   const settings = await db.select().from(companySettingsTable).limit(1);
   const prefix = settings[0]?.invoicePrefix || "INV";
   const invoiceNumber = await makeInvoiceNumber(prefix);
@@ -144,6 +178,12 @@ router.get("/sale-invoices/:id", authMiddleware, async (req, res) => {
 router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const data = req.body;
+
+  // Credit limit check — exclude this invoice's own existing balance when recalculating
+  if (data.partyId && Number(data.balanceDue) > 0) {
+    const limitError = await checkCreditLimit(Number(data.partyId), Number(data.balanceDue), Number(id));
+    if (limitError) return res.status(400).json({ error: limitError, code: "CREDIT_LIMIT_REACHED" });
+  }
 
   // Update the invoice header
   const [invoice] = await db.update(saleInvoicesTable).set({
