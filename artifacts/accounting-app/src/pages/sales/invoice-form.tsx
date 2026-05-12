@@ -482,18 +482,43 @@ export default function SaleInvoiceForm() {
                       </div>
                     </div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">GST%</Label>
-                      {item.gstLocked ? (
-                        <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
-                      ) : (
-                        <Select value={String(item.gstPct)} onValueChange={v => updateItem(index, "gstPct", v)}>
-                          <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
-                        </Select>
-                      )}
+                      <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground">
+                        <Lock className="h-3 w-3 shrink-0" />{item.gstPct}%
+                      </div>
                     </div>
                   </div>
-                  {/* Per-item amount breakdown */}
-                  {item.quantity > 0 && item.rate > 0 && (
+
+                  {/* Inclusive GST breakdown — always visible when inclusive and has values */}
+                  {item.quantity > 0 && item.rate > 0 && item.gstInclusive && item.gstPct > 0 && (
+                    <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
+                      <p className="font-semibold text-amber-800 mb-1">GST Inclusive Breakdown</p>
+                      <div className="flex justify-between text-amber-900">
+                        <span>Rate entered (incl. {item.gstPct}% GST)</span>
+                        <span className="font-medium">{formatCurrency(item.rate)} × {item.quantity}</span>
+                      </div>
+                      <div className="flex justify-between text-green-800 font-medium">
+                        <span>Cost Price (base)</span>
+                        <span>{formatCurrency(item.taxableAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-blue-800 font-medium">
+                        <span>GST ({item.gstPct}%)</span>
+                        <span>+ {formatCurrency(item.gstAmount)}</span>
+                      </div>
+                      {item.discountAmount > 0 && (
+                        <div className="flex justify-between text-red-700">
+                          <span>Discount ({item.discountPct}%)</span>
+                          <span>− {formatCurrency(item.discountAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold border-t border-amber-200 pt-1 mt-0.5 text-amber-900">
+                        <span>Item Total</span>
+                        <span>{formatCurrency(item.total)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Standard breakdown for exclusive GST */}
+                  {item.quantity > 0 && item.rate > 0 && (!item.gstInclusive || item.gstPct === 0) && (
                     <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-xs space-y-0.5">
                       <div className="flex justify-between text-muted-foreground">
                         <span>Base amount</span>
@@ -501,7 +526,7 @@ export default function SaleInvoiceForm() {
                       </div>
                       {item.gstPct > 0 && (
                         <div className="flex justify-between text-muted-foreground">
-                          <span>GST ({item.gstPct}%{item.gstInclusive ? " incl." : ""})</span>
+                          <span>GST ({item.gstPct}%)</span>
                           <span>+ {formatCurrency(item.gstAmount)}</span>
                         </div>
                       )}
@@ -565,23 +590,42 @@ export default function SaleInvoiceForm() {
                       <TableCell>
                         <div className="space-y-1">
                           <GstToggle value={item.gstInclusive} onChange={v => updateItem(index, "gstInclusive", v)} />
-                          {item.gstLocked ? (
-                            <div className="h-8 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
-                          ) : (
-                            <Select value={String(item.gstPct)} onValueChange={v => updateItem(index, "gstPct", v)}>
-                              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                              <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
-                            </Select>
-                          )}
+                          <div className="h-8 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground">
+                            <Lock className="h-3 w-3 shrink-0" />{item.gstPct}%
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
                         {item.quantity > 0 && item.rate > 0 ? (
-                          <div className="space-y-0.5 text-xs leading-tight">
-                            <div className="text-muted-foreground">{formatCurrency(item.taxableAmount)} base</div>
-                            {item.gstPct > 0 && <div className="text-muted-foreground">+ {formatCurrency(item.gstAmount)} GST{item.gstInclusive ? " (incl.)" : ""}</div>}
-                            <div className="font-bold text-sm text-foreground border-t pt-0.5">{formatCurrency(item.total)}</div>
-                          </div>
+                          item.gstInclusive && item.gstPct > 0 ? (
+                            <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs space-y-0.5 text-left min-w-[130px]">
+                              <div className="flex justify-between text-green-800 font-medium">
+                                <span>Base</span>
+                                <span>{formatCurrency(item.taxableAmount)}</span>
+                              </div>
+                              <div className="flex justify-between text-blue-800 font-medium">
+                                <span>GST {item.gstPct}%</span>
+                                <span>+{formatCurrency(item.gstAmount)}</span>
+                              </div>
+                              {item.discountAmount > 0 && (
+                                <div className="flex justify-between text-red-700">
+                                  <span>Disc.</span>
+                                  <span>−{formatCurrency(item.discountAmount)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between font-bold border-t border-amber-200 pt-0.5 text-amber-900 text-sm">
+                                <span>Total</span>
+                                <span>{formatCurrency(item.total)}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5 text-xs leading-tight">
+                              <div className="text-muted-foreground">{formatCurrency(item.taxableAmount)} base</div>
+                              {item.gstPct > 0 && <div className="text-muted-foreground">+{formatCurrency(item.gstAmount)} GST</div>}
+                              {item.discountAmount > 0 && <div className="text-red-600">−{formatCurrency(item.discountAmount)} disc.</div>}
+                              <div className="font-bold text-sm text-foreground border-t pt-0.5">{formatCurrency(item.total)}</div>
+                            </div>
+                          )
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
