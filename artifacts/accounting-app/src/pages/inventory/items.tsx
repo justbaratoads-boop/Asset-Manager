@@ -23,9 +23,15 @@ export default function StockItemList() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteMutation.mutateAsync({ id: deleteId });
-    queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey() });
-    setDeleteId(null);
+    try {
+      await deleteMutation.mutateAsync({ id: deleteId });
+      queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey() });
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Failed to delete";
+      toast({ title: "Cannot delete", description: msg, variant: "destructive" });
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   const list = items as any[];
