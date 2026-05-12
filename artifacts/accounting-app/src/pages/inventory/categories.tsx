@@ -19,6 +19,7 @@ export default function Categories() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [nameError, setNameError] = useState("");
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -33,11 +34,21 @@ export default function Categories() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    await createMutation.mutateAsync({ data: { name: name.trim() } as any });
-    queryClient.invalidateQueries({ queryKey: getListStockCategoriesQueryKey() });
-    setOpen(false);
-    setName("");
-    toast({ title: "Category created" });
+    try {
+      await createMutation.mutateAsync({ data: { name: name.trim() } as any });
+      queryClient.invalidateQueries({ queryKey: getListStockCategoriesQueryKey() });
+      setOpen(false);
+      setName("");
+      setNameError("");
+      toast({ title: "Category created" });
+    } catch (err: any) {
+      const msg: string = err?.response?.data?.error || err?.message || "Failed to create";
+      if (msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("already there")) {
+        setNameError(msg);
+      } else {
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      }
+    }
   };
 
   const startEdit = (c: any) => {
@@ -94,7 +105,7 @@ export default function Categories() {
           <h1 className="text-xl font-bold">Stock Categories</h1>
           <p className="text-sm text-muted-foreground">{list.length} categories</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setName(""); setNameError(""); } }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />New Category</Button>
           </DialogTrigger>
@@ -103,7 +114,15 @@ export default function Categories() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-1">
                 <Label>Name *</Label>
-                <Input required value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="e.g. Electronics, Chemicals" />
+                <Input
+                  required
+                  value={name}
+                  onChange={e => { setName(e.target.value); setNameError(""); }}
+                  autoFocus
+                  placeholder="e.g. Electronics, Chemicals"
+                  className={nameError ? "border-destructive focus-visible:ring-destructive" : ""}
+                />
+                {nameError && <p className="text-xs text-destructive">{nameError}</p>}
               </div>
               <Button type="submit" className="w-full" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create"}
