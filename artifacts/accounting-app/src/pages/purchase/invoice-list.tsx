@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Pencil, Trash2, Calendar, X, IndianRupee, Eye, FileText } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Calendar, X, IndianRupee, Eye, FileText, Ban, RotateCcw } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -321,6 +321,7 @@ export default function PurchaseInvoiceList() {
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [cancelId, setCancelId] = useState<number | null>(null);
   const [payInvoice, setPayInvoice] = useState<any | null>(null);
   const [viewId, setViewId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -338,6 +339,27 @@ export default function PurchaseInvoiceList() {
     queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
     setDeleteId(null);
     toast({ title: "Invoice deleted" });
+  };
+
+  const handleCancel = async () => {
+    if (!cancelId) return;
+    try {
+      await customFetch(`/api/purchase-invoices/${cancelId}/cancel`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
+      toast({ title: "Invoice cancelled" });
+    } catch (err: any) {
+      toast({ title: "Failed to cancel", description: err?.data?.error || err.message, variant: "destructive" });
+    } finally { setCancelId(null); }
+  };
+
+  const handleUncancel = async (id: number) => {
+    try {
+      await customFetch(`/api/purchase-invoices/${id}/uncancel`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
+      toast({ title: "Invoice restored" });
+    } catch (err: any) {
+      toast({ title: "Failed to restore", description: err?.data?.error || err.message, variant: "destructive" });
+    }
   };
 
   const hasFilters = dateFrom || dateTo || statusFilter !== "all";
@@ -423,9 +445,18 @@ export default function PurchaseInvoiceList() {
                 <Link href={`/purchase/invoices/${inv.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
-                {Number(inv.balanceDue) > 0 && (
+                {Number(inv.balanceDue) > 0 && inv.status !== "cancelled" && (
                   <Button size="sm" variant="outline" className="flex-1 text-green-600 border-green-200 hover:bg-green-50" onClick={() => setPayInvoice(inv)}>
                     <IndianRupee className="h-3.5 w-3.5 mr-1" />Pay
+                  </Button>
+                )}
+                {inv.status === "cancelled" ? (
+                  <Button size="sm" variant="outline" className="px-3 text-amber-600 border-amber-200 hover:bg-amber-50" title="Restore invoice" onClick={() => handleUncancel(inv.id)}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" className="px-3 text-orange-600 border-orange-200 hover:bg-orange-50" title="Cancel invoice" onClick={() => setCancelId(inv.id)}>
+                    <Ban className="h-3.5 w-3.5" />
                   </Button>
                 )}
                 <Button size="sm" variant="outline" className="text-destructive border-destructive/30 px-3" onClick={() => setDeleteId(inv.id)}>
@@ -480,9 +511,18 @@ export default function PurchaseInvoiceList() {
                       <Link href={`/purchase/invoices/${inv.id}/edit`}>
                         <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
                       </Link>
-                      {Number(inv.balanceDue) > 0 && (
+                      {Number(inv.balanceDue) > 0 && inv.status !== "cancelled" && (
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" title="Record Payment" onClick={() => setPayInvoice(inv)}>
                           <IndianRupee className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {inv.status === "cancelled" ? (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Restore invoice" onClick={() => handleUncancel(inv.id)}>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-orange-600" title="Cancel invoice" onClick={() => setCancelId(inv.id)}>
+                          <Ban className="h-3.5 w-3.5" />
                         </Button>
                       )}
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(inv.id)}>
@@ -513,6 +553,7 @@ export default function PurchaseInvoiceList() {
       />
 
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
+      <ConfirmDialog open={!!cancelId} onOpenChange={o => !o && setCancelId(null)} onConfirm={handleCancel} title="Cancel invoice?" description="This will mark the invoice as cancelled. You can restore it later." confirmLabel="Cancel Invoice" />
     </div>
   );
 }

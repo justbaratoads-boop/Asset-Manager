@@ -16,6 +16,7 @@ interface ConfirmDialogProps {
   description?: string;
   onConfirm: () => void;
   loading?: boolean;
+  confirmLabel?: string;
 }
 
 export function ConfirmDialog({
@@ -25,6 +26,7 @@ export function ConfirmDialog({
   description = "This action cannot be undone.",
   onConfirm,
   loading,
+  confirmLabel,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -36,7 +38,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            {loading ? "Deleting..." : "Delete"}
+            {loading ? "Processing..." : confirmLabel ?? "Delete"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

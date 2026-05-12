@@ -147,4 +147,20 @@ async function convertOrder(req: Request, res: Response) {
 router.post("/orders/:id/convert", authMiddleware, convertOrder);
 router.post("/orders/:id/convert-to-invoice", authMiddleware, convertOrder);
 
+router.post("/orders/:id/cancel", authMiddleware, async (req, res) => {
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
+  if (!order) return res.status(404).json({ error: "Not found" });
+  if (order.status === "cancelled") return res.status(400).json({ error: "Already cancelled" });
+  await db.update(ordersTable).set({ status: "cancelled" }).where(eq(ordersTable.id, Number(req.params.id)));
+  res.json({ ok: true, status: "cancelled" });
+});
+
+router.post("/orders/:id/uncancel", authMiddleware, async (req, res) => {
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
+  if (!order) return res.status(404).json({ error: "Not found" });
+  if (order.status !== "cancelled") return res.status(400).json({ error: "Order is not cancelled" });
+  await db.update(ordersTable).set({ status: "pending" }).where(eq(ordersTable.id, Number(req.params.id)));
+  res.json({ ok: true, status: "pending" });
+});
+
 export default router;

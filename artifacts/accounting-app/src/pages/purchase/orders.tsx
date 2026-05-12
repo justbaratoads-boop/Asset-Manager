@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Pencil, Trash2, Calendar, X, Eye, PackageCheck, CheckCheck, ShoppingBag } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Calendar, X, Eye, PackageCheck, CheckCheck, ShoppingBag, Ban, RotateCcw } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -330,6 +330,7 @@ export default function PurchaseOrderList() {
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [cancelId, setCancelId] = useState<number | null>(null);
   const [viewId, setViewId] = useState<number | null>(null);
   const [receiveId, setReceiveId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -344,6 +345,27 @@ export default function PurchaseOrderList() {
     await deleteMutation.mutateAsync({ id: deleteId });
     queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
     setDeleteId(null);
+  };
+
+  const handleCancel = async () => {
+    if (!cancelId) return;
+    try {
+      await customFetch(`/api/purchase-orders/${cancelId}/cancel`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
+      toast({ title: "Purchase order cancelled" });
+    } catch (err: any) {
+      toast({ title: "Failed to cancel", description: err?.data?.error || err.message, variant: "destructive" });
+    } finally { setCancelId(null); }
+  };
+
+  const handleUncancel = async (id: number) => {
+    try {
+      await customFetch(`/api/purchase-orders/${id}/uncancel`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
+      toast({ title: "Purchase order restored to open" });
+    } catch (err: any) {
+      toast({ title: "Failed to restore", description: err?.data?.error || err.message, variant: "destructive" });
+    }
   };
 
   const handleReceiveDone = (result: any) => {
@@ -444,6 +466,15 @@ export default function PurchaseOrderList() {
                     <PackageCheck className="h-3.5 w-3.5 mr-1" />Receive
                   </Button>
                 )}
+                {o.status === "cancelled" ? (
+                  <Button size="sm" variant="outline" className="px-3 text-amber-600 border-amber-200 hover:bg-amber-50" title="Restore order" onClick={() => handleUncancel(o.id)}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" className="px-3 text-orange-600 border-orange-200 hover:bg-orange-50" title="Cancel order" onClick={() => setCancelId(o.id)}>
+                    <Ban className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="text-destructive border-destructive/30 px-3" onClick={() => setDeleteId(o.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -499,6 +530,15 @@ export default function PurchaseOrderList() {
                           <PackageCheck className="h-3.5 w-3.5" />
                         </Button>
                       )}
+                      {o.status === "cancelled" ? (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Restore order" onClick={() => handleUncancel(o.id)}>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-orange-600" title="Cancel order" onClick={() => setCancelId(o.id)}>
+                          <Ban className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(o.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -513,6 +553,7 @@ export default function PurchaseOrderList() {
       </Card>
 
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
+      <ConfirmDialog open={!!cancelId} onOpenChange={o => !o && setCancelId(null)} onConfirm={handleCancel} title="Cancel purchase order?" description="This will mark the order as cancelled. You can restore it later." confirmLabel="Cancel Order" />
 
       <PurchaseOrderViewSheet id={viewId} onClose={() => setViewId(null)} />
 

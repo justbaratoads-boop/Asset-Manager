@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useListOrders, useDeleteOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
+import { useListOrders, useDeleteOrder, getListOrdersQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Pencil, Trash2, FileText, Calendar, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FileText, Calendar, X, Ban, RotateCcw } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,7 @@ export default function OrderList() {
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [cancelId, setCancelId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [, setLocation] = useLocation();
   const { data: orders = [], isLoading } = useListOrders({ search: search || undefined });
@@ -46,6 +47,27 @@ export default function OrderList() {
     queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
     setDeleteId(null);
     toast({ title: "Order deleted" });
+  };
+
+  const handleCancel = async () => {
+    if (!cancelId) return;
+    try {
+      await customFetch(`/api/orders/${cancelId}/cancel`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      toast({ title: "Order cancelled" });
+    } catch (err: any) {
+      toast({ title: "Failed to cancel order", description: err?.data?.error || err.message, variant: "destructive" });
+    } finally { setCancelId(null); }
+  };
+
+  const handleUncancel = async (id: number) => {
+    try {
+      await customFetch(`/api/orders/${id}/uncancel`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      toast({ title: "Order restored to pending" });
+    } catch (err: any) {
+      toast({ title: "Failed to restore order", description: err?.data?.error || err.message, variant: "destructive" });
+    }
   };
 
   const hasFilters = dateFrom || dateTo || statusFilter !== "all";
@@ -130,6 +152,15 @@ export default function OrderList() {
                     <FileText className="h-3.5 w-3.5 mr-1" />Invoice
                   </Button>
                 )}
+                {order.status === "cancelled" ? (
+                  <Button size="sm" variant="outline" className="px-3 text-amber-600 border-amber-200 hover:bg-amber-50" title="Restore order" onClick={() => handleUncancel(order.id)}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" className="px-3 text-orange-600 border-orange-200 hover:bg-orange-50" title="Cancel order" onClick={() => setCancelId(order.id)}>
+                    <Ban className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="text-destructive border-destructive/30 px-3" onClick={() => setDeleteId(order.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -176,6 +207,15 @@ export default function OrderList() {
                           <FileText className="h-3.5 w-3.5" />
                         </Button>
                       )}
+                      {order.status === "cancelled" ? (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Restore order" onClick={() => handleUncancel(order.id)}>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-orange-600" title="Cancel order" onClick={() => setCancelId(order.id)}>
+                          <Ban className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(order.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
@@ -187,6 +227,7 @@ export default function OrderList() {
         </CardContent>
       </Card>
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
+      <ConfirmDialog open={!!cancelId} onOpenChange={o => !o && setCancelId(null)} onConfirm={handleCancel} title="Cancel order?" description="This will mark the order as cancelled. You can restore it later." confirmLabel="Cancel Order" />
     </div>
   );
 }

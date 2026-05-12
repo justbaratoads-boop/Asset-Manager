@@ -211,6 +211,26 @@ router.delete("/purchase-invoices/:id", authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+router.post("/purchase-invoices/:id/cancel", authMiddleware, async (req, res) => {
+  const [inv] = await db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).limit(1);
+  if (!inv) return res.status(404).json({ error: "Not found" });
+  if (inv.status === "cancelled") return res.status(400).json({ error: "Already cancelled" });
+  await db.update(purchaseInvoicesTable).set({ status: "cancelled" }).where(eq(purchaseInvoicesTable.id, Number(req.params.id)));
+  res.json({ ok: true, status: "cancelled" });
+});
+
+router.post("/purchase-invoices/:id/uncancel", authMiddleware, async (req, res) => {
+  const [inv] = await db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).limit(1);
+  if (!inv) return res.status(404).json({ error: "Not found" });
+  if (inv.status !== "cancelled") return res.status(400).json({ error: "Invoice is not cancelled" });
+  const paid = Number(inv.amountPaid);
+  const total = Number(inv.grandTotal);
+  const balance = Number(inv.balanceDue);
+  const restored = balance <= 0 ? "paid" : paid > 0 ? "partial" : "confirmed";
+  await db.update(purchaseInvoicesTable).set({ status: restored }).where(eq(purchaseInvoicesTable.id, Number(req.params.id)));
+  res.json({ ok: true, status: restored });
+});
+
 // Purchase orders
 router.get("/purchase-orders", authMiddleware, async (req, res) => {
   const conditions: any[] = [eq(purchaseOrdersTable.isDeleted, "false")];
@@ -270,6 +290,22 @@ router.put("/purchase-orders/:id", authMiddleware, async (req, res) => {
 router.delete("/purchase-orders/:id", authMiddleware, async (req, res) => {
   await db.update(purchaseOrdersTable).set({ isDeleted: "true" }).where(eq(purchaseOrdersTable.id, Number(req.params.id)));
   res.json({ ok: true });
+});
+
+router.post("/purchase-orders/:id/cancel", authMiddleware, async (req, res) => {
+  const [order] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, Number(req.params.id))).limit(1);
+  if (!order) return res.status(404).json({ error: "Not found" });
+  if (order.status === "cancelled") return res.status(400).json({ error: "Already cancelled" });
+  await db.update(purchaseOrdersTable).set({ status: "cancelled" }).where(eq(purchaseOrdersTable.id, Number(req.params.id)));
+  res.json({ ok: true, status: "cancelled" });
+});
+
+router.post("/purchase-orders/:id/uncancel", authMiddleware, async (req, res) => {
+  const [order] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, Number(req.params.id))).limit(1);
+  if (!order) return res.status(404).json({ error: "Not found" });
+  if (order.status !== "cancelled") return res.status(400).json({ error: "Order is not cancelled" });
+  await db.update(purchaseOrdersTable).set({ status: "open" }).where(eq(purchaseOrdersTable.id, Number(req.params.id)));
+  res.json({ ok: true, status: "open" });
 });
 
 router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => {
