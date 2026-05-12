@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Package } from "lucide-react";
+import { ItemMultiSearch } from "@/components/item-search-combobox";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
@@ -88,27 +89,17 @@ function BatchDialog({ batch, stockItems, onSaved, onClose }: {
         <Input type="date" value={form.expiryDate} onChange={e => set("expiryDate", e.target.value)} />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         <Label>Assign Stock Items</Label>
         {stockItems.length === 0 ? (
           <p className="text-xs text-muted-foreground py-2">No stock items found. Add items first.</p>
         ) : (
-          <div className="border rounded-md max-h-48 overflow-y-auto divide-y">
-            {stockItems.map(item => (
-              <label key={item.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={selectedItems.includes(item.id)}
-                  onChange={() => toggleItem(item.id)}
-                  className="h-4 w-4 accent-primary"
-                />
-                <span className="text-sm">{item.name}</span>
-              </label>
-            ))}
-          </div>
-        )}
-        {selectedItems.length > 0 && (
-          <p className="text-xs text-muted-foreground">{selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""} selected</p>
+          <ItemMultiSearch
+            stockItems={stockItems}
+            selectedIds={selectedItems}
+            onToggle={toggleItem}
+            placeholder="Search and add items…"
+          />
         )}
       </div>
 

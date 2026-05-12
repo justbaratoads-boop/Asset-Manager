@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save } from "lucide-react";
+import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { useToast } from "@/hooks/use-toast";
 
 interface Item {
@@ -187,6 +188,10 @@ export default function PurchaseInvoiceForm() {
     }
   };
 
+  const clearItem = (index: number) => {
+    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: undefined, gstLocked: false }, isInterstate); return u; });
+  };
+
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
@@ -292,15 +297,17 @@ export default function PurchaseInvoiceForm() {
                       <span className="text-sm font-semibold text-muted-foreground">Item {i + 1}</span>
                       <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                     </div>
-                    <div className="flex gap-2">
-                      <Select onValueChange={v => selectStock(i, v)}>
-                        <SelectTrigger className="h-10 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
-                        <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <Button type="button" size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Quick add" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}><Plus className="h-4 w-4" /></Button>
-                    </div>
-                    {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
-                    {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
+                    <ItemSearchCombobox
+                      stockItems={stockItems as any[]}
+                      itemName={item.itemName}
+                      stockItemId={item.stockItemId}
+                      onNameChange={v => updateItem(i, "itemName", v)}
+                      onItemSelect={si => selectStock(i, String(si.id))}
+                      onClear={() => clearItem(i)}
+                      onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
+                      placeholder="Search item…"
+                      inputClassName="h-10"
+                    />
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>{item.stockItemId ? (<div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<Input className="h-10 text-base" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />)}</div>
@@ -348,15 +355,16 @@ export default function PurchaseInvoiceForm() {
                     {items.map((item, i) => (
                       <TableRow key={i}>
                         <TableCell>
-                          <div className="flex gap-1 items-center">
-                            <Select onValueChange={v => selectStock(i, v)}>
-                              <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
-                              <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                            </Select>
-                            <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" title="Quick add item" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}><Plus className="h-3.5 w-3.5" /></Button>
-                          </div>
-                          {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
-                          {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
+                          <ItemSearchCombobox
+                            stockItems={stockItems as any[]}
+                            itemName={item.itemName}
+                            stockItemId={item.stockItemId}
+                            onNameChange={v => updateItem(i, "itemName", v)}
+                            onItemSelect={si => selectStock(i, String(si.id))}
+                            onClear={() => clearItem(i)}
+                            onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
+                            placeholder="Search item…"
+                          />
                         </TableCell>
                         <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                         <TableCell>{item.stockItemId ? (<div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<Input className="h-9 text-sm" value={item.unit} onChange={e => updateItem(i, "unit", e.target.value)} />)}</TableCell>
