@@ -9,30 +9,53 @@ const router = Router();
 // ---- BATCHES ----
 router.get("/stock-batches", authMiddleware, async (_req, res) => {
   const batches = await db.select().from(stockBatchesTable).orderBy(stockBatchesTable.name);
-  res.json(batches);
+  // attach assigned items to each batch
+  const items = await db.select({
+    id: stockItemsTable.id,
+    name: stockItemsTable.name,
+    batchId: stockItemsTable.batchId,
+  }).from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false"));
+
+  const result = batches.map(b => ({
+    ...b,
+    items: items.filter(i => i.batchId === b.id).map(i => ({ id: i.id, name: i.name })),
+  }));
+  res.json(result);
 });
 
 router.post("/stock-batches", authMiddleware, async (req, res) => {
-  const [batch] = await db.insert(stockBatchesTable).values({
-    name: req.body.name,
-    description: req.body.description,
-    expiryDate: req.body.expiryDate,
-  }).returning();
+  const { name, description, expiryDate, itemIds } = req.body;
+  const [batch] = await db.insert(stockBatchesTable).values({ name, description, expiryDate }).returning();
+  // assign selected items to this batch
+  if (Array.isArray(itemIds) && itemIds.length > 0) {
+    for (const itemId of itemIds) {
+      await db.update(stockItemsTable).set({ batchId: batch.id }).where(eq(stockItemsTable.id, Number(itemId)));
+    }
+  }
   res.status(201).json(batch);
 });
 
 router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
-  const [batch] = await db.update(stockBatchesTable).set({
-    name: req.body.name,
-    description: req.body.description,
-    expiryDate: req.body.expiryDate,
-  }).where(eq(stockBatchesTable.id, Number(req.params.id))).returning();
+  const id = Number(req.params.id);
+  const { name, description, expiryDate, itemIds } = req.body;
+  const [batch] = await db.update(stockBatchesTable).set({ name, description, expiryDate })
+    .where(eq(stockBatchesTable.id, id)).returning();
   if (!batch) return res.status(404).json({ error: "Not found" });
+  // clear previous assignments for this batch, then set new ones
+  await db.update(stockItemsTable).set({ batchId: null }).where(eq(stockItemsTable.batchId, id));
+  if (Array.isArray(itemIds) && itemIds.length > 0) {
+    for (const itemId of itemIds) {
+      await db.update(stockItemsTable).set({ batchId: id }).where(eq(stockItemsTable.id, Number(itemId)));
+    }
+  }
   res.json(batch);
 });
 
 router.delete("/stock-batches/:id", authMiddleware, async (req, res) => {
-  await db.delete(stockBatchesTable).where(eq(stockBatchesTable.id, Number(req.params.id)));
+  const id = Number(req.params.id);
+  // clear batchId on assigned items before deleting
+  await db.update(stockItemsTable).set({ batchId: null }).where(eq(stockItemsTable.batchId, id));
+  await db.delete(stockBatchesTable).where(eq(stockBatchesTable.id, id));
   res.json({ ok: true });
 });
 

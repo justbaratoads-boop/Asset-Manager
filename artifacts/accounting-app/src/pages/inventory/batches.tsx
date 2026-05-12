@@ -5,41 +5,71 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Pencil, Trash2, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
 
+interface BatchItem { id: number; name: string; }
 interface Batch {
   id: number;
   name: string;
   description?: string;
   expiryDate?: string;
-  createdAt?: string;
+  items: BatchItem[];
 }
+interface StockItem { id: number; name: string; }
 
-function BatchDialog({ batch, onSaved, onClose }: { batch?: Batch; onSaved: () => void; onClose: () => void }) {
+function BatchDialog({ batch, stockItems, onSaved, onClose }: {
+  batch?: Batch;
+  stockItems: StockItem[];
+  onSaved: () => void;
+  onClose: () => void;
+}) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ name: batch?.name || "", description: batch?.description || "", expiryDate: batch?.expiryDate || "" });
+  const [form, setForm] = useState({
+    name: batch?.name || "",
+    description: batch?.description || "",
+    expiryDate: batch?.expiryDate || "",
+  });
+  const [selectedItems, setSelectedItems] = useState<number[]>(
+    batch?.items?.map(i => i.id) ?? []
+  );
   const [loading, setLoading] = useState(false);
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  const toggleItem = (id: number) => {
+    setSelectedItems(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { toast({ title: "Batch name is required", variant: "destructive" }); return; }
     setLoading(true);
     try {
+      const payload = { ...form, itemIds: selectedItems };
       if (batch) {
-        await customFetch(`/api/stock-batches/${batch.id}`, { method: "PUT", body: JSON.stringify(form), headers: { "Content-Type": "application/json" } });
+        await customFetch(`/api/stock-batches/${batch.id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" },
+        });
       } else {
-        await customFetch("/api/stock-batches", { method: "POST", body: JSON.stringify(form), headers: { "Content-Type": "application/json" } });
+        await customFetch("/api/stock-batches", {
+          method: "POST",
+          body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" },
+        });
       }
       toast({ title: batch ? "Batch updated" : "Batch created" });
       onSaved();
       onClose();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err?.message || "Failed to save", variant: "destructive" });
     } finally { setLoading(false); }
   };
 
@@ -47,7 +77,7 @@ function BatchDialog({ batch, onSaved, onClose }: { batch?: Batch; onSaved: () =
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
         <Label>Batch Name *</Label>
-        <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Batch-2024-A" />
+        <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Batch-2024-A" autoFocus />
       </div>
       <div className="space-y-1">
         <Label>Description</Label>
@@ -57,7 +87,34 @@ function BatchDialog({ batch, onSaved, onClose }: { batch?: Batch; onSaved: () =
         <Label>Expiry Date</Label>
         <Input type="date" value={form.expiryDate} onChange={e => set("expiryDate", e.target.value)} />
       </div>
-      <Button type="submit" disabled={loading}>{loading ? "Saving..." : batch ? "Update Batch" : "Create Batch"}</Button>
+
+      <div className="space-y-2">
+        <Label>Assign Stock Items</Label>
+        {stockItems.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-2">No stock items found. Add items first.</p>
+        ) : (
+          <div className="border rounded-md max-h-48 overflow-y-auto divide-y">
+            {stockItems.map(item => (
+              <label key={item.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={selectedItems.includes(item.id)}
+                  onChange={() => toggleItem(item.id)}
+                  className="h-4 w-4 accent-primary"
+                />
+                <span className="text-sm">{item.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {selectedItems.length > 0 && (
+          <p className="text-xs text-muted-foreground">{selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""} selected</p>
+        )}
+      </div>
+
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? "Saving..." : batch ? "Update Batch" : "Create Batch"}
+      </Button>
     </form>
   );
 }
@@ -66,19 +123,20 @@ export default function Batches() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: batches = [], isLoading } = useFetch<Batch[]>("/api/stock-batches");
+  const { data: stockItems = [] } = useFetch<StockItem[]>("/api/stock-items");
   const [newOpen, setNewOpen] = useState(false);
   const [editBatch, setEditBatch] = useState<Batch | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/stock-batches"] });
 
   const deleteBatch = async (id: number) => {
-    if (!confirm("Delete this batch?")) return;
+    if (!confirm("Delete this batch? Assigned items will be unlinked.")) return;
     try {
       await customFetch(`/api/stock-batches/${id}`, { method: "DELETE" });
       toast({ title: "Batch deleted" });
       invalidate();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err?.message || "Failed to delete", variant: "destructive" });
     }
   };
 
@@ -90,9 +148,13 @@ export default function Batches() {
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-2" />New Batch</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>New Batch</DialogTitle></DialogHeader>
-            <BatchDialog onSaved={invalidate} onClose={() => setNewOpen(false)} />
+            <BatchDialog
+              stockItems={stockItems as StockItem[]}
+              onSaved={invalidate}
+              onClose={() => setNewOpen(false)}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -101,7 +163,7 @@ export default function Batches() {
         <CardHeader><CardTitle className="text-base">All Batches</CardTitle></CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">Loading...</p>
           ) : (batches as Batch[]).length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">No batches yet. Create one to get started.</p>
           ) : (
@@ -111,7 +173,8 @@ export default function Batches() {
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Expiry Date</TableHead>
-                  <TableHead className="w-24"></TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -121,6 +184,22 @@ export default function Batches() {
                     <TableCell className="text-muted-foreground">{batch.description || "—"}</TableCell>
                     <TableCell>{batch.expiryDate || "—"}</TableCell>
                     <TableCell>
+                      {batch.items?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {batch.items.slice(0, 3).map(item => (
+                            <Badge key={item.id} variant="secondary" className="text-xs font-normal">
+                              <Package className="h-2.5 w-2.5 mr-1" />{item.name}
+                            </Badge>
+                          ))}
+                          {batch.items.length > 3 && (
+                            <Badge variant="outline" className="text-xs">+{batch.items.length - 3} more</Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No items</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex gap-1">
                         <Dialog open={editBatch?.id === batch.id} onOpenChange={open => !open && setEditBatch(null)}>
                           <DialogTrigger asChild>
@@ -128,10 +207,15 @@ export default function Batches() {
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="max-w-md">
                             <DialogHeader><DialogTitle>Edit Batch</DialogTitle></DialogHeader>
                             {editBatch?.id === batch.id && (
-                              <BatchDialog batch={editBatch} onSaved={invalidate} onClose={() => setEditBatch(null)} />
+                              <BatchDialog
+                                batch={editBatch}
+                                stockItems={stockItems as StockItem[]}
+                                onSaved={invalidate}
+                                onClose={() => setEditBatch(null)}
+                              />
                             )}
                           </DialogContent>
                         </Dialog>
