@@ -16,6 +16,7 @@ import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
+import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 
 interface InvoiceItem {
   stockItemId?: number;
@@ -166,6 +167,7 @@ export default function SaleInvoiceForm() {
 
   const [billType, setBillType] = useState<"credit" | "cash">("credit");
   const [partyId, setPartyId] = useState<number | undefined>();
+  const [showAddParty, setShowAddParty] = useState(false);
   const [manualName, setManualName] = useState("");
   const [date, setDate] = useState(today());
   const [isInterstate, setIsInterstate] = useState(false);
@@ -408,7 +410,10 @@ export default function SaleInvoiceForm() {
             <div className="grid grid-cols-2 gap-4">
               {billType === "credit" ? (
                 <div className="space-y-1">
-                  <Label>Party *</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Party *</Label>
+                    <button type="button" onClick={() => setShowAddParty(true)} className="text-xs text-primary hover:underline font-medium">+ Add Party</button>
+                  </div>
                   <Select value={partyId ? String(partyId) : ""} onValueChange={v => { setPartyId(Number(v)); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}>
                     <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select party" /></SelectTrigger>
                     <SelectContent>{(parties as any[]).filter((p: any) => p.type === "customer" || p.type === "both").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
@@ -730,6 +735,12 @@ export default function SaleInvoiceForm() {
       </div>
 
       <QuickAddItemDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={handleQuickAdded} />
+      <QuickAddPartyDialog
+        open={showAddParty}
+        onOpenChange={setShowAddParty}
+        defaultAccountGroup="Sundry Debtors"
+        onCreated={p => { setPartyId(p.id); setErrors(prev => { const n = { ...prev }; delete n.party; return n; }); }}
+      />
     </form>
   );
 }

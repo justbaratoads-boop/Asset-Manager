@@ -22,8 +22,8 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   open,
   onOpenChange,
-  title = "Are you sure?",
-  description = "This action cannot be undone.",
+  title = "Delete this entry?",
+  description = "This entry will be permanently deleted and cannot be recovered.",
   onConfirm,
   loading,
   confirmLabel,

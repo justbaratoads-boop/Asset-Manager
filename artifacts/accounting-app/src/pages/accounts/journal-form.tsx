@@ -226,6 +226,8 @@ export default function JournalForm() {
                     className="h-8 text-xs text-right"
                     type="number"
                     min="0"
+                    step="any"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={line.drAmount || ""}
                     onChange={e => {
@@ -237,6 +239,8 @@ export default function JournalForm() {
                     className="h-8 text-xs text-right"
                     type="number"
                     min="0"
+                    step="any"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={line.crAmount || ""}
                     onChange={e => {

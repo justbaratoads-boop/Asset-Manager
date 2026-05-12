@@ -85,7 +85,7 @@ export default function PaymentForm() {
       <Card>
         <CardContent className="p-4 grid grid-cols-2 gap-4">
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.date} onChange={e => set("date", e.target.value)} /></div>
-          <div className="space-y-1"><Label>Amount *</Label><Input type="number" required value={form.amount} onChange={e => set("amount", e.target.value)} /></div>
+          <div className="space-y-1"><Label>Amount *</Label><Input type="number" required inputMode="decimal" min="0" step="any" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0.00" /></div>
           <div className="space-y-1 col-span-2">
             <Label>Party</Label>
             <Select value={form.partyId} onValueChange={v => set("partyId", v)}>

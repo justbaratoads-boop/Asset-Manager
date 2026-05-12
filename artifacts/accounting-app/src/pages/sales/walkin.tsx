@@ -95,8 +95,8 @@ export default function WalkinSale() {
                     </Select>
                     <Input className="h-7 mt-1 text-xs" placeholder="Name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />
                   </TableCell>
-                  <TableCell><Input className="h-7 text-xs" type="number" value={item.quantity} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                  <TableCell><Input className="h-7 text-xs" type="number" value={item.rate} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
+                  <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.quantity} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
+                  <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.rate} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                   <TableCell>
                     <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
                       <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>

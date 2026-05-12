@@ -157,19 +157,19 @@ export default function ItemForm() {
         <CardContent className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
             <Label>Purchase Rate</Label>
-            <Input type="number" value={form.purchaseRate} onChange={e => set("purchaseRate", e.target.value)} disabled={usedInBills} />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.purchaseRate} onChange={e => set("purchaseRate", e.target.value)} disabled={usedInBills} placeholder="0.00" />
           </div>
           <div className="space-y-1">
             <Label>Sale Rate</Label>
-            <Input type="number" value={form.saleRate} onChange={e => set("saleRate", e.target.value)} disabled={usedInBills} />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.saleRate} onChange={e => set("saleRate", e.target.value)} disabled={usedInBills} placeholder="0.00" />
           </div>
           <div className="space-y-1">
             <Label>Min Stock Level</Label>
-            <Input type="number" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} disabled={usedInBills} />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} disabled={usedInBills} placeholder="0" />
           </div>
           <div className="space-y-1">
             <Label>{isEdit ? "Physical Stock" : "Opening Stock"}</Label>
-            <Input type="number" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} disabled={usedInBills} />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} disabled={usedInBills} placeholder="0" />
           </div>
         </CardContent>
       </Card>

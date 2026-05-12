@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save } from "lucide-react";
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
+import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 
@@ -125,6 +126,7 @@ export default function PurchaseInvoiceForm() {
   const [items, setItems] = useState<Item[]>([calc({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false }, false)]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [showAddParty, setShowAddParty] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
@@ -271,7 +273,10 @@ export default function PurchaseInvoiceForm() {
             <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <Label>Supplier *</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Supplier *</Label>
+                    <button type="button" onClick={() => setShowAddParty(true)} className="text-xs text-primary hover:underline font-medium">+ Add Party</button>
+                  </div>
                   <Select value={partyId ? String(partyId) : ""} onValueChange={v => { setPartyId(Number(v)); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}>
                     <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select supplier" /></SelectTrigger>
                     <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier" || p.type === "both").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
@@ -479,6 +484,12 @@ export default function PurchaseInvoiceForm() {
       </div>
 
       <QuickAddItemDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={handleQuickAdded} />
+      <QuickAddPartyDialog
+        open={showAddParty}
+        onOpenChange={setShowAddParty}
+        defaultAccountGroup="Sundry Creditors"
+        onCreated={p => { setPartyId(p.id); setErrors(prev => { const n = { ...prev }; delete n.party; return n; }); }}
+      />
     </form>
   );
 }

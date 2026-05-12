@@ -12,6 +12,7 @@ import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
+import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 
 interface POItem {
   stockItemId?: number;
@@ -74,6 +75,7 @@ export default function PurchaseOrderForm() {
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<POItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showAddParty, setShowAddParty] = useState(false);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
@@ -158,7 +160,10 @@ export default function PurchaseOrderForm() {
         <CardHeader><CardTitle className="text-base">Supplier & Date</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label>Supplier *</Label>
+            <div className="flex items-center justify-between">
+              <Label>Supplier *</Label>
+              <button type="button" onClick={() => setShowAddParty(true)} className="text-xs text-primary hover:underline font-medium">+ Add Party</button>
+            </div>
             <Select value={partyId ? String(partyId) : ""} onValueChange={selectParty}>
               <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select supplier" /></SelectTrigger>
               <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier" || p.type === "both").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
@@ -298,6 +303,13 @@ export default function PurchaseOrderForm() {
           </div>
         </CardContent>
       </Card>
+
+      <QuickAddPartyDialog
+        open={showAddParty}
+        onOpenChange={setShowAddParty}
+        defaultAccountGroup="Sundry Creditors"
+        onCreated={p => { setPartyId(p.id); setPartyName(p.name); setErrors(prev => { const n = { ...prev }; delete n.party; return n; }); }}
+      />
     </form>
   );
 }

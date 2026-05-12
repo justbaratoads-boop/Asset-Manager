@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
+import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface OrderItem {
@@ -137,6 +138,7 @@ export default function OrderForm() {
   const [dispatchNotes, setDispatchNotes] = useState("");
   const [items, setItems] = useState<OrderItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showAddParty, setShowAddParty] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
@@ -241,7 +243,10 @@ export default function OrderForm() {
         <CardHeader><CardTitle className="text-base">Party & Date</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label>Party *</Label>
+            <div className="flex items-center justify-between">
+              <Label>Party *</Label>
+              <button type="button" onClick={() => setShowAddParty(true)} className="text-xs text-primary hover:underline font-medium">+ Add Party</button>
+            </div>
             <Select value={partyId ? String(partyId) : ""} onValueChange={selectParty}>
               <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select party" /></SelectTrigger>
               <SelectContent>{(parties as any[]).filter((p: any) => p.type === "customer" || p.type === "both").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
@@ -400,6 +405,12 @@ export default function OrderForm() {
       </Card>
 
       <QuickAddItemDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={handleQuickAdded} />
+      <QuickAddPartyDialog
+        open={showAddParty}
+        onOpenChange={setShowAddParty}
+        defaultAccountGroup="Sundry Debtors"
+        onCreated={p => { setPartyId(p.id); setPartyName(p.name); setPartyPhone(p.phone || ""); setErrors(prev => { const n = { ...prev }; delete n.party; return n; }); }}
+      />
     </form>
   );
 }
