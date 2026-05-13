@@ -5,22 +5,41 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/pagination";
+import { ExportButtons } from "@/components/export-buttons";
+import { ColumnSelector } from "@/components/column-selector";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
+const ALL_COLUMNS = [
+  { header: "#", key: "idx" },
+  { header: "Item", key: "name" },
+  { header: "Unit", key: "unit" },
+  { header: "Physical Stock", key: "physicalStock", format: (v: any) => String(Number(v)) },
+  { header: "Reserved (Orders)", key: "reservedQty", format: (v: any) => String(Number(v)) },
+  { header: "Available Stock", key: "availableStock", format: (v: any) => String(Number(v)) },
+  { header: "Status", key: "status" },
+];
+
 function availBadge(avail: number, minStock: number) {
-  if (avail < 0)
-    return <Badge variant="outline" className="bg-red-100 text-red-700 text-xs">Overbooked</Badge>;
-  if (avail === 0)
-    return <Badge variant="outline" className="bg-amber-100 text-amber-700 text-xs">Out of Stock</Badge>;
-  if (avail <= minStock)
-    return <Badge variant="outline" className="bg-amber-100 text-amber-700 text-xs">Low Stock</Badge>;
+  if (avail < 0) return <Badge variant="outline" className="bg-red-100 text-red-700 text-xs">Overbooked</Badge>;
+  if (avail === 0) return <Badge variant="outline" className="bg-amber-100 text-amber-700 text-xs">Out of Stock</Badge>;
+  if (avail <= minStock) return <Badge variant="outline" className="bg-amber-100 text-amber-700 text-xs">Low Stock</Badge>;
   return <Badge variant="outline" className="bg-green-100 text-green-700 text-xs">Available</Badge>;
+}
+
+function getStatus(item: any): string {
+  if (item.availableStock < 0) return "Overbooked";
+  if (item.availableStock === 0) return "Out of Stock";
+  if (item.availableStock <= item.minStockLevel) return "Low Stock";
+  return "Available";
 }
 
 export default function StockAvailabilityReport() {
   const [page, setPage] = useState(1);
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-availability", ALL_COLUMNS);
+  const vis = visibleKeys;
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["stock-availability"],
@@ -34,35 +53,23 @@ export default function StockAvailabilityReport() {
   const totalReserved = list.reduce((s: number, i: any) => s + i.reservedQty, 0);
   const totalAvailable = list.reduce((s: number, i: any) => s + i.availableStock, 0);
 
+  const exportData = list.map((item, idx) => ({ ...item, idx: idx + 1, status: getStatus(item) }));
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Stock Availability Report</h1>
-        <p className="text-xs text-muted-foreground">{list.length} items</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-muted-foreground">{list.length} items</p>
+          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
+          <ExportButtons data={exportData} columns={visibleColumns} filename="stock-availability" title="Stock Availability Report" />
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Total Physical Stock</p>
-            <p className="text-2xl font-bold">{totalPhysical.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">Units in warehouse</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Reserved (Pending Orders)</p>
-            <p className="text-2xl font-bold text-amber-600">{totalReserved.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">Ordered, not yet delivered</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Available Stock</p>
-            <p className={cn("text-2xl font-bold", totalAvailable < 0 ? "text-red-600" : "text-green-600")}>{totalAvailable.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">Free to sell</p>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground mb-1">Total Physical Stock</p><p className="text-2xl font-bold">{totalPhysical.toLocaleString()}</p><p className="text-xs text-muted-foreground mt-1">Units in warehouse</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground mb-1">Reserved (Pending Orders)</p><p className="text-2xl font-bold text-amber-600">{totalReserved.toLocaleString()}</p><p className="text-xs text-muted-foreground mt-1">Ordered, not yet delivered</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground mb-1">Available Stock</p><p className={cn("text-2xl font-bold", totalAvailable < 0 ? "text-red-600" : "text-green-600")}>{totalAvailable.toLocaleString()}</p><p className="text-xs text-muted-foreground mt-1">Free to sell</p></CardContent></Card>
       </div>
 
       <Card>
@@ -70,43 +77,39 @@ export default function StockAvailabilityReport() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>#</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Unit</TableHead>
-                <TableHead className="text-right">Physical Stock</TableHead>
-                <TableHead className="text-right">Reserved (Orders)</TableHead>
-                <TableHead className="text-right">Available Stock</TableHead>
-                <TableHead>Status</TableHead>
+                {vis.has("idx") && <TableHead>#</TableHead>}
+                {vis.has("name") && <TableHead>Item</TableHead>}
+                {vis.has("unit") && <TableHead>Unit</TableHead>}
+                {vis.has("physicalStock") && <TableHead className="text-right">Physical Stock</TableHead>}
+                {vis.has("reservedQty") && <TableHead className="text-right">Reserved (Orders)</TableHead>}
+                {vis.has("availableStock") && <TableHead className="text-right">Available Stock</TableHead>}
+                {vis.has("status") && <TableHead>Status</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No stock items found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-8">No stock items found</TableCell></TableRow>
               ) : paginated.map((item: any, idx: number) => (
                 <TableRow key={item.id} className={cn(item.availableStock < 0 && "bg-red-50", item.availableStock === 0 && "bg-amber-50")}>
-                  <TableCell className="text-xs text-muted-foreground">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell className="text-sm">{item.unit}</TableCell>
-                  <TableCell className="text-right font-medium">{Number(item.physicalStock).toLocaleString()}</TableCell>
-                  <TableCell className="text-right">
-                    {item.reservedQty > 0 ? (
-                      <span className="text-amber-700 font-medium">{Number(item.reservedQty).toLocaleString()}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-bold">
-                    <span className={cn(
-                      item.availableStock < 0 ? "text-red-600" :
-                      item.availableStock === 0 ? "text-amber-600" :
-                      "text-green-700"
-                    )}>
-                      {Number(item.availableStock).toLocaleString()}
-                    </span>
-                  </TableCell>
-                  <TableCell>{availBadge(item.availableStock, item.minStockLevel)}</TableCell>
+                  {vis.has("idx") && <TableCell className="text-xs text-muted-foreground">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>}
+                  {vis.has("name") && <TableCell className="font-medium">{item.name}</TableCell>}
+                  {vis.has("unit") && <TableCell className="text-sm">{item.unit}</TableCell>}
+                  {vis.has("physicalStock") && <TableCell className="text-right font-medium">{Number(item.physicalStock).toLocaleString()}</TableCell>}
+                  {vis.has("reservedQty") && (
+                    <TableCell className="text-right">
+                      {item.reservedQty > 0 ? <span className="text-amber-700 font-medium">{Number(item.reservedQty).toLocaleString()}</span> : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  )}
+                  {vis.has("availableStock") && (
+                    <TableCell className="text-right font-bold">
+                      <span className={cn(item.availableStock < 0 ? "text-red-600" : item.availableStock === 0 ? "text-amber-600" : "text-green-700")}>
+                        {Number(item.availableStock).toLocaleString()}
+                      </span>
+                    </TableCell>
+                  )}
+                  {vis.has("status") && <TableCell>{availBadge(item.availableStock, item.minStockLevel)}</TableCell>}
                 </TableRow>
               ))}
             </TableBody>

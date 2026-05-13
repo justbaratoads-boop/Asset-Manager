@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
+import { ColumnSelector } from "@/components/column-selector";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -21,7 +23,7 @@ const TYPE_COLORS: Record<string, string> = {
   "Debit Note": "bg-pink-100 text-pink-700",
 };
 
-const columns = [
+const ALL_COLUMNS = [
   { header: "Date", key: "date", format: formatDate },
   { header: "Type", key: "type" },
   { header: "Reference#", key: "number" },
@@ -39,20 +41,23 @@ export default function AllTransactions() {
   const [to, setTo] = useState(fy.to);
   const [typeFilter, setTypeFilter] = useState("all");
   const { data, isLoading } = useGetAllTransactions({ from: from || undefined, to: to || undefined });
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("all-transactions", ALL_COLUMNS);
+  const vis = visibleKeys;
 
   let transactions: any[] = (data as any)?.transactions || [];
-  if (typeFilter !== "all") {
-    transactions = transactions.filter((t: any) => t.type === typeFilter);
-  }
+  if (typeFilter !== "all") transactions = transactions.filter((t: any) => t.type === typeFilter);
 
   const totalDebit = transactions.reduce((s: number, t: any) => s + (t.debit || 0), 0);
   const totalCredit = transactions.reduce((s: number, t: any) => s + (t.credit || 0), 0);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">All Transactions</h1>
-        <ExportButtons data={transactions} columns={columns} filename={`all-transactions-${from}-${to}`} title="All Transactions" />
+        <div className="flex items-center gap-2">
+          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
+          <ExportButtons data={transactions} columns={visibleColumns} filename={`all-transactions-${from}-${to}`} title="All Transactions" />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -81,24 +86,29 @@ export default function AllTransactions() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference#</TableHead>
-                <TableHead>Party / Narration</TableHead><TableHead className="text-right">Amount</TableHead>
+                {vis.has("date") && <TableHead>Date</TableHead>}
+                {vis.has("type") && <TableHead>Type</TableHead>}
+                {vis.has("number") && <TableHead>Reference#</TableHead>}
+                {vis.has("party") && <TableHead>Party / Narration</TableHead>}
+                {vis.has("amount") && <TableHead className="text-right">Amount</TableHead>}
+                {vis.has("debit") && <TableHead className="text-right">Debit</TableHead>}
+                {vis.has("credit") && <TableHead className="text-right">Credit</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
-                ? <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                 : !transactions.length
-                  ? <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
                   : transactions.map((t: any, i: number) => (
                     <TableRow key={i}>
-                      <TableCell className="text-sm">{formatDate(t.date)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{t.number}</TableCell>
-                      <TableCell className="max-w-xs truncate text-sm">{t.party || "-"}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(t.amount)}</TableCell>
+                      {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
+                      {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
+                      {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
+                      {vis.has("party") && <TableCell className="max-w-xs truncate text-sm">{t.party || "-"}</TableCell>}
+                      {vis.has("amount") && <TableCell className="text-right font-medium">{formatCurrency(t.amount)}</TableCell>}
+                      {vis.has("debit") && <TableCell className="text-right">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
+                      {vis.has("credit") && <TableCell className="text-right">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
                     </TableRow>
                   ))
               }

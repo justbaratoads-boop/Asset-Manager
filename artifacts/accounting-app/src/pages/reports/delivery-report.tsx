@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useGetDeliveryReport } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
+import { ColumnSelector } from "@/components/column-selector";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
 import { Truck } from "lucide-react";
 
@@ -17,8 +19,8 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
-const columns = [
-  { header: "Date", key: "date", format: formatDate },
+const ALL_COLUMNS = [
+  { header: "Order Date", key: "date", format: formatDate },
   { header: "Order#", key: "orderNumber" },
   { header: "Party", key: "partyName" },
   { header: "Driver", key: "driverName" },
@@ -34,15 +36,20 @@ export default function DeliveryReport() {
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
   const { data, isLoading } = useGetDeliveryReport({ from: from || undefined, to: to || undefined });
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("delivery-report", ALL_COLUMNS);
+  const vis = visibleKeys;
 
   const orders: any[] = (data as any)?.orders || [];
   const vehicleSummary: any[] = (data as any)?.vehicleSummary || [];
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Delivery Report</h1>
-        <ExportButtons data={orders} columns={columns} filename={`delivery-report-${from}-${to}`} title="Delivery Report" />
+        <div className="flex items-center gap-2">
+          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
+          <ExportButtons data={orders} columns={visibleColumns} filename={`delivery-report-${from}-${to}`} title="Delivery Report" />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -77,30 +84,33 @@ export default function DeliveryReport() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Order Date</TableHead><TableHead>Order#</TableHead><TableHead>Party</TableHead>
-                <TableHead>Driver</TableHead><TableHead>Vehicle</TableHead><TableHead>Vehicle No.</TableHead>
-                <TableHead>Delivery Date</TableHead><TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
+                {vis.has("date") && <TableHead>Order Date</TableHead>}
+                {vis.has("orderNumber") && <TableHead>Order#</TableHead>}
+                {vis.has("partyName") && <TableHead>Party</TableHead>}
+                {vis.has("driverName") && <TableHead>Driver</TableHead>}
+                {vis.has("vehicleName") && <TableHead>Vehicle</TableHead>}
+                {vis.has("vehicleNo") && <TableHead>Vehicle No.</TableHead>}
+                {vis.has("deliveryDate") && <TableHead>Delivery Date</TableHead>}
+                {vis.has("grandTotal") && <TableHead className="text-right">Amount</TableHead>}
+                {vis.has("status") && <TableHead>Status</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
-                ? <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                 : !orders.length
-                  ? <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No dispatched orders for selected period</TableCell></TableRow>
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No dispatched orders for selected period</TableCell></TableRow>
                   : orders.map((o: any) => (
                     <TableRow key={o.id}>
-                      <TableCell className="text-sm">{formatDate(o.date)}</TableCell>
-                      <TableCell className="font-mono text-xs">{o.orderNumber}</TableCell>
-                      <TableCell className="max-w-[140px] truncate">{o.partyName}</TableCell>
-                      <TableCell className="text-sm">{o.driverName || "-"}</TableCell>
-                      <TableCell className="text-sm">{o.vehicleName || "-"}</TableCell>
-                      <TableCell className="font-mono text-xs">{o.vehicleNo || "-"}</TableCell>
-                      <TableCell className="text-sm">{o.deliveryDate ? formatDate(o.deliveryDate) : "-"}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(o.grandTotal)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs capitalize ${STATUS_COLORS[o.status] || ""}`}>{o.status}</Badge>
-                      </TableCell>
+                      {vis.has("date") && <TableCell className="text-sm">{formatDate(o.date)}</TableCell>}
+                      {vis.has("orderNumber") && <TableCell className="font-mono text-xs">{o.orderNumber}</TableCell>}
+                      {vis.has("partyName") && <TableCell className="max-w-[140px] truncate">{o.partyName}</TableCell>}
+                      {vis.has("driverName") && <TableCell className="text-sm">{o.driverName || "-"}</TableCell>}
+                      {vis.has("vehicleName") && <TableCell className="text-sm">{o.vehicleName || "-"}</TableCell>}
+                      {vis.has("vehicleNo") && <TableCell className="font-mono text-xs">{o.vehicleNo || "-"}</TableCell>}
+                      {vis.has("deliveryDate") && <TableCell className="text-sm">{o.deliveryDate ? formatDate(o.deliveryDate) : "-"}</TableCell>}
+                      {vis.has("grandTotal") && <TableCell className="text-right font-medium">{formatCurrency(o.grandTotal)}</TableCell>}
+                      {vis.has("status") && <TableCell><Badge variant="outline" className={`text-xs capitalize ${STATUS_COLORS[o.status] || ""}`}>{o.status}</Badge></TableCell>}
                     </TableRow>
                   ))
               }

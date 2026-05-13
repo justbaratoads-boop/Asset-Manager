@@ -4,6 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
+import { ColumnSelector } from "@/components/column-selector";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 
 const groupColors: Record<string, string> = {
   assets: "bg-blue-100 text-blue-700",
@@ -13,7 +15,7 @@ const groupColors: Record<string, string> = {
   capital: "bg-purple-100 text-purple-700",
 };
 
-const columns = [
+const ALL_COLUMNS = [
   { header: "Ledger", key: "name" },
   { header: "Group", key: "group" },
   { header: "Nature", key: "nature" },
@@ -26,46 +28,60 @@ const columns = [
 export default function TrialBalance() {
   const { data, isLoading } = useGetTrialBalance();
   const rows: any[] = (data as any)?.rows || [];
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("trial-balance", ALL_COLUMNS);
+  const vis = visibleKeys;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Trial Balance</h1>
-        <ExportButtons data={rows} columns={columns} filename="trial-balance" title="Trial Balance" />
+        <div className="flex items-center gap-2">
+          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
+          <ExportButtons data={rows} columns={visibleColumns} filename="trial-balance" title="Trial Balance" />
+        </div>
       </div>
       <Card>
         <CardContent className="p-4">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Ledger</TableHead><TableHead>Group</TableHead>
-                <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
+                {vis.has("name") && <TableHead>Ledger</TableHead>}
+                {vis.has("group") && <TableHead>Group</TableHead>}
+                {vis.has("nature") && <TableHead>Nature</TableHead>}
+                {vis.has("openingBalance") && <TableHead className="text-right">Opening</TableHead>}
+                {vis.has("debit") && <TableHead className="text-right">Debit</TableHead>}
+                {vis.has("credit") && <TableHead className="text-right">Credit</TableHead>}
+                {vis.has("closing") && <TableHead className="text-right">Balance</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
-                ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
                 : !rows.length
-                  ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No ledger data</TableCell></TableRow>
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No ledger data</TableCell></TableRow>
                   : rows.map((r: any) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell><Badge variant="outline" className={`text-xs capitalize ${groupColors[r.group] || ""}`}>{r.group}</Badge></TableCell>
-                      <TableCell className="text-right">{r.debit > 0 ? formatCurrency(r.debit) : ""}</TableCell>
-                      <TableCell className="text-right">{r.credit > 0 ? formatCurrency(r.credit) : ""}</TableCell>
-                      <TableCell className={`text-right font-medium ${r.closing < 0 ? "text-red-600" : ""}`}>
-                        {formatCurrency(Math.abs(r.closing))} {r.closing >= 0 ? "Dr" : "Cr"}
-                      </TableCell>
+                      {vis.has("name") && <TableCell className="font-medium">{r.name}</TableCell>}
+                      {vis.has("group") && <TableCell><Badge variant="outline" className={`text-xs capitalize ${groupColors[r.group] || ""}`}>{r.group}</Badge></TableCell>}
+                      {vis.has("nature") && <TableCell className="text-xs capitalize">{r.nature}</TableCell>}
+                      {vis.has("openingBalance") && <TableCell className="text-right text-sm">{formatCurrency(r.openingBalance)}</TableCell>}
+                      {vis.has("debit") && <TableCell className="text-right">{r.debit > 0 ? formatCurrency(r.debit) : ""}</TableCell>}
+                      {vis.has("credit") && <TableCell className="text-right">{r.credit > 0 ? formatCurrency(r.credit) : ""}</TableCell>}
+                      {vis.has("closing") && (
+                        <TableCell className={`text-right font-medium ${r.closing < 0 ? "text-red-600" : ""}`}>
+                          {formatCurrency(Math.abs(r.closing))} {r.closing >= 0 ? "Dr" : "Cr"}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
               }
               {rows.length > 0 && (
                 <TableRow className="font-bold bg-muted/30">
-                  <TableCell colSpan={2}>Total</TableCell>
-                  <TableCell className="text-right">{formatCurrency((data as any)?.totalDebit)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency((data as any)?.totalCredit)}</TableCell>
-                  <TableCell />
+                  <TableCell colSpan={visibleColumns.filter(c => !["debit","credit","closing","openingBalance"].includes(c.key)).length}>Total</TableCell>
+                  {vis.has("openingBalance") && <TableCell />}
+                  {vis.has("debit") && <TableCell className="text-right">{formatCurrency((data as any)?.totalDebit)}</TableCell>}
+                  {vis.has("credit") && <TableCell className="text-right">{formatCurrency((data as any)?.totalCredit)}</TableCell>}
+                  {vis.has("closing") && <TableCell />}
                 </TableRow>
               )}
             </TableBody>

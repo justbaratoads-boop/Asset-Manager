@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useListParties, useGetPartyStatement } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,12 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
+import { ColumnSelector } from "@/components/column-selector";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
 
-const columns = [
+const ALL_COLUMNS = [
   { header: "Date", key: "date", format: formatDate },
   { header: "Type", key: "type" },
   { header: "Reference#", key: "number" },
+  { header: "Narration", key: "narration" },
   { header: "Debit", key: "debit", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
   { header: "Credit", key: "credit", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
   { header: "Balance", key: "balance", format: (v: any) => String(Number(v).toFixed(2)) },
@@ -33,6 +36,8 @@ export default function PartyStatement() {
   const [to, setTo] = useState(fy.to);
   const { data: parties = [] } = useListParties();
   const { data, isLoading } = useGetPartyStatement({ partyId: partyId || undefined, from: from || undefined, to: to || undefined });
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("party-statement", ALL_COLUMNS);
+  const vis = visibleKeys;
 
   const transactions: any[] = (data as any)?.transactions || [];
   const closingBalance = (data as any)?.closingBalance || 0;
@@ -40,11 +45,14 @@ export default function PartyStatement() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Party Statement</h1>
-        {transactions.length > 0 && (
-          <ExportButtons data={transactions} columns={columns} filename={`party-statement-${selectedParty?.name || ""}`} title={`Party Statement — ${selectedParty?.name || ""}`} />
-        )}
+        <div className="flex items-center gap-2">
+          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
+          {transactions.length > 0 && (
+            <ExportButtons data={transactions} columns={visibleColumns} filename={`party-statement-${selectedParty?.name || ""}`} title={`Party Statement — ${selectedParty?.name || ""}`} />
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -83,33 +91,42 @@ export default function PartyStatement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference#</TableHead>
-                  <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
+                  {vis.has("date") && <TableHead>Date</TableHead>}
+                  {vis.has("type") && <TableHead>Type</TableHead>}
+                  {vis.has("number") && <TableHead>Reference#</TableHead>}
+                  {vis.has("narration") && <TableHead>Narration</TableHead>}
+                  {vis.has("debit") && <TableHead className="text-right">Debit</TableHead>}
+                  {vis.has("credit") && <TableHead className="text-right">Credit</TableHead>}
+                  {vis.has("balance") && <TableHead className="text-right">Balance</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading
-                  ? <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                   : !transactions.length
-                    ? <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No transactions for this party in selected period</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for this party in selected period</TableCell></TableRow>
                     : transactions.map((t: any, i: number) => (
                       <TableRow key={i}>
-                        <TableCell className="text-sm">{formatDate(t.date)}</TableCell>
-                        <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>
-                        <TableCell className="font-mono text-xs">{t.number}</TableCell>
-                        <TableCell className="text-right text-red-600">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>
-                        <TableCell className="text-right text-green-600">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>
-                        <TableCell className={`text-right font-medium ${t.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}</TableCell>
+                        {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
+                        {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
+                        {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
+                        {vis.has("narration") && <TableCell className="text-sm text-muted-foreground">{t.narration || "-"}</TableCell>}
+                        {vis.has("debit") && <TableCell className="text-right text-red-600">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
+                        {vis.has("credit") && <TableCell className="text-right text-green-600">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
+                        {vis.has("balance") && <TableCell className={`text-right font-medium ${t.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}</TableCell>}
                       </TableRow>
                     ))
                 }
                 {transactions.length > 0 && (
                   <TableRow className="font-bold bg-muted/30">
-                    <TableCell colSpan={5}>Closing Balance</TableCell>
-                    <TableCell className={`text-right ${closingBalance < 0 ? "text-red-600" : "text-green-600"}`}>
-                      {formatCurrency(Math.abs(closingBalance))} {closingBalance >= 0 ? "Dr" : "Cr"}
-                    </TableCell>
+                    <TableCell colSpan={visibleColumns.filter(c => !["debit","credit","balance"].includes(c.key)).length}>Closing Balance</TableCell>
+                    {vis.has("debit") && <TableCell />}
+                    {vis.has("credit") && <TableCell />}
+                    {vis.has("balance") && (
+                      <TableCell className={`text-right ${closingBalance < 0 ? "text-red-600" : "text-green-600"}`}>
+                        {formatCurrency(Math.abs(closingBalance))} {closingBalance >= 0 ? "Dr" : "Cr"}
+                      </TableCell>
+                    )}
                   </TableRow>
                 )}
               </TableBody>

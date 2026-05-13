@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
+import { ColumnSelector } from "@/components/column-selector";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
 
-const columns = [
+const ALL_COLUMNS = [
   { header: "Item", key: "name" },
   { header: "Unit", key: "unit" },
   { header: "HSN Code", key: "hsnCode" },
@@ -28,6 +30,8 @@ export default function StockSummary() {
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
   const { data, isLoading } = useGetStockSummary({ from: from || undefined, to: to || undefined });
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-summary", ALL_COLUMNS);
+  const vis = visibleKeys;
 
   const summary: any[] = (data as any)?.summary || [];
   const totalClosingValue = summary.reduce((s: number, i: any) => s + (i.closingValue || 0), 0);
@@ -36,9 +40,12 @@ export default function StockSummary() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Stock Summary</h1>
-        <ExportButtons data={summary} columns={columns} filename={`stock-summary-${from}-${to}`} title="Stock Summary" />
+        <div className="flex items-center gap-2">
+          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
+          <ExportButtons data={summary} columns={visibleColumns} filename={`stock-summary-${from}-${to}`} title="Stock Summary" />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -57,44 +64,51 @@ export default function StockSummary() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item</TableHead><TableHead>Unit</TableHead><TableHead>HSN</TableHead>
-                <TableHead className="text-right">Open Qty</TableHead><TableHead className="text-right">Open Value</TableHead>
-                <TableHead className="text-right">Purchased Qty</TableHead><TableHead className="text-right">Purchase Value</TableHead>
-                <TableHead className="text-right">Sold Qty</TableHead><TableHead className="text-right">Sale Value</TableHead>
-                <TableHead className="text-right font-bold">Close Qty</TableHead><TableHead className="text-right font-bold">Close Value</TableHead>
+                {vis.has("name") && <TableHead>Item</TableHead>}
+                {vis.has("unit") && <TableHead>Unit</TableHead>}
+                {vis.has("hsnCode") && <TableHead>HSN</TableHead>}
+                {vis.has("openingQty") && <TableHead className="text-right">Open Qty</TableHead>}
+                {vis.has("openingValue") && <TableHead className="text-right">Open Value</TableHead>}
+                {vis.has("purchasedQty") && <TableHead className="text-right">Purchased Qty</TableHead>}
+                {vis.has("purchasedValue") && <TableHead className="text-right">Purchase Value</TableHead>}
+                {vis.has("soldQty") && <TableHead className="text-right">Sold Qty</TableHead>}
+                {vis.has("soldValue") && <TableHead className="text-right">Sale Value</TableHead>}
+                {vis.has("closingQty") && <TableHead className="text-right font-bold">Close Qty</TableHead>}
+                {vis.has("closingValue") && <TableHead className="text-right font-bold">Close Value</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
-                ? <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                 : !summary.length
-                  ? <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No stock items found</TableCell></TableRow>
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No stock items found</TableCell></TableRow>
                   : summary.map((item: any) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium max-w-[160px] truncate">{item.name}</TableCell>
-                      <TableCell className="text-xs">{item.unit}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{item.hsnCode || "-"}</TableCell>
-                      <TableCell className="text-right text-sm">{Number(item.openingQty).toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-sm">{formatCurrency(item.openingValue)}</TableCell>
-                      <TableCell className="text-right text-sm text-blue-600">{Number(item.purchasedQty).toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-sm">{formatCurrency(item.purchasedValue)}</TableCell>
-                      <TableCell className="text-right text-sm text-green-600">{Number(item.soldQty).toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-sm">{formatCurrency(item.soldValue)}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        <div className="flex items-center justify-end gap-1">
-                          {Number(item.closingQty).toFixed(2)}
-                          {item.closingQty <= 0 && <Badge variant="outline" className="text-xs text-red-600 border-red-300">Out</Badge>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">{formatCurrency(item.closingValue)}</TableCell>
+                      {vis.has("name") && <TableCell className="font-medium max-w-[160px] truncate">{item.name}</TableCell>}
+                      {vis.has("unit") && <TableCell className="text-xs">{item.unit}</TableCell>}
+                      {vis.has("hsnCode") && <TableCell className="text-xs text-muted-foreground">{item.hsnCode || "-"}</TableCell>}
+                      {vis.has("openingQty") && <TableCell className="text-right text-sm">{Number(item.openingQty).toFixed(2)}</TableCell>}
+                      {vis.has("openingValue") && <TableCell className="text-right text-sm">{formatCurrency(item.openingValue)}</TableCell>}
+                      {vis.has("purchasedQty") && <TableCell className="text-right text-sm text-blue-600">{Number(item.purchasedQty).toFixed(2)}</TableCell>}
+                      {vis.has("purchasedValue") && <TableCell className="text-right text-sm">{formatCurrency(item.purchasedValue)}</TableCell>}
+                      {vis.has("soldQty") && <TableCell className="text-right text-sm text-green-600">{Number(item.soldQty).toFixed(2)}</TableCell>}
+                      {vis.has("soldValue") && <TableCell className="text-right text-sm">{formatCurrency(item.soldValue)}</TableCell>}
+                      {vis.has("closingQty") && (
+                        <TableCell className="text-right font-semibold">
+                          <div className="flex items-center justify-end gap-1">
+                            {Number(item.closingQty).toFixed(2)}
+                            {item.closingQty <= 0 && <Badge variant="outline" className="text-xs text-red-600 border-red-300">Out</Badge>}
+                          </div>
+                        </TableCell>
+                      )}
+                      {vis.has("closingValue") && <TableCell className="text-right font-semibold">{formatCurrency(item.closingValue)}</TableCell>}
                     </TableRow>
                   ))
               }
               {summary.length > 0 && (
                 <TableRow className="font-bold bg-muted/30">
-                  <TableCell colSpan={9}>Total</TableCell>
-                  <TableCell />
-                  <TableCell className="text-right">{formatCurrency(totalClosingValue)}</TableCell>
+                  <TableCell colSpan={visibleColumns.filter(c => c.key !== "closingValue").length}>Total</TableCell>
+                  {vis.has("closingValue") && <TableCell className="text-right">{formatCurrency(totalClosingValue)}</TableCell>}
                 </TableRow>
               )}
             </TableBody>
