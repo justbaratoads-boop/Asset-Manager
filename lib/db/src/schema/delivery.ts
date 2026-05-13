@@ -2,6 +2,16 @@ import { pgTable, serial, text, numeric, integer, timestamp, date } from "drizzl
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const driversTable = pgTable("drivers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  phone: text("phone"),
+  licenseNumber: text("license_number"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
 export const vehiclesTable = pgTable("vehicles", {
   id: serial("id").primaryKey(),
   vehicleNumber: text("vehicle_number").notNull(),
@@ -20,6 +30,7 @@ export const deliveriesTable = pgTable("deliveries", {
   challanNumber: text("challan_number").unique(),
   tripNumber: text("trip_number").notNull().unique(),
   date: date("date"),
+  saleInvoiceId: integer("sale_invoice_id"),
   driverId: integer("driver_id"),
   vehicleId: integer("vehicle_id"),
   invoiceNumber: text("invoice_number"),
@@ -39,8 +50,12 @@ export const deliveryInvoicesTable = pgTable("delivery_invoices", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export type Driver = typeof driversTable.$inferSelect;
 export type Vehicle = typeof vehiclesTable.$inferSelect;
 export type Delivery = typeof deliveriesTable.$inferSelect;
+
+export const insertDriverSchema = createInsertSchema(driversTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDriver = z.infer<typeof insertDriverSchema>;
 
 export const insertVehicleSchema = createInsertSchema(vehiclesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;

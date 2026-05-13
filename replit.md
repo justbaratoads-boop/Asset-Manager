@@ -37,7 +37,7 @@ React + Vite + Tailwind SPA. Full-featured Indian SMB accounting suite.
 - Inventory: Stock Items (GST applicable/rate, batch assignment), Categories, Current Stock, Batches (CRUD)
 - Reports: Day Book, Trial Balance, P&L, Balance Sheet, Registers, Cash Book
 - GST Reports: GSTR-3B, GSTR-2B, HSN Summary
-- Delivery management, Company Settings, Users & Roles
+- Delivery management (Challans, Drivers, Vehicles), Company Settings, Users & Roles
 
 **Sale Invoice form:**
 - Cash/Credit toggle: Credit = party required; Cash = optional customer name, no party

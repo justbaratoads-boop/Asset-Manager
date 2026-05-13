@@ -972,6 +972,28 @@ export interface UpdateDeliveryBody {
   notes?: string | null;
 }
 
+export interface Driver {
+  id: number;
+  name: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  licenseNumber?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface CreateDriverBody {
+  name: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  licenseNumber?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
 export interface Vehicle {
   id: number;
   vehicleNumber: string;

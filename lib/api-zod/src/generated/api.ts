@@ -1904,6 +1904,59 @@ export const UpdateDeliveryResponse = zod.object({
 });
 
 /**
+ * @summary List drivers
+ */
+export const ListDriversResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  phone: zod.string().nullish(),
+  licenseNumber: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const ListDriversResponse = zod.array(ListDriversResponseItem);
+
+/**
+ * @summary Create driver
+ */
+export const CreateDriverBody = zod.object({
+  name: zod.string(),
+  phone: zod.string().nullish(),
+  licenseNumber: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Update driver
+ */
+export const UpdateDriverParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateDriverBody = zod.object({
+  name: zod.string(),
+  phone: zod.string().nullish(),
+  licenseNumber: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const UpdateDriverResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  phone: zod.string().nullish(),
+  licenseNumber: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete driver
+ */
+export const DeleteDriverParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List vehicles
  */
 export const ListVehiclesResponseItem = zod.object({

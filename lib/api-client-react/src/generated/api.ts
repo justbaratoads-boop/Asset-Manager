@@ -24,6 +24,7 @@ import type {
   CreateCreditNoteBody,
   CreateDebitNoteBody,
   CreateDeliveryBody,
+  CreateDriverBody,
   CreateJournalBody,
   CreateLedgerBody,
   CreateOrderBody,
@@ -43,6 +44,7 @@ import type {
   DayBookEntry,
   DebitNote,
   Delivery,
+  Driver,
   GetAllTransactions200,
   GetAllTransactionsParams,
   GetBalanceSheetParams,
@@ -6558,6 +6560,336 @@ export const useUpdateDelivery = <
   TContext
 > => {
   return useMutation(getUpdateDeliveryMutationOptions(options));
+};
+
+/**
+ * @summary List drivers
+ */
+export const getListDriversUrl = () => {
+  return `/api/drivers`;
+};
+
+export const listDrivers = async (options?: RequestInit): Promise<Driver[]> => {
+  return customFetch<Driver[]>(getListDriversUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDriversQueryKey = () => {
+  return [`/api/drivers`] as const;
+};
+
+export const getListDriversQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDrivers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDrivers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListDriversQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listDrivers>>> = ({
+    signal,
+  }) => listDrivers({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDrivers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDriversQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDrivers>>
+>;
+export type ListDriversQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List drivers
+ */
+
+export function useListDrivers<
+  TData = Awaited<ReturnType<typeof listDrivers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDrivers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDriversQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create driver
+ */
+export const getCreateDriverUrl = () => {
+  return `/api/drivers`;
+};
+
+export const createDriver = async (
+  createDriverBody: CreateDriverBody,
+  options?: RequestInit,
+): Promise<Driver> => {
+  return customFetch<Driver>(getCreateDriverUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createDriverBody),
+  });
+};
+
+export const getCreateDriverMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDriver>>,
+    TError,
+    { data: BodyType<CreateDriverBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createDriver>>,
+  TError,
+  { data: BodyType<CreateDriverBody> },
+  TContext
+> => {
+  const mutationKey = ["createDriver"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createDriver>>,
+    { data: BodyType<CreateDriverBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createDriver(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateDriverMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createDriver>>
+>;
+export type CreateDriverMutationBody = BodyType<CreateDriverBody>;
+export type CreateDriverMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create driver
+ */
+export const useCreateDriver = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDriver>>,
+    TError,
+    { data: BodyType<CreateDriverBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createDriver>>,
+  TError,
+  { data: BodyType<CreateDriverBody> },
+  TContext
+> => {
+  return useMutation(getCreateDriverMutationOptions(options));
+};
+
+/**
+ * @summary Update driver
+ */
+export const getUpdateDriverUrl = (id: number) => {
+  return `/api/drivers/${id}`;
+};
+
+export const updateDriver = async (
+  id: number,
+  createDriverBody: CreateDriverBody,
+  options?: RequestInit,
+): Promise<Driver> => {
+  return customFetch<Driver>(getUpdateDriverUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createDriverBody),
+  });
+};
+
+export const getUpdateDriverMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDriver>>,
+    TError,
+    { id: number; data: BodyType<CreateDriverBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateDriver>>,
+  TError,
+  { id: number; data: BodyType<CreateDriverBody> },
+  TContext
+> => {
+  const mutationKey = ["updateDriver"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateDriver>>,
+    { id: number; data: BodyType<CreateDriverBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateDriver(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateDriverMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateDriver>>
+>;
+export type UpdateDriverMutationBody = BodyType<CreateDriverBody>;
+export type UpdateDriverMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update driver
+ */
+export const useUpdateDriver = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDriver>>,
+    TError,
+    { id: number; data: BodyType<CreateDriverBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateDriver>>,
+  TError,
+  { id: number; data: BodyType<CreateDriverBody> },
+  TContext
+> => {
+  return useMutation(getUpdateDriverMutationOptions(options));
+};
+
+/**
+ * @summary Delete driver
+ */
+export const getDeleteDriverUrl = (id: number) => {
+  return `/api/drivers/${id}`;
+};
+
+export const deleteDriver = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteDriverUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteDriverMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDriver>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteDriver>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteDriver"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteDriver>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteDriver(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteDriverMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteDriver>>
+>;
+
+export type DeleteDriverMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete driver
+ */
+export const useDeleteDriver = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDriver>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteDriver>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteDriverMutationOptions(options));
 };
 
 /**

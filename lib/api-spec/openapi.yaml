@@ -26,6 +26,7 @@ tags:
   - name: creditNotes
   - name: debitNotes
   - name: deliveries
+  - name: drivers
   - name: vehicles
   - name: users
   - name: roles
@@ -1589,6 +1590,85 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Delivery"
+
+  # DRIVERS
+  /drivers:
+    get:
+      operationId: listDrivers
+      tags: [drivers]
+      summary: List drivers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Drivers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Driver"
+    post:
+      operationId: createDriver
+      tags: [drivers]
+      summary: Create driver
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDriverBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+
+  /drivers/{id}:
+    put:
+      operationId: updateDriver
+      tags: [drivers]
+      summary: Update driver
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDriverBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+    delete:
+      operationId: deleteDriver
+      tags: [drivers]
+      summary: Delete driver
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
 
   # VEHICLES
   /vehicles:
@@ -3652,6 +3732,40 @@ components:
           enum: [pending, in_transit, delivered]
         notes:
           type: ["string", "null"]
+
+    Driver:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: ["string", "null"]
+        licenseNumber:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+
+    CreateDriverBody:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: ["string", "null"]
+        licenseNumber:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - name
 
     Vehicle:
       type: object
