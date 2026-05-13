@@ -20,6 +20,7 @@ export const partiesTable = pgTable("parties", {
   email: text("email"),
   creditLimitEnabled: text("credit_limit_enabled").notNull().default("false"),
   creditLimit: numeric("credit_limit", { precision: 15, scale: 2 }),
+  paymentTerms: text("payment_terms"),
   openingBalance: numeric("opening_balance", { precision: 15, scale: 2 }).notNull().default("0"),
   balanceType: text("balance_type").notNull().default("dr"),
   isDeleted: text("is_deleted").notNull().default("false"),

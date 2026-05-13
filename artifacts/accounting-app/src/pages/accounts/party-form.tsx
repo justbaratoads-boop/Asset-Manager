@@ -24,6 +24,7 @@ const BLANK_FORM = {
   gstType: "unregistered",
   address: "", city: "", state: "", pincode: "",
   gstin: "", pan: "", phone: "", email: "",
+  paymentTerms: "",
   openingBalance: "", balanceType: "dr",
   creditLimitEnabled: false, creditLimit: "",
 };
@@ -141,6 +142,7 @@ export default function PartyForm() {
       pan: e.pan || "",
       phone: e.phone || "",
       email: e.email || "",
+      paymentTerms: e.paymentTerms || "",
       openingBalance: String(e.openingBalance || ""),
       balanceType: e.balanceType || "dr",
       creditLimitEnabled: e.creditLimitEnabled === "true" || e.creditLimitEnabled === true,
@@ -175,6 +177,7 @@ export default function PartyForm() {
     const payload = {
       ...form,
       gstin: form.gstType !== "unregistered" ? form.gstin.toUpperCase() : undefined,
+      paymentTerms: form.paymentTerms || undefined,
       openingBalance: Number(form.openingBalance) || 0,
       creditLimitEnabled: form.creditLimitEnabled,
       creditLimit: form.creditLimitEnabled && form.creditLimit ? Number(form.creditLimit) : undefined,
@@ -394,6 +397,15 @@ export default function PartyForm() {
       <Card>
         <CardHeader><CardTitle className="text-base">Financial</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <Label>Payment Terms</Label>
+            <Input
+              value={form.paymentTerms}
+              onChange={e => set("paymentTerms", e.target.value)}
+              placeholder="e.g. Net 30 days, Due on receipt"
+              disabled={hasInvoices}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Opening Balance</Label>

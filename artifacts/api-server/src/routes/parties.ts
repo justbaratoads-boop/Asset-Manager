@@ -73,6 +73,7 @@ router.post("/parties", authMiddleware, async (req, res) => {
     email: data.email,
     creditLimitEnabled: data.creditLimitEnabled === true || data.creditLimitEnabled === "true" ? "true" : "false",
     creditLimit: data.creditLimitEnabled && data.creditLimit != null ? String(data.creditLimit) : null,
+    paymentTerms: data.paymentTerms || null,
     openingBalance: String(data.openingBalance || 0),
     balanceType: data.balanceType || "dr",
   }).returning();
@@ -134,6 +135,7 @@ router.put("/parties/:id", authMiddleware, async (req, res) => {
     email: data.email,
     creditLimitEnabled: data.creditLimitEnabled === true || data.creditLimitEnabled === "true" ? "true" : "false",
     creditLimit: data.creditLimitEnabled && data.creditLimit != null ? String(data.creditLimit) : null,
+    paymentTerms: data.paymentTerms || null,
     openingBalance: String(data.openingBalance || 0),
     balanceType: data.balanceType || "dr",
   }).where(eq(partiesTable.id, Number(id))).returning();

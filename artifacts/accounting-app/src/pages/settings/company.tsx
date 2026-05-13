@@ -20,7 +20,7 @@ export default function CompanySettings() {
     gstin: "", pan: "", phone: "", email: "", website: "",
     bankName: "", bankAccount: "", bankIfsc: "", bankBranch: "",
     currency: "INR", financialYearStart: "04",
-    invoicePrefix: "INV", poPrefix: "PO", paymentTerms: "",
+    invoicePrefix: "INV", poPrefix: "PO",
     billFooter: "", logoUrl: "",
   });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -93,8 +93,8 @@ export default function CompanySettings() {
         <CardContent className="grid grid-cols-2 gap-4">
           <div className="space-y-1 col-span-2"><Label>Address</Label><Input value={form.address} onChange={e => set("address", e.target.value)} /></div>
           <div className="space-y-1"><Label>City</Label><Input value={form.city} onChange={e => set("city", e.target.value)} /></div>
-          <div className="space-y-1"><Label>State</Label>
-            <Select value={form.state} onValueChange={v => set("state", v)}>
+          <div className="space-y-1"><Label>State *</Label>
+            <Select value={form.state} onValueChange={v => set("state", v)} required>
               <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
               <SelectContent>{INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
@@ -127,7 +127,6 @@ export default function CompanySettings() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1"><Label>Payment Terms</Label><Input value={form.paymentTerms} onChange={e => set("paymentTerms", e.target.value)} placeholder="e.g. Net 30 days" /></div>
           <div className="space-y-1 col-span-2">
             <Label>Bill Footer / Thank You Message</Label>
             <Textarea value={form.billFooter || ""} onChange={e => set("billFooter", e.target.value)} placeholder="e.g. Thank you for your business! All disputes subject to local jurisdiction." rows={2} />
