@@ -13,6 +13,7 @@ router.get("/users", authMiddleware, async (_req, res) => {
     name: usersTable.name,
     email: usersTable.email,
     role: usersTable.role,
+    permissions: usersTable.permissions,
     phone: usersTable.phone,
     isActive: usersTable.isActive,
     createdAt: usersTable.createdAt,
@@ -60,6 +61,7 @@ router.put("/users/:id", authMiddleware, async (req, res) => {
     name: data.name,
     email: data.email,
     role: data.role,
+    permissions: data.permissions !== undefined ? data.permissions : undefined,
     phone: data.phone,
     isActive: data.isActive,
   };
@@ -71,6 +73,7 @@ router.put("/users/:id", authMiddleware, async (req, res) => {
     name: usersTable.name,
     email: usersTable.email,
     role: usersTable.role,
+    permissions: usersTable.permissions,
     isActive: usersTable.isActive,
   });
   if (!user) return res.status(404).json({ error: "Not found" });

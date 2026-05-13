@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useGetSaleInvoice, useGetCompanySettings, getGetSaleInvoiceQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -615,6 +615,9 @@ export default function SaleInvoiceView() {
 
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [copies, setCopies] = useState("1");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const ps = loadPrintSettings();
   const defaultCopies = ps.invoiceCopies || "1";
   const copyLabelsStr = ps.copyLabels || "Original, Duplicate, Triplicate";
@@ -679,15 +682,12 @@ export default function SaleInvoiceView() {
     }
   };
 
-  const handlePrint = () => {
-    const numCopies = Number(copies);
+  const buildPrintHtml = (numCopies: number) => {
     const printerType = ps.printerType || "a4";
     const layoutStyle = ps.layoutStyle || "1";
     const cssKey = `${printerType}_${layoutStyle}`;
     const css = PRINT_CSS[cssKey] || PRINT_CSS["a4_1"];
-
     const invoiceBody = buildInvoiceHtml(inv, company, ps);
-
     const elements: string[] = [];
     for (let i = 0; i < numCopies; i++) {
       const pageBreak = i > 0 ? `<div style="page-break-before:always"></div>` : "";
@@ -696,14 +696,29 @@ export default function SaleInvoiceView() {
         : "";
       elements.push(`${pageBreak}${copyBadge}${invoiceBody}`);
     }
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${inv?.invoiceNumber}</title><style>${css}@media print{@page{margin:0}}</style></head><body>${elements.join("")}</body></html>`;
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      setTimeout(() => win.print(), 250);
-    }
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${inv?.invoiceNumber}</title><style>${css}@media print{@page{margin:0}}</style></head><body>${elements.join("")}</body></html>`;
+  };
+
+  const handleOpenPreview = () => {
+    const html = buildPrintHtml(Number(copies));
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    setPreviewBlobUrl(url);
     setPrintDialogOpen(false);
+    setPreviewOpen(true);
+  };
+
+  const handlePrintFromPreview = () => {
+    iframeRef.current?.contentWindow?.print();
+  };
+
+  const handleClosePreview = () => {
+    setPreviewOpen(false);
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+      setPreviewBlobUrl(null);
+    }
   };
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
@@ -795,8 +810,44 @@ export default function SaleInvoiceView() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPrintDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handlePrint}><Printer className="h-4 w-4 mr-2" />Print</Button>
+            <Button onClick={handleOpenPreview}><Printer className="h-4 w-4 mr-2" />Preview & Print</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print preview dialog */}
+      <Dialog open={previewOpen} onOpenChange={v => { if (!v) handleClosePreview(); }}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col gap-3 p-4">
+          <DialogHeader className="pb-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="h-4 w-4 text-muted-foreground" />
+              Print Preview — {inv?.invoiceNumber}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              {ps.printerType?.toUpperCase() || "A4"} · Layout {ps.layoutStyle || "1"} · {copies} {Number(copies) === 1 ? "copy" : "copies"}
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden rounded-lg border bg-gray-100 min-h-0">
+            {previewBlobUrl && (
+              <iframe
+                ref={iframeRef}
+                src={previewBlobUrl}
+                className="w-full h-full"
+                title="Print Preview"
+              />
+            )}
+          </div>
+          <div className="flex justify-between items-center pt-1">
+            <Button variant="outline" onClick={handleClosePreview}>Cancel</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => { handleClosePreview(); setPrintDialogOpen(true); }}>
+                Change Settings
+              </Button>
+              <Button onClick={handlePrintFromPreview}>
+                <Printer className="h-4 w-4 mr-2" />Print Now
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

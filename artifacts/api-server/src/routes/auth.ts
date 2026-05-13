@@ -49,7 +49,7 @@ router.get("/auth/me", authMiddleware, async (req, res) => {
   }
 
   const u = users[0];
-  return res.json({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, isActive: u.isActive });
+  return res.json({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, isActive: u.isActive, permissions: u.permissions ?? null });
 });
 
 router.post("/auth/logout", (_req, res) => {

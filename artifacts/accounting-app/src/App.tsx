@@ -200,7 +200,6 @@ function Router() {
       <PR path="/settings/company" component={CompanySettings} />
       <PR path="/settings/print" component={PrintSettings} />
       <PR path="/settings/users" component={UsersSettings} />
-      <PR path="/settings/vehicles" component={DeliveryPage} />
 
       <Route component={NotFound} />
     </Switch>
