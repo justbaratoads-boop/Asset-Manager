@@ -396,7 +396,38 @@ export default function SaleInvoiceView() {
 
   const handlePrint = () => {
     const numCopies = Number(copies);
-    const elements = [];
+    const printerType = ps.printerType || "a4";
+
+    const formatCss: Record<string, string> = {
+      a4: `
+        body { font-family: sans-serif; font-size: 13px; color: #000; margin: 0; padding: 16mm; max-width: 210mm; box-sizing: border-box; }
+        table { border-collapse: collapse; width: 100%; }
+        @page { size: A4; margin: 0; }
+      `,
+      a5: `
+        body { font-family: sans-serif; font-size: 11px; color: #000; margin: 0; padding: 10mm; max-width: 148mm; box-sizing: border-box; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { padding: 3px 4px !important; font-size: 11px !important; }
+        h1 { font-size: 16px !important; } h2 { font-size: 14px !important; }
+        @page { size: A5; margin: 0; }
+      `,
+      thermal: `
+        body { font-family: 'Courier New', monospace; font-size: 11px; color: #000; margin: 0; padding: 4mm; width: 80mm; max-width: 80mm; box-sizing: border-box; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { padding: 2px 2px !important; font-size: 11px !important; border: none !important; }
+        thead tr { border-top: 1px dashed #000 !important; border-bottom: 1px dashed #000 !important; }
+        tfoot tr { border-top: 1px dashed #000 !important; }
+        .border, .border-t, .border-b { border-style: dashed !important; }
+        img { max-width: 60mm; display: block; margin: 0 auto 4px; }
+        h1 { font-size: 14px !important; text-align: center; } h2 { font-size: 12px !important; text-align: center; }
+        .flex { display: block !important; } .sm\\:flex { display: block !important; }
+        .sm\\:text-right { text-align: left !important; }
+        .rounded-xl, .rounded-lg { border-radius: 0 !important; border: none !important; padding: 0 !important; }
+        @page { size: 80mm auto; margin: 0; }
+      `,
+    };
+
+    const elements: string[] = [];
     for (let i = 0; i < numCopies; i++) {
       elements.push(`<div class="copy" style="${i > 0 ? "page-break-before:always;" : ""}">`);
       if (numCopies > 1) {
@@ -405,7 +436,7 @@ export default function SaleInvoiceView() {
       elements.push(document.getElementById("invoice-print")?.innerHTML || "");
       elements.push(`</div>`);
     }
-    const html = `<!DOCTYPE html><html><head><title>Invoice ${inv?.invoiceNumber}</title><style>body{font-family:sans-serif;font-size:13px;padding:16px;color:#000}table{border-collapse:collapse;width:100%}@media print{.no-print{display:none}}</style></head><body>${elements.join("")}</body></html>`;
+    const html = `<!DOCTYPE html><html><head><title>Invoice ${inv?.invoiceNumber}</title><style>${formatCss[printerType] || formatCss.a4}@media print{.no-print{display:none}}</style></head><body>${elements.join("")}</body></html>`;
     const win = window.open("", "_blank");
     if (win) {
       win.document.write(html);
