@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Printer, ArrowLeft, Copy, IndianRupee, Edit } from "lucide-react";
+import { Printer, ArrowLeft, Copy, IndianRupee, Edit, FileCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 
@@ -211,6 +211,114 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
   );
 }
 
+function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: any }) {
+  const ps = loadPrintSettings();
+  const showLogo = ps.showLogo !== false;
+  const amountPaid = Number(invoice.amountPaid) || 0;
+  const grandTotal = Number(invoice.grandTotal) || 0;
+  const isFullyPaid = amountPaid >= grandTotal;
+
+  return (
+    <div id="acknowledgment-print" className="bg-white border rounded-xl p-8 max-w-2xl mx-auto text-black text-sm">
+      {/* Header */}
+      <div className="flex justify-between items-start mb-6">
+        <div className="flex items-start gap-3">
+          {showLogo && company?.logoUrl && (
+            <img src={company.logoUrl} alt="Logo" className="h-12 w-auto object-contain shrink-0" />
+          )}
+          <div>
+            <p className="font-bold text-base">{company?.companyName || company?.name || ""}</p>
+            {company?.address && <p className="text-xs text-gray-500">{company.address}{company?.city ? `, ${company.city}` : ""}{company?.state ? `, ${company.state}` : ""}</p>}
+            {company?.gstin && <p className="text-xs text-gray-500">GSTIN: {company.gstin}</p>}
+          </div>
+        </div>
+        <div className="text-right">
+          <h1 className="text-xl font-bold uppercase tracking-wide text-gray-800">Acknowledgment</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Against Invoice #{invoice.invoiceNumber}</p>
+          <p className="text-xs text-gray-500">{formatDate(invoice.date)}</p>
+        </div>
+      </div>
+
+      {/* Party */}
+      <div className="border rounded-lg px-4 py-3 mb-5 bg-gray-50">
+        <p className="text-xs text-gray-400 uppercase font-semibold mb-0.5">Received From</p>
+        <p className="font-semibold text-base">{invoice.partyName || invoice.customerName || "—"}</p>
+      </div>
+
+      {/* Items */}
+      <table className="w-full mb-5 text-sm border-collapse">
+        <thead>
+          <tr className="border-b-2 border-gray-300">
+            <th className="text-left py-2 font-semibold w-6">#</th>
+            <th className="text-left py-2 font-semibold">Item Description</th>
+            <th className="text-right py-2 font-semibold">Qty</th>
+            <th className="text-right py-2 font-semibold">Rate</th>
+            <th className="text-right py-2 font-semibold">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoice.items?.map((item: any, i: number) => (
+            <tr key={i} className="border-b border-gray-200">
+              <td className="py-1.5">{i + 1}</td>
+              <td className="py-1.5">{item.itemName}</td>
+              <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
+              <td className="py-1.5 text-right">{formatCurrency(item.rate)}</td>
+              <td className="py-1.5 text-right font-medium">{formatCurrency(item.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Totals */}
+      <div className="flex justify-end mb-6">
+        <div className="w-56 space-y-1 text-sm">
+          <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(invoice.subtotal)}</span></div>
+          {Number(invoice.totalDiscount) > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>}
+          {Number(invoice.totalCgst) > 0 && <div className="flex justify-between text-gray-500"><span>CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>}
+          {Number(invoice.totalSgst) > 0 && <div className="flex justify-between text-gray-500"><span>SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>}
+          {Number(invoice.totalIgst) > 0 && <div className="flex justify-between text-gray-500"><span>IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>}
+          <div className="flex justify-between font-bold text-base border-t pt-2 mt-1"><span>Total</span><span>{formatCurrency(grandTotal)}</span></div>
+          <div className="flex justify-between text-green-600 font-medium"><span>Amount Received</span><span>{formatCurrency(amountPaid)}</span></div>
+          {!isFullyPaid && (
+            <div className="flex justify-between text-red-500 font-medium"><span>Balance Due</span><span>{formatCurrency(grandTotal - amountPaid)}</span></div>
+          )}
+        </div>
+      </div>
+
+      {/* Receipt Statement */}
+      <div className="border-2 border-gray-300 rounded-lg p-4 mb-8 bg-gray-50">
+        <p className="text-sm leading-relaxed text-gray-700">
+          I / We hereby acknowledge the receipt of goods and{" "}
+          {isFullyPaid
+            ? <>an amount of <span className="font-bold text-black">{formatCurrency(amountPaid)}</span> (in full settlement) against Invoice <span className="font-semibold">#{invoice.invoiceNumber}</span> dated {formatDate(invoice.date)}.</>
+            : <>a partial payment of <span className="font-bold text-black">{formatCurrency(amountPaid)}</span> against Invoice <span className="font-semibold">#{invoice.invoiceNumber}</span> dated {formatDate(invoice.date)}. Balance due: <span className="font-bold text-red-600">{formatCurrency(grandTotal - amountPaid)}</span>.</>
+          }
+          {" "}All goods have been received in good condition.
+        </p>
+      </div>
+
+      {/* Signatures */}
+      <div className="flex justify-between items-end mt-4">
+        <div className="text-center space-y-2">
+          <div className="h-12 border-b border-gray-400 w-40"></div>
+          <p className="text-xs text-gray-500">Date: _______________</p>
+        </div>
+        <div className="text-center space-y-2">
+          <div className="h-12 border-b border-gray-400 w-48"></div>
+          <p className="text-xs text-gray-500">Customer Signature &amp; Stamp</p>
+        </div>
+        <div className="text-center space-y-2">
+          <div className="h-12 border-b border-gray-400 w-48"></div>
+          <p className="text-xs text-gray-500">
+            For {company?.companyName || company?.name || ""}<br />
+            <span className="text-gray-400">Authorised Signatory</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SaleInvoiceView() {
   const [, params] = useRoute("/sales/invoices/:id");
   const [, search] = useLocation();
@@ -226,6 +334,7 @@ export default function SaleInvoiceView() {
   const defaultCopies = ps.invoiceCopies || "1";
   const copyLabelsStr = ps.copyLabels || "Original, Duplicate, Triplicate";
   const copyLabels = copyLabelsStr.split(",").map((s: string) => s.trim());
+  const acknowledgmentEnabled = ps.printAcknowledgment === true;
 
   // Record payment dialog
   const [payDialogOpen, setPayDialogOpen] = useState(false);
@@ -273,6 +382,17 @@ export default function SaleInvoiceView() {
       setPrintDialogOpen(true);
     }
   }, [search]);
+
+  const handlePrintAcknowledgment = () => {
+    const content = document.getElementById("acknowledgment-print")?.innerHTML || "";
+    const html = `<!DOCTYPE html><html><head><title>Acknowledgment - ${inv?.invoiceNumber}</title><style>body{font-family:sans-serif;font-size:13px;padding:24px;color:#000;max-width:700px;margin:0 auto}table{border-collapse:collapse;width:100%}@media print{body{padding:0}}</style></head><body>${content}</body></html>`;
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      win.print();
+    }
+  };
 
   const handlePrint = () => {
     const numCopies = Number(copies);
@@ -326,6 +446,11 @@ export default function SaleInvoiceView() {
           <Button variant="outline" size="sm" onClick={() => { setCopies("2"); setPrintDialogOpen(true); }}>
             <Copy className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Print 2nd Copy</span>
           </Button>
+          {acknowledgmentEnabled && (
+            <Button variant="outline" size="sm" onClick={handlePrintAcknowledgment} className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50">
+              <FileCheck className="h-4 w-4" /><span className="hidden sm:inline">Print Acknowledgment</span>
+            </Button>
+          )}
           <Button size="sm" onClick={() => { setCopies(defaultCopies); setPrintDialogOpen(true); }}>
             <Printer className="h-4 w-4 mr-1" />Print
           </Button>
@@ -349,6 +474,13 @@ export default function SaleInvoiceView() {
       )}
 
       <InvoiceDocument invoice={inv} company={company as any} />
+
+      {/* Hidden acknowledgment document — rendered offscreen for print */}
+      {acknowledgmentEnabled && (
+        <div className="hidden print:hidden" aria-hidden="true" style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          <AcknowledgmentDocument invoice={inv} company={company as any} />
+        </div>
+      )}
 
       {/* Print dialog */}
       <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>

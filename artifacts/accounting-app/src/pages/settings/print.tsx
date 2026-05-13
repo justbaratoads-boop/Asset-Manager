@@ -26,6 +26,7 @@ interface PrintSettings {
   copyLabels: string;
   billTitle: string;
   termsAndConditions: string;
+  printAcknowledgment: boolean;
 }
 
 const DEFAULT: PrintSettings = {
@@ -43,6 +44,7 @@ const DEFAULT: PrintSettings = {
   copyLabels: "Original, Duplicate, Triplicate",
   billTitle: "TAX INVOICE",
   termsAndConditions: "",
+  printAcknowledgment: false,
 };
 
 function loadSettings(): PrintSettings {
@@ -142,6 +144,22 @@ export default function PrintSettings() {
                 />
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Acknowledgment Receipt</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Print Acknowledgment</p>
+              <p className="text-xs text-muted-foreground">When enabled, a "Print Acknowledgment" button appears on every sale invoice. It prints a payment receipt confirming the customer has received the goods/amount.</p>
+            </div>
+            <Switch
+              checked={settings.printAcknowledgment}
+              onCheckedChange={v => set("printAcknowledgment", v)}
+            />
           </div>
         </CardContent>
       </Card>
