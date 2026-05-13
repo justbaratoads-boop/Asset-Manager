@@ -65,6 +65,7 @@ router.post("/orders", authMiddleware, async (req, res) => {
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
         total: String(item.total),
+        description: item.description || null,
       });
     }
   }

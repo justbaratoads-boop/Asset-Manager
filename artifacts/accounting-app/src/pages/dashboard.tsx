@@ -1,11 +1,22 @@
-import { useGetDashboardSummary, useGetRecentActivity, useGetLowStockAlerts } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useGetRecentActivity, useGetLowStockAlerts, customFetch } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { TrendingUp, TrendingDown, Package, ShoppingCart, Receipt, AlertTriangle, Calendar } from "lucide-react";
+import { TrendingUp, TrendingDown, Package, ShoppingCart, Receipt, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useFY } from "@/lib/financial-year";
+
+function monthStart(): string {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function KpiCard({ title, value, icon: Icon, variant = "default" }: { title: string; value: string; icon: any; variant?: string }) {
   return (
@@ -26,10 +37,17 @@ function KpiCard({ title, value, icon: Icon, variant = "default" }: { title: str
 }
 
 export default function Dashboard() {
-  const { data: summary, isLoading: loadingSum } = useGetDashboardSummary();
+  const [periodFrom, setPeriodFrom] = useState(monthStart);
+  const [periodTo, setPeriodTo] = useState(todayStr);
+
+  const { data: summary, isLoading: loadingSum } = useQuery({
+    queryKey: ["dashboard-summary", periodFrom, periodTo],
+    queryFn: () => customFetch<any>(`/api/dashboard/summary?from=${periodFrom}&to=${periodTo}`),
+    staleTime: 60_000,
+  });
+
   const { data: activity = [], isLoading: loadingAct } = useGetRecentActivity();
   const { data: lowStock = [], isLoading: loadingStock } = useGetLowStockAlerts();
-  const { fy, setFYStart, availableFYs } = useFY();
 
   return (
     <div className="space-y-6">
@@ -38,19 +56,25 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Today's business snapshot</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Financial Year:</span>
-          <Select value={String(fy.startYear)} onValueChange={v => setFYStart(Number(v))}>
-            <SelectTrigger className="w-28 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableFYs.map(f => (
-                <SelectItem key={f.startYear} value={String(f.startYear)}>FY {f.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+            <Input
+              type="date"
+              value={periodFrom}
+              onChange={e => setPeriodFrom(e.target.value)}
+              className="h-8 w-36 text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
+            <Input
+              type="date"
+              value={periodTo}
+              onChange={e => setPeriodTo(e.target.value)}
+              className="h-8 w-36 text-sm"
+            />
+          </div>
         </div>
       </div>
 
@@ -60,8 +84,9 @@ export default function Dashboard() {
         <KpiCard title="Open Orders" value={loadingSum ? "..." : String(summary?.openOrdersCount || 0)} icon={ShoppingCart} variant="amber" />
         <KpiCard title="Due Payables" value={loadingSum ? "..." : formatCurrency(summary?.duePayables)} icon={TrendingDown} variant="red" />
         <KpiCard title="Low Stock Items" value={loadingSum ? "..." : String(summary?.lowStockCount || 0)} icon={Package} variant="amber" />
-        <KpiCard title="Month Sales" value={loadingSum ? "..." : formatCurrency(summary?.monthSales)} icon={TrendingUp} variant="green" />
-        <KpiCard title="Month Purchases" value={loadingSum ? "..." : formatCurrency(summary?.monthPurchases)} icon={TrendingDown} />
+        <KpiCard title="Period Sales" value={loadingSum ? "..." : formatCurrency(summary?.periodSales)} icon={TrendingUp} variant="green" />
+        <KpiCard title="Period Purchases" value={loadingSum ? "..." : formatCurrency(summary?.periodPurchases)} icon={TrendingDown} />
+        <KpiCard title="Period Collections" value={loadingSum ? "..." : formatCurrency(summary?.periodCollections)} icon={Receipt} variant="green" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

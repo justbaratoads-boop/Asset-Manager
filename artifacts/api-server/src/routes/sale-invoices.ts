@@ -118,6 +118,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
         total: String(item.total),
+        description: item.description || null,
       });
 
       if (item.stockItemId) {
@@ -248,6 +249,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
         total: String(item.total),
+        description: item.description || null,
       });
 
       if (item.stockItemId) {

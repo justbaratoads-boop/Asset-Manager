@@ -18,10 +18,13 @@ function monthStart(): string {
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 }
 
-router.get("/dashboard/summary", authMiddleware, async (_req, res) => {
+router.get("/dashboard/summary", authMiddleware, async (req, res) => {
   try {
     const today = todayStr();
     const mStart = monthStart();
+    const { from, to } = req.query as { from?: string; to?: string };
+    const periodFrom = from || mStart;
+    const periodTo = to || today;
 
     const [todaySales] = await db
       .select({ total: sql<string>`COALESCE(SUM(grand_total), 0)` })
@@ -51,22 +54,31 @@ router.get("/dashboard/summary", authMiddleware, async (_req, res) => {
         sql`physical_stock::numeric <= min_stock_level::numeric`
       ));
 
-    const [monthSales] = await db
+    const [periodSales] = await db
       .select({ total: sql<string>`COALESCE(SUM(grand_total), 0)` })
       .from(saleInvoicesTable)
       .where(and(
-        gte(saleInvoicesTable.date, mStart),
-        lte(saleInvoicesTable.date, today),
+        gte(saleInvoicesTable.date, periodFrom),
+        lte(saleInvoicesTable.date, periodTo),
         eq(saleInvoicesTable.isDeleted, "false")
       ));
 
-    const [monthPurchases] = await db
+    const [periodPurchases] = await db
       .select({ total: sql<string>`COALESCE(SUM(grand_total), 0)` })
       .from(purchaseInvoicesTable)
       .where(and(
-        gte(purchaseInvoicesTable.date, mStart),
-        lte(purchaseInvoicesTable.date, today),
+        gte(purchaseInvoicesTable.date, periodFrom),
+        lte(purchaseInvoicesTable.date, periodTo),
         eq(purchaseInvoicesTable.isDeleted, "false")
+      ));
+
+    const [periodCollections] = await db
+      .select({ total: sql<string>`COALESCE(SUM(amount), 0)` })
+      .from(receiptsTable)
+      .where(and(
+        gte(receiptsTable.date, periodFrom),
+        lte(receiptsTable.date, periodTo),
+        eq(receiptsTable.isDeleted, "false")
       ));
 
     res.json({
@@ -75,11 +87,14 @@ router.get("/dashboard/summary", authMiddleware, async (_req, res) => {
       openOrdersCount: openOrders.count,
       duePayables: Number(duePurchases.total),
       lowStockCount: lowStockCount.count,
-      monthSales: Number(monthSales.total),
-      monthPurchases: Number(monthPurchases.total),
+      periodSales: Number(periodSales.total),
+      periodPurchases: Number(periodPurchases.total),
+      periodCollections: Number(periodCollections.total),
+      periodFrom,
+      periodTo,
     });
   } catch (err) {
-    console.error(err);
+    req.log?.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

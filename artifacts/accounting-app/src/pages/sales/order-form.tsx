@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 interface OrderItem {
   stockItemId?: number;
   itemName: string;
+  description?: string;
   hsnCode: string;
   quantity: number;
   unit: string;
@@ -47,6 +48,7 @@ function calcItem(item: Partial<OrderItem>): OrderItem {
   return {
     stockItemId: item.stockItemId,
     itemName: item.itemName || "",
+    description: item.description || "",
     hsnCode: item.hsnCode || "",
     quantity: qty, unit: item.unit || "pcs", rate,
     discountPct: discPct, gstPct,
@@ -160,7 +162,7 @@ export default function OrderForm() {
     setDispatchNotes(o.dispatchNotes || "");
     if (o.items?.length) {
       setItems(o.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+        stockItemId: i.stockItemId, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
         gstLocked: !!i.stockItemId, gstInclusive: false,
@@ -284,6 +286,12 @@ export default function OrderForm() {
                 </div>
                 {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
                 {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
+                <Input
+                  className="h-8 text-sm"
+                  placeholder="Description (optional)"
+                  value={item.description || ""}
+                  onChange={e => updateItem(i, "description", e.target.value)}
+                />
                 {item.stockItemId && stockAvail[item.stockItemId] && (
                   <p className="text-xs px-1 -mt-1">
                     <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>
@@ -369,6 +377,12 @@ export default function OrderForm() {
                       </div>
                       {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
                       {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
+                      <Input
+                        className="h-7 text-xs mt-1"
+                        placeholder="Description (optional)"
+                        value={item.description || ""}
+                        onChange={e => updateItem(i, "description", e.target.value)}
+                      />
                       {item.stockItemId && stockAvail[item.stockItemId] && (
                         <p className="text-xs mt-0.5 px-1">
                           <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>

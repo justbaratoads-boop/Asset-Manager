@@ -23,6 +23,7 @@ import { OtherChargesSection, type OtherCharge } from "@/components/other-charge
 interface InvoiceItem {
   stockItemId?: number;
   itemName: string;
+  description?: string;
   hsnCode: string;
   quantity: number;
   unit: string;
@@ -62,6 +63,7 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
   return {
     stockItemId: item.stockItemId,
     itemName: item.itemName || "",
+    description: item.description || "",
     hsnCode: item.hsnCode || "",
     quantity: qty,
     unit: item.unit || "pcs",
@@ -146,9 +148,8 @@ function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose
   );
 }
 
-const PAYMENT_MODES = [
+const BASE_PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
-  { value: "bank_transfer", label: "Bank Transfer" },
   { value: "upi", label: "UPI" },
   { value: "cheque", label: "Cheque" },
 ];
@@ -183,6 +184,15 @@ export default function SaleInvoiceForm() {
 
   const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
+      if (Array.isArray(data)) setBankAccounts(data.map((l: any) => ({ value: `bank_${l.id}`, label: l.name })));
+    }).catch(() => {});
+  }, []);
+
+  const allPaymentModes = [...BASE_PAYMENT_MODES, ...bankAccounts];
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
 
@@ -243,7 +253,7 @@ export default function SaleInvoiceForm() {
     }
     if (inv.items?.length) {
       setItems(inv.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+        stockItemId: i.stockItemId, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
         gstLocked: !!i.stockItemId, gstInclusive: false,
@@ -259,7 +269,7 @@ export default function SaleInvoiceForm() {
       if (order.notes) setNotes(order.notes);
       if (order.items?.length) {
         setItems(order.items.map((i: any) => calcItem({
-          stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+          stockItemId: i.stockItemId, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
           quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
           discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
           gstLocked: !!i.stockItemId, gstInclusive: false,
@@ -464,6 +474,12 @@ export default function SaleInvoiceForm() {
                       {` ${item.unit}`}
                     </p>
                   )}
+                  <Input
+                    className="h-8 text-sm"
+                    placeholder="Description (optional)"
+                    value={item.description || ""}
+                    onChange={e => updateItem(index, "description", e.target.value)}
+                  />
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" /></div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
@@ -596,6 +612,12 @@ export default function SaleInvoiceForm() {
                             {` ${item.unit}`}
                           </p>
                         )}
+                        <Input
+                          className="h-7 text-xs mt-1"
+                          placeholder="Description (optional)"
+                          value={item.description || ""}
+                          onChange={e => updateItem(index, "description", e.target.value)}
+                        />
                       </TableCell>
                       <TableCell><Input className="h-9 text-sm" type="number" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
                       <TableCell>{item.stockItemId ? (
@@ -708,8 +730,8 @@ export default function SaleInvoiceForm() {
               {payRows.map((row, i) => (
                 <div key={i} className="flex gap-1.5 items-center">
                   <Select value={row.mode} onValueChange={v => updatePayRow(i, "mode", v)}>
-                    <SelectTrigger className="h-8 text-xs w-[112px] shrink-0"><SelectValue /></SelectTrigger>
-                    <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="h-8 text-xs w-[120px] shrink-0"><SelectValue /></SelectTrigger>
+                    <SelectContent>{allPaymentModes.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                   </Select>
                   <div className="relative flex-1 min-w-[80px]">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>

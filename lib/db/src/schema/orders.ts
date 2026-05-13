@@ -40,6 +40,7 @@ export const orderItemsTable = pgTable("order_items", {
   sgst: numeric("sgst", { precision: 15, scale: 2 }).notNull().default("0"),
   igst: numeric("igst", { precision: 15, scale: 2 }).notNull().default("0"),
   total: numeric("total", { precision: 15, scale: 2 }).notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

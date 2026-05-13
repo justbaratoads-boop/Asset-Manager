@@ -20,9 +20,8 @@ function loadPrintSettings() {
   catch { return {}; }
 }
 
-const PAYMENT_MODES = [
+const BASE_PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
-  { value: "bank_transfer", label: "Bank Transfer" },
   { value: "upi", label: "UPI" },
   { value: "cheque", label: "Cheque" },
 ];
@@ -69,7 +68,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
   const itemRows = items.map((item: any, i: number) => `
     <tr>
       <td>${i + 1}</td>
-      <td>${item.itemName || ""}</td>
+      <td>${item.itemName || ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
       ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
       <td class="tr">${fmtN(item.rate)}</td>
@@ -393,7 +392,10 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
             {invoice.items?.map((item: any, i: number) => (
               <tr key={i} className="border-b">
                 <td className="py-2 pl-4 sm:pl-0">{i + 1}</td>
-                <td className="py-2">{item.itemName}</td>
+                <td className="py-2">
+                  <div>{item.itemName}</div>
+                  {item.description && <div className="text-xs text-gray-500 italic mt-0.5">{item.description}</div>}
+                </td>
                 {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
                 <td className="py-2 text-right">{item.quantity} {item.unit}</td>
                 <td className="py-2 text-right">{formatCurrency(item.rate)}</td>
@@ -631,6 +633,15 @@ export default function SaleInvoiceView() {
   const [payRef, setPayRef] = useState("");
   const [payError, setPayError] = useState("");
   const [isSavingPay, setIsSavingPay] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
+      if (Array.isArray(data)) setBankAccounts(data.map((l: any) => ({ value: `bank_${l.id}`, label: l.name })));
+    }).catch(() => {});
+  }, []);
+
+  const allPaymentModes = [...BASE_PAYMENT_MODES, ...bankAccounts];
 
   const inv = invoice as any;
   const balanceDue = Number(inv?.balanceDue) || 0;
@@ -899,7 +910,7 @@ export default function SaleInvoiceView() {
               <Select value={payMode} onValueChange={setPayMode}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                  {allPaymentModes.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
