@@ -297,23 +297,153 @@ router.get("/reports/profit-loss", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
-  const ledgers = await db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false"));
-  const lines = await db.select().from(journalLinesTable);
+  // Fetch all transaction data in parallel (same sources as trial balance)
+  const [
+    ledgers,
+    journalLines,
+    saleInvoices,
+    purchaseInvoices,
+    receipts,
+    payments,
+    creditNotes,
+    debitNotes,
+  ] = await Promise.all([
+    db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
+    db
+      .select({ line: journalLinesTable })
+      .from(journalLinesTable)
+      .innerJoin(
+        journalEntriesTable,
+        and(
+          eq(journalLinesTable.entryId, journalEntriesTable.id),
+          eq(journalEntriesTable.isDeleted, "false"),
+        ),
+      ),
+    db.select().from(saleInvoicesTable).where(eq(saleInvoicesTable.isDeleted, "false")),
+    db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.isDeleted, "false")),
+    db.select().from(receiptsTable).where(eq(receiptsTable.isDeleted, "false")),
+    db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
+    db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
+    db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+  ]);
 
-  const balances: Record<number, number> = {};
-  for (const line of lines) {
-    if (!balances[line.ledgerId]) balances[line.ledgerId] = 0;
-    balances[line.ledgerId] += line.type === "dr" ? Number(line.amount) : -Number(line.amount);
+  // Canonical ledger IDs by name
+  const byName = (name: string) => ledgers.find(l => l.name === name)?.id;
+  const LEDGER = {
+    cash:      byName("Cash")                ?? 1,
+    ar:        byName("Accounts Receivable") ?? 3,
+    ap:        byName("Accounts Payable")    ?? 5,
+    sales:     byName("Sales")               ?? 9,
+    purchase:  byName("Purchase")            ?? 10,
+    outputGst: byName("Output GST")          ?? 8,
+    inputGst:  byName("Input GST (ITC)")     ?? 7,
+  };
+
+  // Build Dr/Cr balance map from all transaction sources
+  const bal: Record<number, { dr: number; cr: number }> = {};
+  const add = (ledgerId: number, type: "dr" | "cr", amount: number) => {
+    if (amount === 0) return;
+    if (!bal[ledgerId]) bal[ledgerId] = { dr: 0, cr: 0 };
+    bal[ledgerId][type] += amount;
+  };
+
+  // 1. Manual journal entries
+  for (const { line } of journalLines) {
+    add(line.ledgerId, line.type as "dr" | "cr", Number(line.amount));
   }
 
-  const assets = ledgers.filter(l => l.group === "assets").map(l => ({ name: l.name, amount: Number(l.openingBalance) + (balances[l.id] || 0) }));
-  const liabilities = ledgers.filter(l => l.group === "liabilities").map(l => ({ name: l.name, amount: Number(l.openingBalance) + (balances[l.id] || 0) }));
-  const capital = ledgers.filter(l => l.group === "capital").map(l => ({ name: l.name, amount: Number(l.openingBalance) + (balances[l.id] || 0) }));
+  // 2. Sale invoices: Dr AR/Cash, Cr Sales + Output GST
+  for (const inv of saleInvoices) {
+    const grandTotal = Number(inv.grandTotal);
+    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
+    const taxable = grandTotal - gst;
+    add(inv.partyId ? LEDGER.ar : LEDGER.cash, "dr", grandTotal);
+    add(LEDGER.sales, "cr", taxable);
+    add(LEDGER.outputGst, "cr", gst);
+  }
+
+  // 3. Purchase invoices: Dr Purchase + Input GST, Cr AP/Cash
+  for (const inv of purchaseInvoices) {
+    const grandTotal = Number(inv.grandTotal);
+    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
+    const taxable = grandTotal - gst;
+    add(LEDGER.purchase, "dr", taxable);
+    add(LEDGER.inputGst, "dr", gst);
+    add(inv.partyId ? LEDGER.ap : LEDGER.cash, "cr", grandTotal);
+  }
+
+  // 4. Receipts: Dr ledger (cash/bank), Cr AR
+  for (const r of receipts) {
+    add(r.ledgerId, "dr", Number(r.amount));
+    add(LEDGER.ar, "cr", Number(r.amount));
+  }
+
+  // 5. Payments: Dr AP, Cr ledger (cash/bank)
+  for (const p of payments) {
+    add(LEDGER.ap, "dr", Number(p.amount));
+    add(p.ledgerId, "cr", Number(p.amount));
+  }
+
+  // 6. Credit notes (sale returns): Dr Sales, Cr AR
+  for (const cn of creditNotes) {
+    add(LEDGER.sales, "dr", Number(cn.amount));
+    add(LEDGER.ar, "cr", Number(cn.amount));
+  }
+
+  // 7. Debit notes (purchase returns): Dr AP, Cr Purchase
+  for (const dn of debitNotes) {
+    add(LEDGER.ap, "dr", Number(dn.amount));
+    add(LEDGER.purchase, "cr", Number(dn.amount));
+  }
+
+  // Compute net balance for a ledger (positive = normal balance for its nature)
+  //   Dr-nature: opening + Dr movements - Cr movements
+  //   Cr-nature: opening + Cr movements - Dr movements
+  const netBal = (l: typeof ledgers[0]) => {
+    const b = bal[l.id] || { dr: 0, cr: 0 };
+    const opening = Number(l.openingBalance);
+    return l.nature === "dr"
+      ? opening + b.dr - b.cr
+      : opening + b.cr - b.dr;
+  };
+
+  // Net Profit = net income ledger balances minus net expense ledger balances
+  // Income ledgers (Cr nature): positive balance = revenue earned
+  // Expense ledgers (Dr nature): positive balance = cost incurred
+  const incomeNet = ledgers
+    .filter(l => l.group === "income")
+    .reduce((s, l) => s + netBal(l), 0);
+  const expenseNet = ledgers
+    .filter(l => l.group === "expense")
+    .reduce((s, l) => s + netBal(l), 0);
+  const netProfit = incomeNet - expenseNet;
+
+  // Assets: Dr-nature ledgers that are NOT expense accounts
+  // Includes "assets", "Sundry Debtors", "Bank Accounts", and any other Dr-nature groups
+  const assetItems = ledgers
+    .filter(l => l.nature === "dr" && l.group !== "expense")
+    .map(l => ({ name: l.name, group: l.group, amount: netBal(l) }));
+
+  // Liabilities: Cr-nature ledgers that are NOT capital or income
+  const liabilityItems = ledgers
+    .filter(l => l.nature === "cr" && l.group !== "capital" && l.group !== "income")
+    .map(l => ({ name: l.name, group: l.group, amount: netBal(l) }));
+
+  // Capital accounts
+  const capitalItems = ledgers
+    .filter(l => l.group === "capital")
+    .map(l => ({ name: l.name, amount: netBal(l) }));
+
+  const totalAssets = assetItems.reduce((s, a) => s + a.amount, 0);
+  const totalLiabilities = liabilityItems.reduce((s, l) => s + l.amount, 0);
+  const totalCapital = capitalItems.reduce((s, c) => s + c.amount, 0);
 
   res.json({
-    assets: { items: assets, total: assets.reduce((s, a) => s + a.amount, 0) },
-    liabilities: { items: liabilities, total: liabilities.reduce((s, l) => s + l.amount, 0) },
-    capital: { items: capital, total: capital.reduce((s, c) => s + c.amount, 0) },
+    assets: { items: assetItems, total: totalAssets },
+    liabilities: { items: liabilityItems, total: totalLiabilities },
+    capital: { items: capitalItems, total: totalCapital },
+    netProfit,
+    totalLiabilitiesAndCapital: totalLiabilities + totalCapital + netProfit,
   });
 });
 
