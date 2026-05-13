@@ -64,6 +64,7 @@ import CashBook from "@/pages/reports/cash-book";
 import AllTransactions from "@/pages/reports/all-transactions";
 import PartyStatement from "@/pages/reports/party-statement";
 import StockSummary from "@/pages/reports/stock-summary";
+import StockAvailability from "@/pages/reports/stock-availability";
 import DeliveryReport from "@/pages/reports/delivery-report";
 
 // GST
@@ -182,6 +183,7 @@ function Router() {
       <PR path="/reports/all-transactions" component={AllTransactions} />
       <PR path="/reports/party-statement" component={PartyStatement} />
       <PR path="/reports/stock-summary" component={StockSummary} />
+      <PR path="/reports/stock-availability" component={StockAvailability} />
       <PR path="/reports/delivery-report" component={DeliveryReport} />
 
       {/* GST */}

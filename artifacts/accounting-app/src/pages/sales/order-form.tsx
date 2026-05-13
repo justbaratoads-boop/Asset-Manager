@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useCreateOrder, useGetOrder, useListParties, useListStockItems, useCreateStockItem, getListOrdersQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
+import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,7 @@ export default function OrderForm() {
   const createMutation = useCreateOrder();
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
+  const stockAvail = useStockAvailability();
   const { data: existing } = useGetOrder(editId!, { query: { enabled: isEdit } });
 
   const [partyId, setPartyId] = useState<number | undefined>();
@@ -282,6 +284,16 @@ export default function OrderForm() {
                 </div>
                 {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
                 {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
+                {item.stockItemId && stockAvail[item.stockItemId] && (
+                  <p className="text-xs px-1 -mt-1">
+                    <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>
+                    {" · "}
+                    <span className={stockAvail[item.stockItemId].availableStock < 0 ? "text-red-600 font-medium" : stockAvail[item.stockItemId].availableStock === 0 ? "text-amber-600 font-medium" : "text-green-600 font-medium"}>
+                      Avail: {stockAvail[item.stockItemId].availableStock}
+                    </span>
+                    {` ${item.unit}`}
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
@@ -357,6 +369,16 @@ export default function OrderForm() {
                       </div>
                       {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
                       {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
+                      {item.stockItemId && stockAvail[item.stockItemId] && (
+                        <p className="text-xs mt-0.5 px-1">
+                          <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>
+                          {" · "}
+                          <span className={stockAvail[item.stockItemId].availableStock < 0 ? "text-red-600 font-medium" : stockAvail[item.stockItemId].availableStock === 0 ? "text-amber-600 font-medium" : "text-green-600 font-medium"}>
+                            Avail: {stockAvail[item.stockItemId].availableStock}
+                          </span>
+                          {` ${item.unit}`}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                     <TableCell>{item.stockItemId ? (

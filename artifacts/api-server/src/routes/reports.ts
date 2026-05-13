@@ -429,4 +429,43 @@ router.get("/reports/stock-current", authMiddleware, async (req, res) => {
   })));
 });
 
+router.get("/stock-availability", authMiddleware, async (req, res) => {
+  const result = await db.execute(sql`
+    SELECT
+      si.id,
+      si.name,
+      si.unit,
+      si.hsn_code AS "hsnCode",
+      si.physical_stock::numeric AS "physicalStock",
+      si.purchase_rate::numeric AS "purchaseRate",
+      si.sale_rate::numeric AS "saleRate",
+      si.min_stock_level::numeric AS "minStockLevel",
+      COALESCE(reserved.qty, 0)::numeric AS "reservedQty"
+    FROM stock_items si
+    LEFT JOIN (
+      SELECT oi.stock_item_id, SUM(oi.quantity::numeric) AS qty
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      WHERE o.converted_invoice_id IS NULL
+        AND o.status = 'pending'
+        AND o.is_deleted = 'false'
+      GROUP BY oi.stock_item_id
+    ) AS reserved ON reserved.stock_item_id = si.id
+    WHERE si.is_deleted = 'false'
+    ORDER BY si.name
+  `);
+  res.json(result.rows.map((r: any) => ({
+    id: Number(r.id),
+    name: r.name,
+    unit: r.unit,
+    hsnCode: r.hsnCode,
+    physicalStock: Number(r.physicalStock),
+    reservedQty: Number(r.reservedQty),
+    availableStock: Number(r.physicalStock) - Number(r.reservedQty),
+    purchaseRate: Number(r.purchaseRate),
+    saleRate: Number(r.saleRate),
+    minStockLevel: Number(r.minStockLevel),
+  })));
+});
+
 export default router;
