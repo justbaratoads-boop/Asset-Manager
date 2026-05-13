@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   partiesTable, saleInvoicesTable, purchaseInvoicesTable,
+  saleInvoicePaymentsTable, purchaseInvoicePaymentsTable,
   paymentsTable, receiptsTable, journalLinesTable, journalEntriesTable,
   ordersTable, debitNotesTable, creditNotesTable, companySettingsTable
 } from "@workspace/db/schema";
@@ -212,6 +213,53 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   }).from(paymentsTable)
     .where(and(eq(paymentsTable.partyId, Number(id)), eq(paymentsTable.isDeleted, "false")));
   transactions.push(...pmts);
+
+  // Inline sale-invoice payments for this party (recorded at invoice level, not as standalone receipts)
+  const saleInvPayments = await db.select({
+    date: saleInvoicesTable.date,
+    invoiceNumber: saleInvoicesTable.invoiceNumber,
+    mode: saleInvoicePaymentsTable.mode,
+    amount: saleInvoicePaymentsTable.amount,
+    createdAt: saleInvoicePaymentsTable.createdAt,
+  }).from(saleInvoicePaymentsTable)
+    .innerJoin(saleInvoicesTable, and(
+      eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
+      eq(saleInvoicesTable.isDeleted, "false"),
+      eq(saleInvoicesTable.partyId, Number(id)),
+    ));
+  for (const p of saleInvPayments) {
+    transactions.push({
+      date: p.date,
+      type: "invoice_payment",
+      description: `Payment (${p.mode}) against Invoice #${p.invoiceNumber}`,
+      dr: 0,
+      cr: Number(p.amount),
+      ref: p.invoiceNumber,
+    });
+  }
+
+  // Inline purchase-invoice payments for this party
+  const purchInvPayments = await db.select({
+    date: purchaseInvoicesTable.date,
+    invoiceNumber: purchaseInvoicesTable.invoiceNumber,
+    mode: purchaseInvoicePaymentsTable.mode,
+    amount: purchaseInvoicePaymentsTable.amount,
+  }).from(purchaseInvoicePaymentsTable)
+    .innerJoin(purchaseInvoicesTable, and(
+      eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
+      eq(purchaseInvoicesTable.isDeleted, "false"),
+      eq(purchaseInvoicesTable.partyId, Number(id)),
+    ));
+  for (const p of purchInvPayments) {
+    transactions.push({
+      date: p.date,
+      type: "invoice_payment",
+      description: `Payment (${p.mode}) against Purchase Invoice #${p.invoiceNumber}`,
+      dr: Number(p.amount),
+      cr: 0,
+      ref: p.invoiceNumber,
+    });
+  }
 
   const crNotes = await db.select({
     date: creditNotesTable.date,

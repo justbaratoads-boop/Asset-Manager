@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   saleInvoicesTable, saleInvoiceItemsTable, purchaseInvoicesTable, purchaseInvoiceItemsTable,
+  saleInvoicePaymentsTable, purchaseInvoicePaymentsTable,
   paymentsTable, receiptsTable, journalEntriesTable, journalLinesTable,
   ledgersTable, stockItemsTable, ordersTable,
   creditNotesTable, debitNotesTable, creditNoteItemsTable, debitNoteItemsTable
@@ -71,6 +72,8 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     payments,
     creditNotes,
     debitNotes,
+    saleInvoicePayments,
+    purchaseInvoicePayments,
   ] = await Promise.all([
     db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
     db
@@ -89,6 +92,24 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
     db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
     db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+    // Inline payments recorded directly on sale invoices
+    db.select({
+      mode: saleInvoicePaymentsTable.mode,
+      amount: saleInvoicePaymentsTable.amount,
+    }).from(saleInvoicePaymentsTable)
+      .innerJoin(saleInvoicesTable, and(
+        eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
+        eq(saleInvoicesTable.isDeleted, "false"),
+      )),
+    // Inline payments recorded directly on purchase invoices
+    db.select({
+      mode: purchaseInvoicePaymentsTable.mode,
+      amount: purchaseInvoicePaymentsTable.amount,
+    }).from(purchaseInvoicePaymentsTable)
+      .innerJoin(purchaseInvoicesTable, and(
+        eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
+        eq(purchaseInvoicesTable.isDeleted, "false"),
+      )),
   ]);
 
   // Find canonical ledger IDs by name (fall back to known defaults)
@@ -174,6 +195,35 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     const amount = Number(dn.amount);
     add(LEDGER.ap, "dr", amount);
     add(LEDGER.purchase, "cr", amount);
+  }
+
+  // Helper: map a payment mode string to a ledger ID.
+  // "cash" → Cash; named bank accounts → find by ledger name; fallback → Cash.
+  const modeToLedgerId = (mode: string): number => {
+    if (!mode || mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") {
+      return LEDGER.cash;
+    }
+    return byName(mode) ?? LEDGER.cash;
+  };
+
+  // 8. Inline sale-invoice payments (recorded on invoice form / Record Payment button)
+  //    These reduce what the customer owes — same effect as a standalone Receipt voucher.
+  //    Dr: Cash / Bank (mode-mapped)
+  //    Cr: Accounts Receivable
+  for (const p of saleInvoicePayments) {
+    const amount = Number(p.amount);
+    add(modeToLedgerId(p.mode), "dr", amount);
+    add(LEDGER.ar, "cr", amount);
+  }
+
+  // 9. Inline purchase-invoice payments (recorded on purchase invoice form)
+  //    These reduce what we owe the supplier — same effect as a standalone Payment voucher.
+  //    Dr: Accounts Payable
+  //    Cr: Cash / Bank (mode-mapped)
+  for (const p of purchaseInvoicePayments) {
+    const amount = Number(p.amount);
+    add(LEDGER.ap, "dr", amount);
+    add(modeToLedgerId(p.mode), "cr", amount);
   }
 
   // Build result rows — opening balance added to its natural side
@@ -307,6 +357,8 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     payments,
     creditNotes,
     debitNotes,
+    saleInvoicePayments,
+    purchaseInvoicePayments,
   ] = await Promise.all([
     db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
     db
@@ -325,6 +377,22 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
     db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
     db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+    db.select({
+      mode: saleInvoicePaymentsTable.mode,
+      amount: saleInvoicePaymentsTable.amount,
+    }).from(saleInvoicePaymentsTable)
+      .innerJoin(saleInvoicesTable, and(
+        eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
+        eq(saleInvoicesTable.isDeleted, "false"),
+      )),
+    db.select({
+      mode: purchaseInvoicePaymentsTable.mode,
+      amount: purchaseInvoicePaymentsTable.amount,
+    }).from(purchaseInvoicePaymentsTable)
+      .innerJoin(purchaseInvoicesTable, and(
+        eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
+        eq(purchaseInvoicesTable.isDeleted, "false"),
+      )),
   ]);
 
   // Canonical ledger IDs by name
@@ -394,6 +462,24 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
   for (const dn of debitNotes) {
     add(LEDGER.ap, "dr", Number(dn.amount));
     add(LEDGER.purchase, "cr", Number(dn.amount));
+  }
+
+  // 8. Inline sale-invoice payments: Dr Cash/Bank, Cr AR
+  const modeToLedgerId = (mode: string): number => {
+    if (!mode || mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") {
+      return LEDGER.cash;
+    }
+    return byName(mode) ?? LEDGER.cash;
+  };
+  for (const p of saleInvoicePayments) {
+    add(modeToLedgerId(p.mode), "dr", Number(p.amount));
+    add(LEDGER.ar, "cr", Number(p.amount));
+  }
+
+  // 9. Inline purchase-invoice payments: Dr AP, Cr Cash/Bank
+  for (const p of purchaseInvoicePayments) {
+    add(LEDGER.ap, "dr", Number(p.amount));
+    add(modeToLedgerId(p.mode), "cr", Number(p.amount));
   }
 
   // Compute net balance for a ledger (positive = normal balance for its nature)
