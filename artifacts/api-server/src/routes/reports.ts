@@ -203,26 +203,96 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
 
 router.get("/reports/profit-loss", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
-  const conditions: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
-  if (from) conditions.push(gte(saleInvoicesTable.date, from as string));
-  if (to) conditions.push(lte(saleInvoicesTable.date, to as string));
 
-  const [sales] = await db.select({ total: sql<string>`COALESCE(SUM(grand_total), 0)` }).from(saleInvoicesTable).where(and(...conditions));
+  const saleCond: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
+  if (from) saleCond.push(gte(saleInvoicesTable.date, from as string));
+  if (to) saleCond.push(lte(saleInvoicesTable.date, to as string));
+
   const purCond: any[] = [eq(purchaseInvoicesTable.isDeleted, "false")];
   if (from) purCond.push(gte(purchaseInvoicesTable.date, from as string));
   if (to) purCond.push(lte(purchaseInvoicesTable.date, to as string));
-  const [purchases] = await db.select({ total: sql<string>`COALESCE(SUM(grand_total), 0)` }).from(purchaseInvoicesTable).where(and(...purCond));
 
-  const totalSales = Number(sales.total);
-  const totalPurchases = Number(purchases.total);
-  const grossProfit = totalSales - totalPurchases;
+  const cnCond: any[] = [eq(creditNotesTable.isDeleted, "false")];
+  if (from) cnCond.push(gte(creditNotesTable.date, from as string));
+  if (to) cnCond.push(lte(creditNotesTable.date, to as string));
+
+  const dnCond: any[] = [eq(debitNotesTable.isDeleted, "false")];
+  if (from) dnCond.push(gte(debitNotesTable.date, from as string));
+  if (to) dnCond.push(lte(debitNotesTable.date, to as string));
+
+  const jeCond: any[] = [eq(journalEntriesTable.isDeleted, "false")];
+  if (from) jeCond.push(gte(journalEntriesTable.date, from as string));
+  if (to) jeCond.push(lte(journalEntriesTable.date, to as string));
+
+  const [saleRow, purRow, cnRow, dnRow, journalLines, ledgers] = await Promise.all([
+    db.select({
+      taxable: sql<string>`COALESCE(SUM(grand_total - total_cgst - total_sgst - total_igst), 0)`,
+    }).from(saleInvoicesTable).where(and(...saleCond)),
+    db.select({
+      taxable: sql<string>`COALESCE(SUM(grand_total - total_cgst - total_sgst - total_igst), 0)`,
+    }).from(purchaseInvoicesTable).where(and(...purCond)),
+    db.select({ total: sql<string>`COALESCE(SUM(amount), 0)` }).from(creditNotesTable).where(and(...cnCond)),
+    db.select({ total: sql<string>`COALESCE(SUM(amount), 0)` }).from(debitNotesTable).where(and(...dnCond)),
+    db.select({ line: journalLinesTable })
+      .from(journalLinesTable)
+      .innerJoin(journalEntriesTable, eq(journalLinesTable.entryId, journalEntriesTable.id))
+      .where(and(...jeCond)),
+    db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
+  ]);
+
+  const salesRevenue = Number(saleRow[0]?.taxable ?? 0);
+  const salesReturns = Number(cnRow[0]?.total ?? 0);
+  const netSales = salesRevenue - salesReturns;
+
+  const purchaseCost = Number(purRow[0]?.taxable ?? 0);
+  const purchaseReturns = Number(dnRow[0]?.total ?? 0);
+  const netPurchases = purchaseCost - purchaseReturns;
+
+  const grossProfit = netSales - netPurchases;
+
+  // Aggregate income and expense movements from manual journal entries
+  const ledgerMap = new Map(ledgers.map(l => [l.id, l]));
+  const otherIncome: Record<string, number> = {};
+  const otherExpenses: Record<string, number> = {};
+
+  for (const { line } of journalLines) {
+    const ledger = ledgerMap.get(line.ledgerId);
+    if (!ledger) continue;
+    const amount = Number(line.amount);
+    if (ledger.group === "income") {
+      const net = line.type === "cr" ? amount : -amount;
+      otherIncome[ledger.name] = (otherIncome[ledger.name] || 0) + net;
+    }
+    if (ledger.group === "expense") {
+      const net = line.type === "dr" ? amount : -amount;
+      otherExpenses[ledger.name] = (otherExpenses[ledger.name] || 0) + net;
+    }
+  }
+
+  const totalOtherIncome = Object.values(otherIncome).reduce((s, v) => s + v, 0);
+  const totalOtherExpenses = Object.values(otherExpenses).reduce((s, v) => s + v, 0);
+  const netProfit = grossProfit + totalOtherIncome - totalOtherExpenses;
 
   res.json({
     period: { from: from || null, to: to || null },
-    income: { sales: totalSales, total: totalSales },
-    expenses: { purchases: totalPurchases, total: totalPurchases },
+    income: {
+      sales: salesRevenue,
+      salesReturns,
+      netSales,
+      otherIncome,
+      totalOtherIncome,
+      total: netSales + totalOtherIncome,
+    },
+    expenses: {
+      purchases: purchaseCost,
+      purchaseReturns,
+      netPurchases,
+      otherExpenses,
+      totalOtherExpenses,
+      total: netPurchases + totalOtherExpenses,
+    },
     grossProfit,
-    netProfit: grossProfit,
+    netProfit,
   });
 });
 
