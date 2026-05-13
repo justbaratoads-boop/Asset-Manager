@@ -4,7 +4,7 @@ import {
   saleInvoicesTable, saleInvoiceItemsTable, purchaseInvoicesTable, purchaseInvoiceItemsTable,
   paymentsTable, receiptsTable, journalEntriesTable, journalLinesTable,
   ledgersTable, stockItemsTable, ordersTable,
-  creditNotesTable, debitNotesTable
+  creditNotesTable, debitNotesTable, creditNoteItemsTable, debitNoteItemsTable
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -619,10 +619,11 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
 
   const items = await db.select().from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false")).orderBy(stockItemsTable.name);
 
+  // Purchases within period
   const purchasedItems = await db.select({
     stockItemId: purchaseInvoiceItemsTable.stockItemId,
-    qty: sql<string>`SUM(quantity)`,
-    value: sql<string>`SUM(taxable_amount)`,
+    qty: sql<string>`SUM(${purchaseInvoiceItemsTable.quantity})`,
+    value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
   }).from(purchaseInvoiceItemsTable)
     .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
     .where(and(
@@ -632,10 +633,11 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
     ))
     .groupBy(purchaseInvoiceItemsTable.stockItemId);
 
+  // Sales within period
   const soldItems = await db.select({
     stockItemId: saleInvoiceItemsTable.stockItemId,
-    qty: sql<string>`SUM(quantity)`,
-    value: sql<string>`SUM(taxable_amount)`,
+    qty: sql<string>`SUM(${saleInvoiceItemsTable.quantity})`,
+    value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
   }).from(saleInvoiceItemsTable)
     .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
     .where(and(
@@ -645,36 +647,85 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
     ))
     .groupBy(saleInvoiceItemsTable.stockItemId);
 
-  const purchasedMap: Record<number, { qty: number; value: number }> = {};
-  for (const p of purchasedItems) {
-    if (p.stockItemId) purchasedMap[p.stockItemId] = { qty: Number(p.qty), value: Number(p.value) };
-  }
+  // Credit notes = sale returns → stock comes back in
+  const creditNoteItems = await db.select({
+    stockItemId: creditNoteItemsTable.stockItemId,
+    qty: sql<string>`SUM(${creditNoteItemsTable.quantity})`,
+    value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
+  }).from(creditNoteItemsTable)
+    .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+    .where(and(
+      eq(creditNotesTable.isDeleted, "false"),
+      ...(from ? [gte(creditNotesTable.date, from as string)] : []),
+      ...(to ? [lte(creditNotesTable.date, to as string)] : []),
+    ))
+    .groupBy(creditNoteItemsTable.stockItemId);
 
-  const soldMap: Record<number, { qty: number; value: number }> = {};
-  for (const s of soldItems) {
-    if (s.stockItemId) soldMap[s.stockItemId] = { qty: Number(s.qty), value: Number(s.value) };
-  }
+  // Debit notes = purchase returns → stock goes out
+  const debitNoteItems = await db.select({
+    stockItemId: debitNoteItemsTable.stockItemId,
+    qty: sql<string>`SUM(${debitNoteItemsTable.quantity})`,
+    value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
+  }).from(debitNoteItemsTable)
+    .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+    .where(and(
+      eq(debitNotesTable.isDeleted, "false"),
+      ...(from ? [gte(debitNotesTable.date, from as string)] : []),
+      ...(to ? [lte(debitNotesTable.date, to as string)] : []),
+    ))
+    .groupBy(debitNoteItemsTable.stockItemId);
+
+  const toMap = <T extends { stockItemId: number | null; qty: string; value: string }>(rows: T[]) => {
+    const map: Record<number, { qty: number; value: number }> = {};
+    for (const r of rows) {
+      if (r.stockItemId) map[r.stockItemId] = { qty: Number(r.qty), value: Number(r.value) };
+    }
+    return map;
+  };
+
+  const purchasedMap = toMap(purchasedItems);
+  const soldMap      = toMap(soldItems);
+  const creditMap    = toMap(creditNoteItems);
+  const debitMap     = toMap(debitNoteItems);
 
   const summary = items.map(item => {
-    const purchased = purchasedMap[item.id] || { qty: 0, value: 0 };
-    const sold = soldMap[item.id] || { qty: 0, value: 0 };
-    const openingQty = Number(item.openingStock);
-    const openingValue = openingQty * Number(item.purchaseRate);
-    const closingQty = openingQty + purchased.qty - sold.qty;
-    const closingValue = closingQty * Number(item.purchaseRate);
+    const purchased    = purchasedMap[item.id] || { qty: 0, value: 0 };
+    const sold         = soldMap[item.id]      || { qty: 0, value: 0 };
+    const saleReturn   = creditMap[item.id]    || { qty: 0, value: 0 }; // credit note = sale return → stock in
+    const purchReturn  = debitMap[item.id]     || { qty: 0, value: 0 }; // debit note  = purchase return → stock out
+
+    // physicalStock is the CURRENT (closing) stock, kept accurate by all transactions
+    const closingQty = Number(item.physicalStock) || 0;
+
+    // Derive opening by reversing the period's net movement
+    // openingQty = closingQty - purchased - saleReturn + sold + purchReturn
+    const openingQty = closingQty - purchased.qty - saleReturn.qty + sold.qty + purchReturn.qty;
+
+    const rate = Number(item.purchaseRate) || 0;
+    const openingValue = openingQty * rate;
+
+    // Closing value = openingValue + net purchases (using actual invoice taxable amounts)
+    const closingValue = openingValue
+      + purchased.value + saleReturn.value
+      - sold.value      - purchReturn.value;
+
     return {
       id: item.id,
       name: item.name,
       unit: item.unit,
       hsnCode: item.hsnCode,
-      purchaseRate: Number(item.purchaseRate),
-      saleRate: Number(item.saleRate),
+      purchaseRate: rate,
+      saleRate: Number(item.saleRate) || 0,
       openingQty,
       openingValue,
-      purchasedQty: purchased.qty,
-      purchasedValue: purchased.value,
-      soldQty: sold.qty,
-      soldValue: sold.value,
+      purchasedQty:      purchased.qty,
+      purchasedValue:    purchased.value,
+      soldQty:           sold.qty,
+      soldValue:         sold.value,
+      saleReturnQty:     saleReturn.qty,
+      saleReturnValue:   saleReturn.value,
+      purchaseReturnQty: purchReturn.qty,
+      purchaseReturnValue: purchReturn.value,
       closingQty,
       closingValue,
     };

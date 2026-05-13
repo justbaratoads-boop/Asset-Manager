@@ -15,22 +15,29 @@ const ALL_COLUMNS = [
   { header: "Item", key: "name" },
   { header: "Unit", key: "unit" },
   { header: "HSN Code", key: "hsnCode" },
-  { header: "Opening Qty", key: "openingQty", format: (v: any) => String(Number(v)) },
-  { header: "Opening Value", key: "openingValue", format: (v: any) => String(Number(v).toFixed(2)) },
-  { header: "Purchased Qty", key: "purchasedQty", format: (v: any) => String(Number(v)) },
-  { header: "Purchase Value", key: "purchasedValue", format: (v: any) => String(Number(v).toFixed(2)) },
-  { header: "Sold Qty", key: "soldQty", format: (v: any) => String(Number(v)) },
-  { header: "Sale Value", key: "soldValue", format: (v: any) => String(Number(v).toFixed(2)) },
-  { header: "Closing Qty", key: "closingQty", format: (v: any) => String(Number(v)) },
-  { header: "Closing Value", key: "closingValue", format: (v: any) => String(Number(v).toFixed(2)) },
+  { header: "Opening Qty", key: "openingQty", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Opening Value", key: "openingValue", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Purchased Qty", key: "purchasedQty", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Purchase Value", key: "purchasedValue", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Sale Return Qty", key: "saleReturnQty", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Sale Return Value", key: "saleReturnValue", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Sold Qty", key: "soldQty", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Sale Value", key: "soldValue", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Purchase Return Qty", key: "purchaseReturnQty", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Purchase Return Value", key: "purchaseReturnValue", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Closing Qty", key: "closingQty", format: (v: any) => Number(v).toFixed(2) },
+  { header: "Closing Value", key: "closingValue", format: (v: any) => Number(v).toFixed(2) },
 ];
+
+// Default visible columns (hide return columns unless needed)
+const DEFAULT_VISIBLE = ["name","unit","hsnCode","openingQty","openingValue","purchasedQty","purchasedValue","soldQty","soldValue","closingQty","closingValue"];
 
 export default function StockSummary() {
   const { fy } = useFY();
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
   const { data, isLoading } = useGetStockSummary({ from: from || undefined, to: to || undefined });
-  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-summary", ALL_COLUMNS);
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-summary", ALL_COLUMNS, DEFAULT_VISIBLE);
   const vis = visibleKeys;
 
   const summary: any[] = (data as any)?.summary || [];
@@ -71,8 +78,12 @@ export default function StockSummary() {
                 {vis.has("openingValue") && <TableHead className="text-right">Open Value</TableHead>}
                 {vis.has("purchasedQty") && <TableHead className="text-right">Purchased Qty</TableHead>}
                 {vis.has("purchasedValue") && <TableHead className="text-right">Purchase Value</TableHead>}
+                {vis.has("saleReturnQty") && <TableHead className="text-right">Sale Return Qty</TableHead>}
+                {vis.has("saleReturnValue") && <TableHead className="text-right">Sale Return Value</TableHead>}
                 {vis.has("soldQty") && <TableHead className="text-right">Sold Qty</TableHead>}
                 {vis.has("soldValue") && <TableHead className="text-right">Sale Value</TableHead>}
+                {vis.has("purchaseReturnQty") && <TableHead className="text-right">Purch. Return Qty</TableHead>}
+                {vis.has("purchaseReturnValue") && <TableHead className="text-right">Purch. Return Value</TableHead>}
                 {vis.has("closingQty") && <TableHead className="text-right font-bold">Close Qty</TableHead>}
                 {vis.has("closingValue") && <TableHead className="text-right font-bold">Close Value</TableHead>}
               </TableRow>
@@ -88,20 +99,24 @@ export default function StockSummary() {
                       {vis.has("unit") && <TableCell className="text-xs">{item.unit}</TableCell>}
                       {vis.has("hsnCode") && <TableCell className="text-xs text-muted-foreground">{item.hsnCode || "-"}</TableCell>}
                       {vis.has("openingQty") && <TableCell className="text-right text-sm">{Number(item.openingQty).toFixed(2)}</TableCell>}
-                      {vis.has("openingValue") && <TableCell className="text-right text-sm">{formatCurrency(item.openingValue)}</TableCell>}
+                      {vis.has("openingValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.openingValue))}</TableCell>}
                       {vis.has("purchasedQty") && <TableCell className="text-right text-sm text-blue-600">{Number(item.purchasedQty).toFixed(2)}</TableCell>}
-                      {vis.has("purchasedValue") && <TableCell className="text-right text-sm">{formatCurrency(item.purchasedValue)}</TableCell>}
+                      {vis.has("purchasedValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.purchasedValue))}</TableCell>}
+                      {vis.has("saleReturnQty") && <TableCell className="text-right text-sm text-orange-600">{Number(item.saleReturnQty).toFixed(2)}</TableCell>}
+                      {vis.has("saleReturnValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.saleReturnValue))}</TableCell>}
                       {vis.has("soldQty") && <TableCell className="text-right text-sm text-green-600">{Number(item.soldQty).toFixed(2)}</TableCell>}
-                      {vis.has("soldValue") && <TableCell className="text-right text-sm">{formatCurrency(item.soldValue)}</TableCell>}
+                      {vis.has("soldValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.soldValue))}</TableCell>}
+                      {vis.has("purchaseReturnQty") && <TableCell className="text-right text-sm text-pink-600">{Number(item.purchaseReturnQty).toFixed(2)}</TableCell>}
+                      {vis.has("purchaseReturnValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.purchaseReturnValue))}</TableCell>}
                       {vis.has("closingQty") && (
                         <TableCell className="text-right font-semibold">
                           <div className="flex items-center justify-end gap-1">
                             {Number(item.closingQty).toFixed(2)}
-                            {item.closingQty <= 0 && <Badge variant="outline" className="text-xs text-red-600 border-red-300">Out</Badge>}
+                            {Number(item.closingQty) <= 0 && <Badge variant="outline" className="text-xs text-red-600 border-red-300">Out</Badge>}
                           </div>
                         </TableCell>
                       )}
-                      {vis.has("closingValue") && <TableCell className="text-right font-semibold">{formatCurrency(item.closingValue)}</TableCell>}
+                      {vis.has("closingValue") && <TableCell className="text-right font-semibold">{formatCurrency(Number(item.closingValue))}</TableCell>}
                     </TableRow>
                   ))
               }

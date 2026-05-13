@@ -17,12 +17,12 @@ function loadKeys(storageKey: string, defaultKeys: string[]): string[] {
   return defaultKeys;
 }
 
-export function useColumnVisibility<T extends ColumnDef>(reportKey: string, allColumns: T[]) {
+export function useColumnVisibility<T extends ColumnDef>(reportKey: string, allColumns: T[], defaultVisible?: string[]) {
   const storageKey = `col-vis:${reportKey}`;
   const allKeys = allColumns.map(c => c.key);
 
   const [visibleKeys, setVisibleKeys] = useState<string[]>(() =>
-    loadKeys(storageKey, allKeys)
+    loadKeys(storageKey, defaultVisible ?? allKeys)
   );
 
   const save = useCallback((keys: string[]) => {
