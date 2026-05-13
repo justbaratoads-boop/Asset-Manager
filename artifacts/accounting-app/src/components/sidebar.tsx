@@ -66,6 +66,7 @@ const navigation = [
       { name: "All Transactions", href: "/reports/all-transactions" },
       { name: "Party Statement", href: "/reports/party-statement" },
       { name: "Stock Summary", href: "/reports/stock-summary" },
+      { name: "Stock Availability", href: "/reports/stock-availability" },
       { name: "Delivery Report", href: "/reports/delivery-report" },
     ],
   },
