@@ -37,6 +37,291 @@ function statusBadge(status: string) {
   return map[status] || "bg-gray-100 text-gray-600";
 }
 
+function fmtN(n: number) {
+  return "₹" + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+}
+
+function buildInvoiceHtml(inv: any, company: any, ps: any): string {
+  const showHsn = ps.showHsnCode !== false;
+  const showBank = ps.showBankDetails !== false;
+  const showSig = ps.showSignatureLine !== false;
+  const showAddr = ps.showAddress !== false;
+  const showGstin = ps.showGstin !== false;
+  const showPartyGstin = ps.showPartyGstin !== false;
+  const showLogo = ps.showLogo !== false;
+  const showFooter = ps.showFooter !== false;
+  const billTitle = ps.billTitle || "TAX INVOICE";
+  const terms = ps.termsAndConditions || "";
+
+  const co = company as any;
+  const logoHtml = showLogo && co?.logoUrl
+    ? `<img class="co-logo" src="${co.logoUrl}" alt="Logo">`
+    : "";
+  const coName = co?.companyName || co?.name || "";
+  const coAddr = showAddr ? [co?.address, co?.city, co?.state, co?.pincode].filter(Boolean).join(", ") : "";
+  const coGstin = showGstin && co?.gstin ? `GSTIN: ${co.gstin}` : "";
+
+  const items: any[] = inv?.items || [];
+  const otherCharges: { name: string; amount: number }[] = (() => {
+    try { return JSON.parse(inv?.otherCharges || "[]"); } catch { return []; }
+  })();
+
+  const itemRows = items.map((item: any, i: number) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${item.itemName || ""}</td>
+      ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
+      <td class="tr">${item.quantity} ${item.unit || ""}</td>
+      <td class="tr">${fmtN(item.rate)}</td>
+      <td class="tr">${item.discountPct || 0}%</td>
+      <td class="tr">${item.gstPct || 0}%</td>
+      <td class="tr"><strong>${fmtN(item.total)}</strong></td>
+    </tr>`).join("");
+
+  const totalsHtml = [
+    `<div class="tot-row"><span>Subtotal</span><span>${fmtN(inv?.subtotal)}</span></div>`,
+    Number(inv?.totalDiscount) > 0
+      ? `<div class="tot-row disc"><span>Discount</span><span>−${fmtN(inv?.totalDiscount)}</span></div>` : "",
+    Number(inv?.totalCgst) > 0
+      ? `<div class="tot-row"><span>CGST</span><span>${fmtN(inv?.totalCgst)}</span></div>` : "",
+    Number(inv?.totalSgst) > 0
+      ? `<div class="tot-row"><span>SGST</span><span>${fmtN(inv?.totalSgst)}</span></div>` : "",
+    Number(inv?.totalIgst) > 0
+      ? `<div class="tot-row"><span>IGST</span><span>${fmtN(inv?.totalIgst)}</span></div>` : "",
+    ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || "Other"}</span><span>${fmtN(c.amount)}</span></div>`),
+    `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
+    `<div class="tot-row paid"><span>Paid</span><span>${fmtN(inv?.amountPaid)}</span></div>`,
+    Number(inv?.balanceDue) > 0
+      ? `<div class="tot-row due"><span>Balance Due</span><span>${fmtN(inv?.balanceDue)}</span></div>` : "",
+  ].join("");
+
+  const bankHtml = showBank && co?.bankAccount ? `
+    <div class="bank">
+      <div class="sec-label">Bank Details</div>
+      <div>${co.bankName ? co.bankName + " — " : ""}A/C: ${co.bankAccount}</div>
+      ${co.bankIfsc ? `<div>IFSC: ${co.bankIfsc}${co.bankBranch ? " | Branch: " + co.bankBranch : ""}</div>` : ""}
+    </div>` : "";
+
+  const sigHtml = showSig ? `
+    <div class="sigs">
+      <div class="sig-blk"><div class="sig-line"></div><div class="sig-lbl">Customer Signature</div></div>
+      <div class="sig-blk"><div class="sig-line"></div><div class="sig-lbl">For ${coName}<br>Authorised Signatory</div></div>
+    </div>` : "";
+
+  const termsHtml = terms ? `<div class="terms"><div class="sec-label">Terms &amp; Conditions</div><div>${terms}</div></div>` : "";
+  const footerHtml = showFooter && co?.billFooter ? `<div class="bill-ftr">${co.billFooter}</div>` : "";
+
+  return `<div class="invoice">
+  <div class="inv-header">
+    <div class="co-info">${logoHtml}<div class="co-text"><div class="co-name">${coName}</div>${coAddr ? `<div class="co-addr">${coAddr}</div>` : ""}${coGstin ? `<div class="co-gstin">${coGstin}</div>` : ""}${co?.phone ? `<div class="co-phone">${co.phone}</div>` : ""}</div></div>
+    <div class="inv-meta"><div class="inv-title">${billTitle}</div><div class="inv-num">#${inv?.invoiceNumber || ""}</div><div class="inv-date">Date: ${inv?.date ? new Date(inv.date).toLocaleDateString("en-IN") : ""}</div></div>
+  </div>
+  <div class="bill-to">
+    <div class="bt-label">Bill To</div>
+    <div class="bt-name">${inv?.partyName || inv?.customerName || "—"}</div>
+    ${showPartyGstin && inv?.partyGstin ? `<div class="bt-gstin">GSTIN: ${inv.partyGstin}</div>` : ""}
+    ${inv?.billingAddress ? `<div class="bt-addr">${inv.billingAddress}</div>` : ""}
+  </div>
+  <table class="items-tbl">
+    <thead><tr>
+      <th>#</th><th>Item</th>
+      ${showHsn ? "<th>HSN</th>" : ""}
+      <th class="tr">Qty</th><th class="tr">Rate</th><th class="tr">Disc%</th><th class="tr">GST%</th><th class="tr">Amount</th>
+    </tr></thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+  <div class="inv-footer">${bankHtml}<div class="totals">${totalsHtml}</div></div>
+  ${termsHtml}${sigHtml}${footerHtml}
+</div>`;
+}
+
+const BASE_CSS = `
+  *{margin:0;padding:0;box-sizing:border-box}
+  .tr{text-align:right}
+  .co-info{display:flex;align-items:flex-start;gap:10px}
+  .co-logo{height:52px;width:auto;object-fit:contain;flex-shrink:0}
+  .inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+  .inv-meta{text-align:right}
+  .inv-num{font-family:monospace;font-size:.9em;margin-top:3px}
+  .inv-date{font-size:.88em;color:#555;margin-top:2px}
+  .bill-to{padding:8px 0;margin-bottom:14px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
+  .bt-label{font-size:.75em;text-transform:uppercase;color:#6b7280;margin-bottom:2px}
+  .bt-name{font-weight:700;font-size:1.05em}
+  .bt-gstin,.bt-addr{font-size:.85em;color:#555;margin-top:2px}
+  .items-tbl{width:100%;border-collapse:collapse;margin-bottom:14px}
+  .inv-footer{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
+  .bank{font-size:.83em;color:#444;max-width:240px}
+  .sec-label{font-weight:600;font-size:.75em;text-transform:uppercase;color:#6b7280;margin-bottom:4px;letter-spacing:.04em}
+  .totals{min-width:210px}
+  .tot-row{display:flex;justify-content:space-between;padding:2px 0;font-size:.9em}
+  .tot-row.grand{font-weight:700;font-size:1.05em;border-top:1px solid #9ca3af;padding-top:4px;margin-top:3px}
+  .tot-row.paid{color:#16a34a}
+  .tot-row.due{color:#dc2626;font-weight:600}
+  .tot-row.disc{color:#dc2626}
+  .sigs{display:flex;justify-content:space-between;margin-top:36px}
+  .sig-blk{text-align:center}
+  .sig-line{border-bottom:1px solid #9ca3af;width:150px;height:44px;margin-bottom:5px}
+  .sig-lbl{font-size:.78em;color:#6b7280}
+  .terms{margin-top:12px;font-size:.8em;color:#6b7280;padding-top:8px;border-top:1px solid #e5e7eb}
+  .bill-ftr{margin-top:14px;text-align:center;font-size:.83em;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:8px}
+`;
+
+const PRINT_CSS: Record<string, string> = {
+  a4_1: `${BASE_CSS}
+    body{font-family:Arial,sans-serif;font-size:13px;padding:16mm;max-width:210mm;color:#000}
+    .co-name{font-size:1.2em;font-weight:700}
+    .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#444;margin-top:1px}
+    .inv-title{font-size:1.6em;font-weight:700;color:#4f46e5}
+    .items-tbl th{background:#f3f4f6;padding:6px 8px;text-align:left;border:1px solid #d1d5db;font-size:.82em}
+    .items-tbl td{padding:5px 8px;border:1px solid #e5e7eb;font-size:.9em}
+    @page{size:A4 portrait;margin:0}`,
+
+  a4_2: `${BASE_CSS}
+    body{font-family:Arial,sans-serif;font-size:13px;max-width:210mm;color:#000;padding:0}
+    .inv-header{background:#4f46e5;color:#fff;padding:14mm 16mm 10mm;margin-bottom:0}
+    .co-name{font-size:1.2em;font-weight:700;color:#fff}
+    .co-addr,.co-gstin,.co-phone{font-size:.85em;color:rgba(255,255,255,.75);margin-top:1px}
+    .inv-title{font-size:1.5em;font-weight:700;color:#fff}
+    .inv-num,.inv-date{color:rgba(255,255,255,.8)}
+    .bill-to{margin:0 16mm 10px;border-top:2px solid #4f46e5;border-bottom:none;padding:8px 0}
+    .items-tbl{margin:0 16mm;width:calc(100% - 32mm)}
+    .items-tbl th{padding:7px 8px;text-align:left;border-bottom:2px solid #4f46e5;color:#4f46e5;font-size:.82em;background:none}
+    .items-tbl td{padding:6px 8px;border-bottom:1px solid #f3f4f6;font-size:.9em}
+    .items-tbl tbody tr:nth-child(even) td{background:#f5f3ff}
+    .tot-row.grand{color:#4f46e5}
+    .inv-footer,.terms,.sigs,.bill-ftr{padding:0 16mm}
+    .inv-footer{margin:14px 0}
+    @page{size:A4 portrait;margin:0}`,
+
+  a4_3: `${BASE_CSS}
+    body{font-family:Georgia,'Times New Roman',serif;font-size:12px;padding:20mm;max-width:210mm;color:#111}
+    .co-name{font-size:1.3em;font-weight:700;letter-spacing:.02em}
+    .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#555;margin-top:1px}
+    .inv-title{font-size:1.4em;font-weight:400;letter-spacing:.12em;text-transform:uppercase}
+    .bill-to{border-top:2px solid #111;border-bottom:1px solid #ccc;padding:8px 0}
+    .items-tbl th{padding:6px 4px;text-align:left;border-bottom:2px solid #111;font-size:.8em;text-transform:uppercase;letter-spacing:.05em;background:none}
+    .items-tbl td{padding:5px 4px;border-bottom:1px solid #e5e7eb;font-size:.9em}
+    .tot-row.grand{border-top:2px solid #111}
+    @page{size:A4 portrait;margin:0}`,
+
+  a5_1: `${BASE_CSS}
+    body{font-family:Arial,sans-serif;font-size:11px;padding:10mm;max-width:148mm;color:#000}
+    .co-logo{height:40px}
+    .co-name{font-size:1.15em;font-weight:700}
+    .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#555;margin-top:1px}
+    .inv-title{font-size:1.3em;font-weight:700;color:#4f46e5}
+    .items-tbl th{background:#f3f4f6;padding:4px 6px;text-align:left;border:1px solid #d1d5db;font-size:.8em}
+    .items-tbl td{padding:3px 6px;border:1px solid #e5e7eb;font-size:.88em}
+    .tot-row{font-size:.88em}
+    .sigs{margin-top:24px}.sig-line{width:120px;height:34px}
+    @page{size:A5 portrait;margin:0}`,
+
+  a5_2: `${BASE_CSS}
+    body{font-family:Arial,sans-serif;font-size:10px;padding:8mm;max-width:148mm;color:#000}
+    .co-logo{height:34px}
+    .co-name{font-size:1.15em;font-weight:700}
+    .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#555}
+    .inv-title{font-size:1.2em;font-weight:700;color:#374151}
+    .inv-header{margin-bottom:10px}
+    .bill-to{padding:5px 0;margin-bottom:8px}
+    .items-tbl th{background:#374151;color:#fff;padding:3px 5px;text-align:left;border:none;font-size:.8em}
+    .items-tbl td{padding:3px 5px;border-bottom:1px solid #f3f4f6;font-size:.88em}
+    .items-tbl tbody tr:nth-child(even) td{background:#f9fafb}
+    .tot-row{padding:1.5px 0;font-size:.88em}
+    .sigs{margin-top:18px}.sig-line{width:108px;height:28px}
+    @page{size:A5 portrait;margin:0}`,
+
+  a5_3: `${BASE_CSS}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10.5px;padding:0;max-width:148mm;color:#000}
+    .inv-header{background:#1e293b;color:#fff;padding:9mm 9mm 7mm;margin-bottom:9mm}
+    .co-logo{height:36px}
+    .co-name{font-size:1.15em;font-weight:700;color:#fff}
+    .co-addr,.co-gstin,.co-phone{font-size:.85em;color:rgba(255,255,255,.7);margin-top:1px}
+    .inv-title{font-size:1.2em;font-weight:700;color:#fff}
+    .inv-num,.inv-date{color:rgba(255,255,255,.75)}
+    .bill-to{margin:0 9mm 8px;border-top:2px solid #1e293b;border-bottom:none;padding:6px 0}
+    .items-tbl{margin:0 9mm;width:calc(100% - 18mm)}
+    .items-tbl th{padding:4px 5px;text-align:left;border-bottom:2px solid #1e293b;color:#1e293b;font-size:.8em;background:none}
+    .items-tbl td{padding:3px 5px;border-bottom:1px solid #f1f5f9;font-size:.88em}
+    .tot-row{font-size:.88em}.tot-row.grand{color:#1e293b}
+    .inv-footer,.terms,.sigs,.bill-ftr{padding:0 9mm}
+    .inv-footer{margin:10px 0}
+    .sigs{margin-top:20px}.sig-line{width:110px;height:30px}
+    @page{size:A5 portrait;margin:0}`,
+
+  thermal_1: `${BASE_CSS}
+    body{font-family:'Courier New',Courier,monospace;font-size:11px;padding:3mm;width:80mm;max-width:80mm;color:#000}
+    .inv-header{display:block;text-align:center;border-bottom:1px dashed #000;padding-bottom:7px;margin-bottom:7px}
+    .co-info{display:block;text-align:center}
+    .co-logo{height:42px;display:block;margin:0 auto 5px}
+    .co-name{font-size:1.1em;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .co-addr,.co-gstin,.co-phone{font-size:.88em}
+    .inv-meta{text-align:center;margin-top:5px}
+    .inv-title{font-weight:700;text-transform:uppercase;font-size:1em}
+    .bill-to{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:5px 0;margin-bottom:6px}
+    .bt-label{font-size:.78em}
+    .items-tbl th{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:2px 2px;font-size:.85em;background:none;text-align:left}
+    .items-tbl td{padding:2px 2px;border:none;font-size:.9em}
+    .inv-footer{display:block;border-top:1px dashed #000;padding-top:6px;margin-top:4px}
+    .bank{margin-bottom:6px;border-bottom:1px dashed #000;padding-bottom:5px;font-size:.85em}
+    .totals{width:100%}
+    .tot-row{font-size:.9em}
+    .tot-row.grand{font-size:1em;font-weight:700;border-top:1px solid #000;padding-top:3px}
+    .sigs{display:block;text-align:center;margin-top:14px}
+    .sig-blk{display:inline-block;margin:0 8px}
+    .sig-line{width:90px;height:30px;margin:0 auto}
+    .terms{font-size:.8em;border-top:1px dashed #000;padding-top:5px;margin-top:8px}
+    .bill-ftr{border-top:1px dashed #000;padding-top:5px;margin-top:8px;font-size:.85em}
+    @page{size:80mm auto;margin:0}`,
+
+  thermal_2: `${BASE_CSS}
+    body{font-family:'Courier New',Courier,monospace;font-size:11px;padding:3mm;width:80mm;max-width:80mm;color:#000}
+    .inv-header{display:block;text-align:center;border-bottom:1px solid #000;padding-bottom:6px;margin-bottom:6px}
+    .co-info{display:block;text-align:center}
+    .co-logo{height:38px;display:block;margin:0 auto 4px}
+    .co-name{font-size:1.1em;font-weight:700}
+    .co-addr,.co-gstin,.co-phone{font-size:.88em}
+    .inv-meta{text-align:center;margin-top:4px}
+    .inv-title{font-weight:700;text-transform:uppercase}
+    .bill-to{border-top:1px solid #000;border-bottom:1px solid #000;padding:4px 0;margin-bottom:5px}
+    .items-tbl th{border-top:1px solid #000;border-bottom:1px solid #000;padding:2px;font-size:.85em;background:none;text-align:left}
+    .items-tbl td{padding:2px;border:none;font-size:.9em}
+    .inv-footer{display:block;border-top:1px solid #000;padding-top:5px;margin-top:3px}
+    .bank{display:none}
+    .totals{width:100%}
+    .tot-row.grand{font-weight:700;border-top:1px solid #000;padding-top:3px}
+    .sigs{display:block;text-align:center;margin-top:12px}
+    .sig-blk{display:inline-block;margin:0 8px}
+    .sig-line{width:84px;height:28px;margin:0 auto}
+    .terms{font-size:.8em;border-top:1px solid #000;padding-top:4px}
+    .bill-ftr{border-top:1px solid #000;padding-top:4px;margin-top:6px;font-size:.85em}
+    @page{size:80mm auto;margin:0}`,
+
+  thermal_3: `${BASE_CSS}
+    body{font-family:'Courier New',Courier,monospace;font-size:11px;padding:2mm;width:80mm;max-width:80mm;color:#000}
+    .inv-header{display:block;text-align:center;margin-bottom:5px}
+    .co-info{display:block;text-align:center}
+    .co-logo{display:none}
+    .co-name{font-size:1.15em;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+    .co-addr,.co-gstin,.co-phone{display:none}
+    .inv-meta{text-align:center;margin-top:3px}
+    .inv-title{font-weight:700;text-transform:uppercase}
+    .bill-to{padding:3px 0;margin-bottom:4px;border-top:1px dashed #000;border-bottom:none}
+    .bt-gstin,.bt-addr{display:none}
+    .items-tbl th{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:2px;background:none;font-size:.85em;text-align:left}
+    .items-tbl td{padding:1px 2px;border:none;font-size:.9em}
+    .inv-footer{display:block;border-top:1px dashed #000;padding-top:3px}
+    .bank{display:none}
+    .totals{width:100%}
+    .tot-row.grand{font-weight:700;border-top:1px solid #000;padding-top:3px}
+    .sigs{display:block;text-align:center;margin-top:10px}
+    .sig-blk{display:inline-block;margin:0 6px}
+    .sig-line{width:78px;height:26px;margin:0 auto}
+    .terms{display:none}
+    .bill-ftr{text-align:center;border-top:1px dashed #000;padding-top:4px;margin-top:6px}
+    @page{size:80mm auto;margin:0}`
+};
+
 function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; company: any; copyLabel?: string }) {
   const ps = loadPrintSettings();
   const billTitle = ps.billTitle || "TAX INVOICE";
@@ -397,51 +682,26 @@ export default function SaleInvoiceView() {
   const handlePrint = () => {
     const numCopies = Number(copies);
     const printerType = ps.printerType || "a4";
+    const layoutStyle = ps.layoutStyle || "1";
+    const cssKey = `${printerType}_${layoutStyle}`;
+    const css = PRINT_CSS[cssKey] || PRINT_CSS["a4_1"];
 
-    const formatCss: Record<string, string> = {
-      a4: `
-        body { font-family: sans-serif; font-size: 13px; color: #000; margin: 0; padding: 16mm; max-width: 210mm; box-sizing: border-box; }
-        table { border-collapse: collapse; width: 100%; }
-        @page { size: A4; margin: 0; }
-      `,
-      a5: `
-        body { font-family: sans-serif; font-size: 11px; color: #000; margin: 0; padding: 10mm; max-width: 148mm; box-sizing: border-box; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { padding: 3px 4px !important; font-size: 11px !important; }
-        h1 { font-size: 16px !important; } h2 { font-size: 14px !important; }
-        @page { size: A5; margin: 0; }
-      `,
-      thermal: `
-        body { font-family: 'Courier New', monospace; font-size: 11px; color: #000; margin: 0; padding: 4mm; width: 80mm; max-width: 80mm; box-sizing: border-box; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { padding: 2px 2px !important; font-size: 11px !important; border: none !important; }
-        thead tr { border-top: 1px dashed #000 !important; border-bottom: 1px dashed #000 !important; }
-        tfoot tr { border-top: 1px dashed #000 !important; }
-        .border, .border-t, .border-b { border-style: dashed !important; }
-        img { max-width: 60mm; display: block; margin: 0 auto 4px; }
-        h1 { font-size: 14px !important; text-align: center; } h2 { font-size: 12px !important; text-align: center; }
-        .flex { display: block !important; } .sm\\:flex { display: block !important; }
-        .sm\\:text-right { text-align: left !important; }
-        .rounded-xl, .rounded-lg { border-radius: 0 !important; border: none !important; padding: 0 !important; }
-        @page { size: 80mm auto; margin: 0; }
-      `,
-    };
+    const invoiceBody = buildInvoiceHtml(inv, company, ps);
 
     const elements: string[] = [];
     for (let i = 0; i < numCopies; i++) {
-      elements.push(`<div class="copy" style="${i > 0 ? "page-break-before:always;" : ""}">`);
-      if (numCopies > 1) {
-        elements.push(`<div style="text-align:right;font-size:11px;font-weight:600;color:#999;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">${copyLabels[i] || `Copy ${i + 1}`}</div>`);
-      }
-      elements.push(document.getElementById("invoice-print")?.innerHTML || "");
-      elements.push(`</div>`);
+      const pageBreak = i > 0 ? `<div style="page-break-before:always"></div>` : "";
+      const copyBadge = numCopies > 1
+        ? `<div style="text-align:right;font-size:11px;font-weight:600;color:#999;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${copyLabels[i] || `Copy ${i + 1}`}</div>`
+        : "";
+      elements.push(`${pageBreak}${copyBadge}${invoiceBody}`);
     }
-    const html = `<!DOCTYPE html><html><head><title>Invoice ${inv?.invoiceNumber}</title><style>${formatCss[printerType] || formatCss.a4}@media print{.no-print{display:none}}</style></head><body>${elements.join("")}</body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${inv?.invoiceNumber}</title><style>${css}@media print{@page{margin:0}}</style></head><body>${elements.join("")}</body></html>`;
     const win = window.open("", "_blank");
     if (win) {
       win.document.write(html);
       win.document.close();
-      win.print();
+      setTimeout(() => win.print(), 250);
     }
     setPrintDialogOpen(false);
   };
