@@ -61,25 +61,144 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
-  const ledgers = await db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false"));
-  const lines = await db.select().from(journalLinesTable);
+  // Fetch all transaction data in parallel
+  const [
+    ledgers,
+    journalLines,
+    saleInvoices,
+    purchaseInvoices,
+    receipts,
+    payments,
+    creditNotes,
+    debitNotes,
+  ] = await Promise.all([
+    db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
+    db
+      .select({ line: journalLinesTable })
+      .from(journalLinesTable)
+      .innerJoin(
+        journalEntriesTable,
+        and(
+          eq(journalLinesTable.entryId, journalEntriesTable.id),
+          eq(journalEntriesTable.isDeleted, "false"),
+        ),
+      ),
+    db.select().from(saleInvoicesTable).where(eq(saleInvoicesTable.isDeleted, "false")),
+    db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.isDeleted, "false")),
+    db.select().from(receiptsTable).where(eq(receiptsTable.isDeleted, "false")),
+    db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
+    db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
+    db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+  ]);
 
-  const balances: Record<number, { dr: number; cr: number }> = {};
-  for (const line of lines) {
-    if (!balances[line.ledgerId]) balances[line.ledgerId] = { dr: 0, cr: 0 };
-    if (line.type === "dr") balances[line.ledgerId].dr += Number(line.amount);
-    else balances[line.ledgerId].cr += Number(line.amount);
+  // Find canonical ledger IDs by name (fall back to known defaults)
+  const byName = (name: string) => ledgers.find(l => l.name === name)?.id;
+  const LEDGER = {
+    cash:       byName("Cash")                ?? 1,
+    ar:         byName("Accounts Receivable") ?? 3,
+    ap:         byName("Accounts Payable")    ?? 5,
+    sales:      byName("Sales")               ?? 9,
+    purchase:   byName("Purchase")            ?? 10,
+    outputGst:  byName("Output GST")          ?? 8,
+    inputGst:   byName("Input GST (ITC)")     ?? 7,
+  };
+
+  // Build ledger balance map: ledgerId -> { dr, cr }
+  const bal: Record<number, { dr: number; cr: number }> = {};
+  const add = (ledgerId: number, type: "dr" | "cr", amount: number) => {
+    if (amount === 0) return;
+    if (!bal[ledgerId]) bal[ledgerId] = { dr: 0, cr: 0 };
+    bal[ledgerId][type] += amount;
+  };
+
+  // 1. Manual journal entries (only from non-deleted entries)
+  for (const { line } of journalLines) {
+    add(line.ledgerId, line.type as "dr" | "cr", Number(line.amount));
   }
 
+  // 2. Sale invoices — double-entry synthesis
+  //    Dr: Accounts Receivable (credit sale: party_id set) or Cash (cash sale: no party)
+  //    Cr: Sales (taxable portion) + Output GST (GST portion)
+  for (const inv of saleInvoices) {
+    const grandTotal = Number(inv.grandTotal);
+    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
+    const taxable = grandTotal - gst;
+    add(inv.partyId ? LEDGER.ar : LEDGER.cash, "dr", grandTotal);
+    add(LEDGER.sales, "cr", taxable);
+    add(LEDGER.outputGst, "cr", gst);
+  }
+
+  // 3. Purchase invoices — double-entry synthesis
+  //    Dr: Purchase (taxable) + Input GST
+  //    Cr: Accounts Payable (credit purchase: party_id set) or Cash (cash purchase)
+  for (const inv of purchaseInvoices) {
+    const grandTotal = Number(inv.grandTotal);
+    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
+    const taxable = grandTotal - gst;
+    add(LEDGER.purchase, "dr", taxable);
+    add(LEDGER.inputGst, "dr", gst);
+    add(inv.partyId ? LEDGER.ap : LEDGER.cash, "cr", grandTotal);
+  }
+
+  // 4. Receipts (money received from customers)
+  //    Dr: ledger_id (cash/bank account where money came in)
+  //    Cr: Accounts Receivable (reduces what the customer owes)
+  for (const r of receipts) {
+    const amount = Number(r.amount);
+    add(r.ledgerId, "dr", amount);
+    add(LEDGER.ar, "cr", amount);
+  }
+
+  // 5. Payments (money paid to suppliers)
+  //    Dr: Accounts Payable (reduces what we owe the supplier)
+  //    Cr: ledger_id (cash/bank account from which money went out)
+  for (const p of payments) {
+    const amount = Number(p.amount);
+    add(LEDGER.ap, "dr", amount);
+    add(p.ledgerId, "cr", amount);
+  }
+
+  // 6. Credit notes (sale returns) — reversal of a sale
+  //    Dr: Sales (reduces revenue)
+  //    Cr: Accounts Receivable (customer owes less / gets refund)
+  for (const cn of creditNotes) {
+    const amount = Number(cn.amount);
+    add(LEDGER.sales, "dr", amount);
+    add(LEDGER.ar, "cr", amount);
+  }
+
+  // 7. Debit notes (purchase returns) — reversal of a purchase
+  //    Dr: Accounts Payable (we owe supplier less)
+  //    Cr: Purchase (reduces purchase expense)
+  for (const dn of debitNotes) {
+    const amount = Number(dn.amount);
+    add(LEDGER.ap, "dr", amount);
+    add(LEDGER.purchase, "cr", amount);
+  }
+
+  // Build result rows — opening balance added to its natural side
   const rows = ledgers.map(l => {
-    const b = balances[l.id] || { dr: 0, cr: 0 };
+    const b = bal[l.id] || { dr: 0, cr: 0 };
     const opening = Number(l.openingBalance);
     const netDr = b.dr + (l.nature === "dr" ? opening : 0);
     const netCr = b.cr + (l.nature === "cr" ? opening : 0);
-    return { id: l.id, name: l.name, group: l.group, nature: l.nature, openingBalance: opening, debit: netDr, credit: netCr, closing: netDr - netCr };
+    return {
+      id: l.id,
+      name: l.name,
+      group: l.group,
+      nature: l.nature,
+      openingBalance: opening,
+      debit: netDr,
+      credit: netCr,
+      closing: netDr - netCr,
+    };
   });
 
-  res.json({ rows, totalDebit: rows.reduce((s, r) => s + r.debit, 0), totalCredit: rows.reduce((s, r) => s + r.credit, 0) });
+  res.json({
+    rows,
+    totalDebit: rows.reduce((s, r) => s + r.debit, 0),
+    totalCredit: rows.reduce((s, r) => s + r.credit, 0),
+  });
 });
 
 router.get("/reports/profit-loss", authMiddleware, async (req, res) => {
