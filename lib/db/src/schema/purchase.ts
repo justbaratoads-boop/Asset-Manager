@@ -65,6 +65,7 @@ export const purchaseOrdersTable = pgTable("purchase_orders", {
   status: text("status").notNull().default("open"),
   grandTotal: numeric("grand_total", { precision: 15, scale: 2 }).notNull().default("0"),
   notes: text("notes"),
+  deliveryDate: text("delivery_date"),
   isDeleted: text("is_deleted").notNull().default("false"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

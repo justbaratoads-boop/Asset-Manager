@@ -242,38 +242,42 @@ router.get("/purchase-orders", authMiddleware, async (req, res) => {
 
 router.post("/purchase-orders", authMiddleware, async (req, res) => {
   const data = req.body;
+  if (!data.partyName) return res.status(400).json({ error: "Party name is required" });
+  if (!data.date) return res.status(400).json({ error: "Date is required" });
+  if (!data.items || data.items.length === 0) return res.status(400).json({ error: "At least one item is required" });
+
   const poNumber = await makeVoucherNumber("PO");
   const [order] = await db.insert(purchaseOrdersTable).values({
     poNumber,
     date: data.date,
-    partyId: data.partyId,
+    partyId: data.partyId || null,
     partyName: data.partyName,
     status: "open",
     grandTotal: String(data.grandTotal || 0),
-    notes: data.notes,
+    notes: data.notes || null,
+    deliveryDate: data.deliveryDate || null,
   }).returning();
 
-  if (data.items?.length) {
-    for (const item of data.items) {
-      await db.insert(purchaseOrderItemsTable).values({
-        orderId: order.id,
-        stockItemId: item.stockItemId,
-        itemName: item.itemName,
-        hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
-        unit: item.unit,
-        rate: String(item.rate),
-        discountPct: String(item.discountPct || 0),
-        gstPct: String(item.gstPct || 0),
-        taxableAmount: String(item.taxableAmount),
-        cgst: String(item.cgst || 0),
-        sgst: String(item.sgst || 0),
-        igst: String(item.igst || 0),
-        total: String(item.total),
-      });
-    }
+  for (const item of data.items) {
+    if (!item.itemName) continue;
+    await db.insert(purchaseOrderItemsTable).values({
+      orderId: order.id,
+      stockItemId: item.stockItemId || null,
+      itemName: item.itemName,
+      hsnCode: item.hsnCode || null,
+      quantity: String(Number(item.quantity) || 0),
+      unit: item.unit || "pcs",
+      rate: String(Number(item.rate) || 0),
+      discountPct: String(Number(item.discountPct) || 0),
+      gstPct: String(Number(item.gstPct) || 0),
+      taxableAmount: String(Number(item.taxableAmount) || 0),
+      cgst: String(Number(item.cgst) || 0),
+      sgst: String(Number(item.sgst) || 0),
+      igst: String(Number(item.igst) || 0),
+      total: String(Number(item.total) || 0),
+    });
   }
-  res.status(201).json(order);
+  res.status(201).json({ ...order, deliveryDate: order.deliveryDate });
 });
 
 router.get("/purchase-orders/:id", authMiddleware, async (req, res) => {
@@ -284,8 +288,42 @@ router.get("/purchase-orders/:id", authMiddleware, async (req, res) => {
 });
 
 router.put("/purchase-orders/:id", authMiddleware, async (req, res) => {
-  const [order] = await db.update(purchaseOrdersTable).set({ status: req.body.status }).where(eq(purchaseOrdersTable.id, Number(req.params.id))).returning();
+  const data = req.body;
+  const updateData: Record<string, unknown> = {};
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.date !== undefined) updateData.date = data.date;
+  if (data.partyId !== undefined) updateData.partyId = data.partyId || null;
+  if (data.partyName !== undefined) updateData.partyName = data.partyName;
+  if (data.notes !== undefined) updateData.notes = data.notes || null;
+  if (data.deliveryDate !== undefined) updateData.deliveryDate = data.deliveryDate || null;
+  if (data.grandTotal !== undefined) updateData.grandTotal = String(data.grandTotal || 0);
+
+  const [order] = await db.update(purchaseOrdersTable).set(updateData).where(eq(purchaseOrdersTable.id, Number(req.params.id))).returning();
   if (!order) return res.status(404).json({ error: "Not found" });
+
+  if (data.items?.length) {
+    await db.delete(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.orderId, Number(req.params.id)));
+    for (const item of data.items) {
+      if (!item.itemName) continue;
+      await db.insert(purchaseOrderItemsTable).values({
+        orderId: order.id,
+        stockItemId: item.stockItemId || null,
+        itemName: item.itemName,
+        hsnCode: item.hsnCode || null,
+        quantity: String(Number(item.quantity) || 0),
+        unit: item.unit || "pcs",
+        rate: String(Number(item.rate) || 0),
+        discountPct: String(Number(item.discountPct) || 0),
+        gstPct: String(Number(item.gstPct) || 0),
+        taxableAmount: String(Number(item.taxableAmount) || 0),
+        cgst: String(Number(item.cgst) || 0),
+        sgst: String(Number(item.sgst) || 0),
+        igst: String(Number(item.igst) || 0),
+        total: String(Number(item.total) || 0),
+      });
+    }
+  }
+
   res.json(order);
 });
 
