@@ -21,6 +21,7 @@ import { customFetch } from "@workspace/api-client-react";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { QuickAddItemDialog } from "@/components/quick-add-item-dialog";
 import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
+import { PartySelect } from "@/components/party-select";
 
 interface InvoiceItem {
   stockItemId?: number;
@@ -380,10 +381,13 @@ export default function SaleInvoiceForm() {
                     <Label>Party *</Label>
                     <button type="button" onClick={() => setShowAddParty(true)} className="text-xs text-primary hover:underline font-medium">+ Add Party</button>
                   </div>
-                  <Select value={partyId ? String(partyId) : ""} onValueChange={v => { setPartyId(Number(v)); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}>
-                    <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select party" /></SelectTrigger>
-                    <SelectContent>{(parties as any[]).filter((p: any) => p.type === "customer").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <PartySelect
+                    value={partyId}
+                    onChange={v => { setPartyId(v); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}
+                    parties={(parties as any[]).filter((p: any) => p.type === "customer")}
+                    placeholder="Select party"
+                    hasError={!!errors.party}
+                  />
                   {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
                 </div>
               ) : (

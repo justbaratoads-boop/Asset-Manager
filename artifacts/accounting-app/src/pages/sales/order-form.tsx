@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PartySelect } from "@/components/party-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -217,10 +218,13 @@ export default function OrderForm() {
               <Label>Party *</Label>
               <button type="button" onClick={() => setShowAddParty(true)} className="text-xs text-primary hover:underline font-medium">+ Add Party</button>
             </div>
-            <Select value={partyId ? String(partyId) : ""} onValueChange={selectParty}>
-              <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select party" /></SelectTrigger>
-              <SelectContent>{(parties as any[]).filter((p: any) => p.type === "customer").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <PartySelect
+              value={partyId}
+              onChange={v => selectParty(String(v))}
+              parties={(parties as any[]).filter((p: any) => p.type === "customer")}
+              placeholder="Select party"
+              hasError={!!errors.party}
+            />
             {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
           </div>
           <div className="space-y-1"><Label>Order Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} className={errors.date ? "border-destructive" : ""} /></div>

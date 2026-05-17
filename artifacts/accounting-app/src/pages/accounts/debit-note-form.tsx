@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PartySelect } from "@/components/party-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
@@ -212,10 +213,13 @@ export default function DebitNoteForm() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Supplier *</Label>
-                <Select value={partyId ? String(partyId) : ""} onValueChange={v => { setPartyId(Number(v)); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}>
-                  <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                  <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
-                </Select>
+                <PartySelect
+                  value={partyId}
+                  onChange={v => { setPartyId(v); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}
+                  parties={(parties as any[]).filter((p: any) => p.type === "supplier")}
+                  placeholder="Select supplier"
+                  hasError={!!errors.party}
+                />
                 {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
               </div>
               <div className="space-y-1">

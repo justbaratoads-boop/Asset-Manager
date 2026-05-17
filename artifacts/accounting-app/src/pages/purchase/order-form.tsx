@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PartySelect } from "@/components/party-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
@@ -176,10 +177,13 @@ export default function PurchaseOrderForm() {
               <Label>Supplier *</Label>
               <button type="button" onClick={() => setShowAddParty(true)} className="text-xs text-primary hover:underline font-medium">+ Add Party</button>
             </div>
-            <Select value={partyId ? String(partyId) : ""} onValueChange={selectParty}>
-              <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select supplier" /></SelectTrigger>
-              <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <PartySelect
+              value={partyId}
+              onChange={v => selectParty(String(v))}
+              parties={(parties as any[]).filter((p: any) => p.type === "supplier")}
+              placeholder="Select supplier"
+              hasError={!!errors.party}
+            />
             {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
           </div>
           <div className="space-y-1"><Label>PO Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
