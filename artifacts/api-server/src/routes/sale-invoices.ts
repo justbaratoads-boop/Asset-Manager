@@ -119,6 +119,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
         total: String(item.total),
+        batchId: item.batchId || null,
         description: item.description || null,
       });
 
@@ -134,7 +135,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
             balanceAfter: String(newStock),
             reference: invoiceNumber,
           });
-          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
+          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0, item.batchId || null);
         }
       }
     }
@@ -229,7 +230,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
           await db.update(stockItemsTable)
             .set({ physicalStock: String(restored) })
             .where(eq(stockItemsTable.id, oldItem.stockItemId));
-          await adjustBatchStockForItem(oldItem.stockItemId, Number(oldItem.quantity), 0);
+          await adjustBatchStockForItem(oldItem.stockItemId, Number(oldItem.quantity), 0, (oldItem as any).batchId || null);
         }
       }
     }
@@ -252,6 +253,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
         total: String(item.total),
+        batchId: item.batchId || null,
         description: item.description || null,
       });
 
@@ -270,7 +272,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
             balanceAfter: String(newStock),
             reference: invoice.invoiceNumber,
           });
-          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
+          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0, item.batchId || null);
         }
       }
     }

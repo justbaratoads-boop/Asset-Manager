@@ -70,6 +70,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
         cgst: String(item.cgst || 0),
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
+        batchId: item.batchId || null,
         total: String(item.total),
       });
 
@@ -85,7 +86,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
             balanceAfter: String(newStock),
             reference: invoiceNumber,
           });
-          await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
+          await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0, item.batchId || null);
         }
       }
     }
@@ -149,7 +150,7 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
       if (si) {
         const restored = Math.max(0, Number(si.physicalStock) - Number(oldItem.quantity));
         await db.update(stockItemsTable).set({ physicalStock: String(restored) }).where(eq(stockItemsTable.id, oldItem.stockItemId));
-        await adjustBatchStockForItem(oldItem.stockItemId, -Number(oldItem.quantity), 0);
+        await adjustBatchStockForItem(oldItem.stockItemId, -Number(oldItem.quantity), 0, (oldItem as any).batchId || null);
       }
     }
   }
@@ -172,6 +173,7 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
         cgst: String(item.cgst || 0),
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
+        batchId: item.batchId || null,
         total: String(item.total),
       });
       if (item.stockItemId) {
@@ -179,7 +181,7 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
         if (si) {
           const newStock = Number(si.physicalStock) + Number(item.quantity);
           await db.update(stockItemsTable).set({ physicalStock: String(newStock) }).where(eq(stockItemsTable.id, item.stockItemId));
-          await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
+          await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0, item.batchId || null);
         }
       }
     }
@@ -297,6 +299,7 @@ router.post("/purchase-orders", authMiddleware, async (req, res) => {
       cgst: String(Number(item.cgst) || 0),
       sgst: String(Number(item.sgst) || 0),
       igst: String(Number(item.igst) || 0),
+      batchId: item.batchId || null,
       total: String(Number(item.total) || 0),
     });
   }
@@ -342,6 +345,7 @@ router.put("/purchase-orders/:id", authMiddleware, async (req, res) => {
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
         igst: String(Number(item.igst) || 0),
+        batchId: item.batchId || null,
         total: String(Number(item.total) || 0),
       });
     }
@@ -434,6 +438,7 @@ router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => 
       sgst: String(sgst.toFixed(2)),
       igst: String(igst.toFixed(2)),
       total: String(total.toFixed(2)),
+      batchId: (item as any).batchId || null,
     });
   }
 

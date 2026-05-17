@@ -23,6 +23,7 @@ import { OtherChargesSection, type OtherCharge } from "@/components/other-charge
 
 interface InvoiceItem {
   stockItemId?: number;
+  batchId?: number;
   itemName: string;
   description?: string;
   hsnCode: string;
@@ -63,6 +64,7 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
   const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
   return {
     stockItemId: item.stockItemId,
+    batchId: item.batchId,
     itemName: item.itemName || "",
     description: item.description || "",
     hsnCode: item.hsnCode || "",
@@ -255,7 +257,7 @@ export default function SaleInvoiceForm() {
     }
     if (inv.items?.length) {
       setItems(inv.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
+        stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
         gstLocked: !!i.stockItemId, gstInclusive: false,
@@ -271,7 +273,7 @@ export default function SaleInvoiceForm() {
       if (order.notes) setNotes(order.notes);
       if (order.items?.length) {
         setItems(order.items.map((i: any) => calcItem({
-          stockItemId: i.stockItemId, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
+          stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
           quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
           discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
           gstLocked: !!i.stockItemId, gstInclusive: false,
@@ -294,7 +296,7 @@ export default function SaleInvoiceForm() {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate);
+        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate);
         return updated;
       });
     }
@@ -303,7 +305,7 @@ export default function SaleInvoiceForm() {
   const clearItem = (index: number) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = calcItem({ ...updated[index], stockItemId: undefined, gstLocked: false }, isInterstate);
+      updated[index] = calcItem({ ...updated[index], stockItemId: undefined, batchId: undefined, gstLocked: false }, isInterstate);
       return updated;
     });
   };
@@ -314,7 +316,7 @@ export default function SaleInvoiceForm() {
       const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate);
+        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate);
         return updated;
       });
     }
@@ -476,19 +478,22 @@ export default function SaleInvoiceForm() {
                       {` ${item.unit}`}
                     </p>
                   )}
-                  {item.stockItemId && (() => {
-                    const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
-                    if (!b) return null;
-                    const avail = Number(b.physicalStock) - Number(b.reservedStock);
-                    const warn = item.quantity > 0 && item.quantity > avail;
-                    return (
-                      <p className={`text-xs px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
-                        <span className="font-medium">Batch: {b.name}</span>
-                        <span className="text-muted-foreground">· avail: {avail}</span>
-                        {warn && <AlertTriangle className="h-3 w-3" />}
-                      </p>
-                    );
-                  })()}
+                  {item.stockItemId && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
+                      <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(index, "batchId", v === "none" ? undefined : Number(v))}>
+                        <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— none —</SelectItem>
+                          {(batches as any[]).map((b: any) => {
+                            const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                            const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                            return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · avail: {avail}</SelectItem>;
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <Input
                     className="h-8 text-sm"
                     placeholder="Description (optional)"
@@ -627,19 +632,22 @@ export default function SaleInvoiceForm() {
                             {` ${item.unit}`}
                           </p>
                         )}
-                        {item.stockItemId && (() => {
-                          const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
-                          if (!b) return null;
-                          const avail = Number(b.physicalStock) - Number(b.reservedStock);
-                          const warn = item.quantity > 0 && item.quantity > avail;
-                          return (
-                            <p className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
-                              <span className="font-medium">Batch: {b.name}</span>
-                              <span className="text-muted-foreground">· avail: {avail}</span>
-                              {warn && <AlertTriangle className="h-3 w-3" />}
-                            </p>
-                          );
-                        })()}
+                        {item.stockItemId && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
+                            <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(index, "batchId", v === "none" ? undefined : Number(v))}>
+                              <SelectTrigger className="h-6 text-xs py-0 flex-1 min-w-0"><SelectValue placeholder="— none —" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">— none —</SelectItem>
+                                {(batches as any[]).map((b: any) => {
+                                  const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                                  const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                                  return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · {avail}</SelectItem>;
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <Input
                           className="h-7 text-xs mt-1"
                           placeholder="Description (optional)"

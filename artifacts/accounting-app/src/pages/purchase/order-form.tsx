@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCreatePurchaseOrder, useGetPurchaseOrder, useListParties, useListStockItems, getListPurchaseOrdersQueryKey, customFetch } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
+import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 
 interface POItem {
   stockItemId?: number;
+  batchId?: number;
   itemName: string;
   hsnCode: string;
   quantity: number;
@@ -44,6 +46,7 @@ function calcItem(item: Partial<POItem>): POItem {
   const gst = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   return {
     stockItemId: item.stockItemId,
+    batchId: item.batchId,
     itemName: item.itemName || "",
     hsnCode: item.hsnCode || "",
     quantity: qty, unit: item.unit || "pcs", rate,
@@ -68,6 +71,7 @@ export default function PurchaseOrderForm() {
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
   const stockAvail = useStockAvailability();
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetPurchaseOrder(editId!, { query: { enabled: isEdit } });
 
   const [partyId, setPartyId] = useState<number | undefined>();
@@ -89,7 +93,7 @@ export default function PurchaseOrderForm() {
     setNotes(o.notes || "");
     if (o.items?.length) {
       setItems(o.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+        stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
         gstLocked: !!i.stockItemId, gstInclusive: false,
@@ -112,7 +116,7 @@ export default function PurchaseOrderForm() {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }); return u; });
     }
   };
 
@@ -207,6 +211,22 @@ export default function PurchaseOrderForm() {
                     {` ${item.unit}`}
                   </p>
                 )}
+                {item.stockItemId && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
+                    <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
+                      <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— none —</SelectItem>
+                        {(batches as any[]).map((b: any) => {
+                          const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                          const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                          return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · avail: {avail}</SelectItem>;
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
@@ -284,6 +304,22 @@ export default function PurchaseOrderForm() {
                           </span>
                           {` ${item.unit}`}
                         </p>
+                      )}
+                      {item.stockItemId && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
+                          <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
+                            <SelectTrigger className="h-6 text-xs py-0 flex-1 min-w-0"><SelectValue placeholder="— none —" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">— none —</SelectItem>
+                              {(batches as any[]).map((b: any) => {
+                                const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                                const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                                return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · {avail}</SelectItem>;
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       )}
                     </TableCell>
                     <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>

@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Item {
   stockItemId?: number;
+  batchId?: number;
   itemName: string;
   hsnCode: string;
   quantity: number;
@@ -51,7 +52,7 @@ function calc(item: Partial<Item>, isInterstate: boolean): Item {
   const grossAmount = qty * rate * (1 - discPct / 100);
   const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
   const gst = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
-  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId };
+  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, cgst: isInterstate ? 0 : gst / 2, sgst: isInterstate ? 0 : gst / 2, igst: isInterstate ? gst : 0, total: taxable + gst, stockItemId: item.stockItemId, batchId: item.batchId };
 }
 
 function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
@@ -177,7 +178,7 @@ export default function PurchaseInvoiceForm() {
     }
     if (inv.items?.length) {
       setItems(inv.items.map((i: any) => calc({
-        stockItemId: i.stockItemId, itemName: i.itemName, hsnCode: i.hsnCode || "",
+        stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
         gstLocked: !!i.stockItemId, gstInclusive: false,
@@ -193,19 +194,19 @@ export default function PurchaseInvoiceForm() {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, gstLocked: si.gstApplicable === "true" }, isInterstate); return u; });
     }
   };
 
   const clearItem = (index: number) => {
-    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: undefined, gstLocked: false }, isInterstate); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: undefined, batchId: undefined, gstLocked: false }, isInterstate); return u; });
   };
 
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
       const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, gstLocked: newItem.gstApplicable === "true" }, isInterstate); return u; });
     }
   };
 
@@ -315,17 +316,22 @@ export default function PurchaseInvoiceForm() {
                       placeholder="Search item…"
                       inputClassName="h-10"
                     />
-                    {item.stockItemId && (() => {
-                      const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
-                      if (!b) return null;
-                      const avail = Number(b.physicalStock) - Number(b.reservedStock);
-                      return (
-                        <p className="text-xs px-1 text-sky-600 flex items-center gap-1">
-                          <span className="font-medium">Batch: {b.name}</span>
-                          <span className="text-muted-foreground">· avail: {avail}</span>
-                        </p>
-                      );
-                    })()}
+                    {item.stockItemId && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
+                        <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
+                          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">— none —</SelectItem>
+                            {(batches as any[]).map((b: any) => {
+                              const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                              const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                              return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · avail: {avail}</SelectItem>;
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>{item.stockItemId ? (<div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" />)}</div>
@@ -383,17 +389,22 @@ export default function PurchaseInvoiceForm() {
                             onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
                             placeholder="Search item…"
                           />
-                          {item.stockItemId && (() => {
-                            const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
-                            if (!b) return null;
-                            const avail = Number(b.physicalStock) - Number(b.reservedStock);
-                            return (
-                              <p className="text-xs mt-0.5 px-1 text-sky-600 flex items-center gap-1">
-                                <span className="font-medium">Batch: {b.name}</span>
-                                <span className="text-muted-foreground">· avail: {avail}</span>
-                              </p>
-                            );
-                          })()}
+                          {item.stockItemId && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
+                              <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
+                                <SelectTrigger className="h-6 text-xs py-0 flex-1 min-w-0"><SelectValue placeholder="— none —" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">— none —</SelectItem>
+                                  {(batches as any[]).map((b: any) => {
+                                    const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                                    const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                                    return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · {avail}</SelectItem>;
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                         <TableCell>{item.stockItemId ? (<div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-9" />)}</TableCell>

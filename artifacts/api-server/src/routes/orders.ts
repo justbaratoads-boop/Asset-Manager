@@ -65,11 +65,12 @@ router.post("/orders", authMiddleware, async (req, res) => {
         cgst: String(item.cgst || 0),
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
+        batchId: item.batchId || null,
         total: String(item.total),
         description: item.description || null,
       });
       if (item.stockItemId) {
-        await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity));
+        await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity), item.batchId || null);
       }
     }
   }
@@ -159,7 +160,7 @@ router.post("/orders/:id/cancel", authMiddleware, async (req, res) => {
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
   for (const item of items) {
     if (item.stockItemId) {
-      await adjustBatchStockForItem(item.stockItemId, 0, -Number(item.quantity));
+      await adjustBatchStockForItem(item.stockItemId, 0, -Number(item.quantity), (item as any).batchId || null);
     }
   }
   await db.update(ordersTable).set({ status: "cancelled" }).where(eq(ordersTable.id, Number(req.params.id)));
@@ -173,7 +174,7 @@ router.post("/orders/:id/uncancel", authMiddleware, async (req, res) => {
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
   for (const item of items) {
     if (item.stockItemId) {
-      await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity));
+      await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity), (item as any).batchId || null);
     }
   }
   await db.update(ordersTable).set({ status: "pending" }).where(eq(ordersTable.id, Number(req.params.id)));
