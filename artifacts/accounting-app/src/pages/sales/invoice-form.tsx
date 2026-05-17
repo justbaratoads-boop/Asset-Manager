@@ -245,7 +245,7 @@ export default function SaleInvoiceForm() {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, gstLocked: true }, isInterstate);
+        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true }, isInterstate);
         return updated;
       });
     }
@@ -265,7 +265,7 @@ export default function SaleInvoiceForm() {
       const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, gstLocked: true }, isInterstate);
+        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : updated[quickAddForIndex].quantity, gstLocked: true }, isInterstate);
         return updated;
       });
     }
@@ -450,7 +450,7 @@ export default function SaleInvoiceForm() {
                     onChange={e => updateItem(index, "description", e.target.value)}
                   />
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" /></div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0.001" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" /></div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
                       {item.stockItemId ? (
                         <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
@@ -604,7 +604,7 @@ export default function SaleInvoiceForm() {
                           onChange={e => updateItem(index, "description", e.target.value)}
                         />
                       </TableCell>
-                      <TableCell><Input className="h-9 text-sm" type="number" min="0.001" step="any" value={item.quantity || ""} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
+                      <TableCell><Input className="h-9 text-sm" type="number" min="0.001" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
                       <TableCell>{item.stockItemId ? (
                         <div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                       ) : (
