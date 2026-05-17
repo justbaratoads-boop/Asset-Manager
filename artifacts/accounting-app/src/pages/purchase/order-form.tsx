@@ -177,7 +177,7 @@ export default function PurchaseOrderForm() {
             {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
           </div>
           <div className="space-y-1"><Label>PO Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-          <div className="space-y-1"><Label>Expected Delivery Date</Label><Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Expected Delivery Date</Label><Input type="date" min={date} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} /></div>
           <div className="space-y-1"><Label>Notes</Label><Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes" /></div>
         </CardContent>
       </Card>

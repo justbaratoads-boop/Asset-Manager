@@ -224,7 +224,7 @@ export default function OrderForm() {
             {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
           </div>
           <div className="space-y-1"><Label>Order Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} className={errors.date ? "border-destructive" : ""} /></div>
-          <div className="space-y-1"><Label>Delivery Date</Label><Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Delivery Date</Label><Input type="date" min={date} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} /></div>
           <div className="space-y-1"><Label>Phone</Label><Input value={partyPhone} onChange={e => setPartyPhone(e.target.value)} placeholder="Auto-filled from party" /></div>
           <div className="space-y-1 col-span-2"><Label>Delivery Address</Label><Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Auto-filled from party" /></div>
         </CardContent>
