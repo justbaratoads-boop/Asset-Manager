@@ -313,7 +313,7 @@ export default function OrderForm() {
                       <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">— none —</SelectItem>
-                        {(batches as any[]).map((b: any) => {
+                        {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
                           const avail = Number(b.physicalStock) - Number(b.reservedStock);
                           const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
                           return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · avail: {avail}</SelectItem>;
@@ -420,7 +420,7 @@ export default function OrderForm() {
                             <SelectTrigger className="h-6 text-xs py-0 flex-1 min-w-0"><SelectValue placeholder="— none —" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">— none —</SelectItem>
-                              {(batches as any[]).map((b: any) => {
+                              {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
                                 const avail = Number(b.physicalStock) - Number(b.reservedStock);
                                 const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
                                 return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · {avail}</SelectItem>;

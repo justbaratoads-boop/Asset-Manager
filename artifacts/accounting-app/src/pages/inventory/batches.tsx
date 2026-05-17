@@ -50,13 +50,7 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
   const [loading, setLoading] = useState(false);
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const takenItemIds = new Set(
-    batches
-      .filter(b => b.id !== batch?.id)
-      .flatMap(b => b.items?.map(i => i.id) ?? [])
-  );
-
-  const availableItems = stockItems.filter(i => !takenItemIds.has(i.id));
+  const availableItems = stockItems;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +124,7 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
             </SelectContent>
           </Select>
         )}
-        <p className="text-xs text-muted-foreground">Each batch can only be assigned to one stock item.</p>
+        <p className="text-xs text-muted-foreground">One batch belongs to one item. One item can have multiple batches.</p>
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>

@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { stockItemsTable } from "@workspace/db/schema";
+import { stockBatchesTable } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 /**
@@ -22,7 +22,7 @@ export async function adjustBatchStock(
 /**
  * Adjust batch stock counters for a stock item.
  * If explicitBatchId is provided, uses that batch directly.
- * Otherwise looks up the item's default batchId.
+ * Otherwise finds the first batch assigned to the item via stockBatchesTable.stockItemId.
  * physicalDelta: positive = increase (purchase/credit note), negative = decrease (sale invoice/debit note)
  * reservedDelta: positive = increase (order placed), negative = decrease (order cancelled/fulfilled)
  */
@@ -35,12 +35,12 @@ export async function adjustBatchStockForItem(
   if (physicalDelta === 0 && reservedDelta === 0) return;
   let batchId: number | null | undefined = explicitBatchId;
   if (!batchId) {
-    const [item] = await db
-      .select({ batchId: stockItemsTable.batchId })
-      .from(stockItemsTable)
-      .where(eq(stockItemsTable.id, stockItemId))
+    const [batch] = await db
+      .select({ id: stockBatchesTable.id })
+      .from(stockBatchesTable)
+      .where(eq(stockBatchesTable.stockItemId, stockItemId))
       .limit(1);
-    batchId = item?.batchId;
+    batchId = batch?.id;
   }
   if (!batchId) return;
   await adjustBatchStock(batchId, physicalDelta, reservedDelta);

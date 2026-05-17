@@ -21,15 +21,12 @@ async function isItemUsedInBills(itemId: number): Promise<boolean> {
   return Number(result.rows[0].cnt) > 0;
 }
 
-// Check if any item assigned to a batch is used in bills
+// Check if a batch's assigned item is used in bills
 async function isBatchUsedInBills(batchId: number): Promise<boolean> {
-  const batchItems = await db.select({ id: stockItemsTable.id })
-    .from(stockItemsTable)
-    .where(eq(stockItemsTable.batchId, batchId));
-  for (const item of batchItems) {
-    if (await isItemUsedInBills(item.id)) return true;
-  }
-  return false;
+  const [batch] = await db.select({ stockItemId: stockBatchesTable.stockItemId })
+    .from(stockBatchesTable).where(eq(stockBatchesTable.id, batchId)).limit(1);
+  if (!batch?.stockItemId) return false;
+  return isItemUsedInBills(batch.stockItemId);
 }
 
 // ---- BATCHES ----
@@ -38,7 +35,6 @@ router.get("/stock-batches", authMiddleware, async (_req, res) => {
   const items = await db.select({
     id: stockItemsTable.id,
     name: stockItemsTable.name,
-    batchId: stockItemsTable.batchId,
   }).from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false"));
 
   const result = batches.map(b => ({
@@ -47,7 +43,7 @@ router.get("/stock-batches", authMiddleware, async (_req, res) => {
     physicalStock: Number(b.physicalStock),
     reservedStock: Number(b.reservedStock),
     availableStock: Number(b.physicalStock) - Number(b.reservedStock),
-    items: items.filter(i => i.batchId === b.id).map(i => ({ id: i.id, name: i.name })),
+    items: b.stockItemId ? items.filter(i => i.id === b.stockItemId).map(i => ({ id: i.id, name: i.name })) : [],
   }));
   res.json(result);
 });
@@ -61,20 +57,20 @@ router.post("/stock-batches", authMiddleware, async (req, res) => {
   if (existing) {
     return res.status(400).json({ error: `A batch named "${name.trim()}" already exists` });
   }
-  const itemIdList: number[] = Array.isArray(itemIds) ? itemIds.slice(0, 1).map(Number) : [];
-  if (itemIdList.length > 0) {
-    const [taken] = await db.select({ id: stockItemsTable.id, batchId: stockItemsTable.batchId })
-      .from(stockItemsTable)
-      .where(and(eq(stockItemsTable.id, itemIdList[0]), eq(stockItemsTable.isDeleted, "false")))
-      .limit(1);
-    if (taken?.batchId) {
-      return res.status(400).json({ error: "This item is already assigned to another batch" });
-    }
-  }
+  const itemId: number | null = Array.isArray(itemIds) && itemIds.length > 0 ? Number(itemIds[0]) : null;
   const opening = String(Number(openingStock) || 0);
-  const [batch] = await db.insert(stockBatchesTable).values({ name, description, expiryDate, openingStock: opening, physicalStock: opening }).returning();
-  if (itemIdList.length > 0) {
-    await db.update(stockItemsTable).set({ batchId: batch.id }).where(eq(stockItemsTable.id, itemIdList[0]));
+  const [batch] = await db.insert(stockBatchesTable).values({
+    name: name.trim(), description, expiryDate,
+    openingStock: opening, physicalStock: opening,
+    stockItemId: itemId,
+  }).returning();
+  // Set item's default batch if item has no batch assigned yet
+  if (itemId) {
+    const [item] = await db.select({ batchId: stockItemsTable.batchId })
+      .from(stockItemsTable).where(eq(stockItemsTable.id, itemId)).limit(1);
+    if (!item?.batchId) {
+      await db.update(stockItemsTable).set({ batchId: batch.id }).where(eq(stockItemsTable.id, itemId));
+    }
   }
   res.status(201).json(batch);
 });
@@ -83,21 +79,17 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   const { name, description, expiryDate, itemIds, openingStock } = req.body;
   if (await isBatchUsedInBills(id)) {
-    return res.status(400).json({ error: "Cannot edit: one or more items in this batch are used in bills" });
+    return res.status(400).json({ error: "Cannot edit: the item assigned to this batch is used in bills" });
   }
-  const itemIdList: number[] = Array.isArray(itemIds) ? itemIds.slice(0, 1).map(Number) : [];
-  if (itemIdList.length > 0) {
-    const [taken] = await db.select({ id: stockItemsTable.id, batchId: stockItemsTable.batchId })
-      .from(stockItemsTable)
-      .where(and(eq(stockItemsTable.id, itemIdList[0]), eq(stockItemsTable.isDeleted, "false")))
-      .limit(1);
-    if (taken?.batchId && taken.batchId !== id) {
-      return res.status(400).json({ error: "This item is already assigned to another batch" });
-    }
-  }
+  const itemId: number | null = Array.isArray(itemIds) && itemIds.length > 0 ? Number(itemIds[0]) : null;
+
   // Adjust physical stock by the opening stock delta if opening changed
-  const [existing] = await db.select({ openingStock: stockBatchesTable.openingStock, physicalStock: stockBatchesTable.physicalStock })
-    .from(stockBatchesTable).where(eq(stockBatchesTable.id, id)).limit(1);
+  const [existing] = await db.select({
+    openingStock: stockBatchesTable.openingStock,
+    physicalStock: stockBatchesTable.physicalStock,
+    stockItemId: stockBatchesTable.stockItemId,
+  }).from(stockBatchesTable).where(eq(stockBatchesTable.id, id)).limit(1);
+
   const newOpening = openingStock !== undefined ? Number(openingStock) : Number(existing?.openingStock || 0);
   const delta = newOpening - Number(existing?.openingStock || 0);
   const newPhysical = Math.max(0, Number(existing?.physicalStock || 0) + delta);
@@ -106,21 +98,60 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
     name, description, expiryDate,
     openingStock: String(newOpening),
     physicalStock: String(newPhysical),
+    stockItemId: itemId,
   }).where(eq(stockBatchesTable.id, id)).returning();
   if (!batch) return res.status(404).json({ error: "Not found" });
-  await db.update(stockItemsTable).set({ batchId: null }).where(eq(stockItemsTable.batchId, id));
-  if (itemIdList.length > 0) {
-    await db.update(stockItemsTable).set({ batchId: id }).where(eq(stockItemsTable.id, itemIdList[0]));
+
+  // If old item had this as default batch and item changed, clear old item's default
+  const oldItemId = existing?.stockItemId;
+  if (oldItemId && oldItemId !== itemId) {
+    const [oldItem] = await db.select({ batchId: stockItemsTable.batchId })
+      .from(stockItemsTable).where(eq(stockItemsTable.id, oldItemId)).limit(1);
+    if (oldItem?.batchId === id) {
+      // Find another batch for this item to use as default, or null
+      const [anotherBatch] = await db.select({ id: stockBatchesTable.id })
+        .from(stockBatchesTable)
+        .where(and(eq(stockBatchesTable.stockItemId, oldItemId), sql`${stockBatchesTable.id} != ${id}`))
+        .limit(1);
+      await db.update(stockItemsTable)
+        .set({ batchId: anotherBatch?.id ?? null })
+        .where(eq(stockItemsTable.id, oldItemId));
+    }
   }
+  // Set new item's default batch if it has none
+  if (itemId) {
+    const [newItem] = await db.select({ batchId: stockItemsTable.batchId })
+      .from(stockItemsTable).where(eq(stockItemsTable.id, itemId)).limit(1);
+    if (!newItem?.batchId) {
+      await db.update(stockItemsTable).set({ batchId: id }).where(eq(stockItemsTable.id, itemId));
+    }
+  }
+
   res.json(batch);
 });
 
 router.delete("/stock-batches/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   if (await isBatchUsedInBills(id)) {
-    return res.status(400).json({ error: "Cannot delete: one or more items in this batch are used in bills" });
+    return res.status(400).json({ error: "Cannot delete: the item assigned to this batch is used in bills" });
   }
-  await db.update(stockItemsTable).set({ batchId: null }).where(eq(stockItemsTable.batchId, id));
+  const [batch] = await db.select({ stockItemId: stockBatchesTable.stockItemId })
+    .from(stockBatchesTable).where(eq(stockBatchesTable.id, id)).limit(1);
+
+  // If the item used this batch as its default, reassign to another batch or null
+  if (batch?.stockItemId) {
+    const [item] = await db.select({ batchId: stockItemsTable.batchId })
+      .from(stockItemsTable).where(eq(stockItemsTable.id, batch.stockItemId)).limit(1);
+    if (item?.batchId === id) {
+      const [anotherBatch] = await db.select({ id: stockBatchesTable.id })
+        .from(stockBatchesTable)
+        .where(and(eq(stockBatchesTable.stockItemId, batch.stockItemId), sql`${stockBatchesTable.id} != ${id}`))
+        .limit(1);
+      await db.update(stockItemsTable)
+        .set({ batchId: anotherBatch?.id ?? null })
+        .where(eq(stockItemsTable.id, batch.stockItemId));
+    }
+  }
   await db.delete(stockBatchesTable).where(eq(stockBatchesTable.id, id));
   res.json({ ok: true });
 });
@@ -223,15 +254,6 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
   if (existing) {
     return res.status(400).json({ error: `A stock item named "${name}" already exists` });
   }
-  if (d.batchId) {
-    const [taken] = await db.select({ id: stockItemsTable.id })
-      .from(stockItemsTable)
-      .where(and(eq(stockItemsTable.batchId, Number(d.batchId)), eq(stockItemsTable.isDeleted, "false")))
-      .limit(1);
-    if (taken) {
-      return res.status(400).json({ error: "This batch is already assigned to another stock item" });
-    }
-  }
   const [item] = await db.insert(stockItemsTable).values({
     name,
     categoryId: d.categoryId,
@@ -291,17 +313,6 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
       });
     }
     return res.json({ ...item, usedInBills: true });
-  }
-
-  // Check batch isn't already assigned to a different item
-  if (d.batchId && Number(d.batchId) !== (current.batchId ?? 0)) {
-    const [taken] = await db.select({ id: stockItemsTable.id })
-      .from(stockItemsTable)
-      .where(and(eq(stockItemsTable.batchId, Number(d.batchId)), eq(stockItemsTable.isDeleted, "false")))
-      .limit(1);
-    if (taken && taken.id !== id) {
-      return res.status(400).json({ error: "This batch is already assigned to another stock item" });
-    }
   }
 
   // Full update for items not used in bills
