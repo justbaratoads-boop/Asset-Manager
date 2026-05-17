@@ -13,9 +13,11 @@ const router = Router();
 
 // Purchase invoices
 router.get("/purchase-invoices", authMiddleware, async (req, res) => {
-  const { search } = req.query;
+  const { search, partyId, status } = req.query;
   const conditions: any[] = [eq(purchaseInvoicesTable.isDeleted, "false")];
   if (search) conditions.push(ilike(purchaseInvoicesTable.partyName, `%${search}%`));
+  if (partyId) conditions.push(eq(purchaseInvoicesTable.partyId, Number(partyId)));
+  if (status) conditions.push(eq(purchaseInvoicesTable.status, status as string));
 
   const invoices = await db.select().from(purchaseInvoicesTable)
     .where(and(...conditions))

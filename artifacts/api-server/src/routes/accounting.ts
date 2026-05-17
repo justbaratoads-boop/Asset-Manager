@@ -3,7 +3,8 @@ import { db } from "@workspace/db";
 import {
   journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable,
   creditNotesTable, creditNoteItemsTable, debitNotesTable, debitNoteItemsTable,
-  ledgersTable
+  ledgersTable, saleInvoicesTable, saleInvoicePaymentsTable,
+  purchaseInvoicesTable, purchaseInvoicePaymentsTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -130,6 +131,31 @@ router.post("/payments", authMiddleware, async (req, res) => {
     reference: data.reference,
   }).returning();
 
+  // Bill-wise: apply each entry as a payment against the respective purchase invoice
+  if (data.billWiseEntries?.length) {
+    for (const entry of data.billWiseEntries) {
+      const amt = Number(entry.amount);
+      if (!amt || amt <= 0) continue;
+      const [inv] = await db.select().from(purchaseInvoicesTable)
+        .where(eq(purchaseInvoicesTable.id, Number(entry.invoiceId))).limit(1);
+      if (!inv) continue;
+      const newPaid = Math.min(Number(inv.amountPaid) + amt, Number(inv.grandTotal));
+      const newBalance = Number(inv.grandTotal) - newPaid;
+      const newStatus = newPaid >= Number(inv.grandTotal) ? "paid" : newPaid > 0 ? "partial" : "confirmed";
+      await db.insert(purchaseInvoicePaymentsTable).values({
+        invoiceId: Number(entry.invoiceId),
+        mode: "payment_voucher",
+        amount: String(amt),
+        reference: voucherNumber,
+      });
+      await db.update(purchaseInvoicesTable).set({
+        amountPaid: String(newPaid),
+        balanceDue: String(newBalance),
+        status: newStatus,
+      }).where(eq(purchaseInvoicesTable.id, Number(entry.invoiceId)));
+    }
+  }
+
   res.status(201).json({ ...payment, amount: Number(payment.amount) });
 });
 
@@ -182,6 +208,31 @@ router.post("/receipts", authMiddleware, async (req, res) => {
     narration: data.narration,
     reference: data.reference,
   }).returning();
+
+  // Bill-wise: apply each entry as a payment against the respective sale invoice
+  if (data.billWiseEntries?.length) {
+    for (const entry of data.billWiseEntries) {
+      const amt = Number(entry.amount);
+      if (!amt || amt <= 0) continue;
+      const [inv] = await db.select().from(saleInvoicesTable)
+        .where(eq(saleInvoicesTable.id, Number(entry.invoiceId))).limit(1);
+      if (!inv) continue;
+      const newPaid = Math.min(Number(inv.amountPaid) + amt, Number(inv.grandTotal));
+      const newBalance = Number(inv.grandTotal) - newPaid;
+      const newStatus = newPaid >= Number(inv.grandTotal) ? "paid" : newPaid > 0 ? "partial" : "confirmed";
+      await db.insert(saleInvoicePaymentsTable).values({
+        invoiceId: Number(entry.invoiceId),
+        mode: "receipt_voucher",
+        amount: String(amt),
+        reference: voucherNumber,
+      });
+      await db.update(saleInvoicesTable).set({
+        amountPaid: String(newPaid),
+        balanceDue: String(newBalance),
+        status: newStatus,
+      }).where(eq(saleInvoicesTable.id, Number(entry.invoiceId)));
+    }
+  }
 
   res.status(201).json({ ...receipt, amount: Number(receipt.amount) });
 });

@@ -40,12 +40,13 @@ async function checkCreditLimit(partyId: number, newBalanceDue: number, excludeI
 const router = Router();
 
 router.get("/sale-invoices", authMiddleware, async (req, res) => {
-  const { search, from, to, status } = req.query;
+  const { search, from, to, status, partyId } = req.query;
   const conditions: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
   if (search) conditions.push(ilike(saleInvoicesTable.partyName, `%${search}%`));
   if (from) conditions.push(gte(saleInvoicesTable.date, from as string));
   if (to) conditions.push(lte(saleInvoicesTable.date, to as string));
   if (status) conditions.push(eq(saleInvoicesTable.status, status as string));
+  if (partyId) conditions.push(eq(saleInvoicesTable.partyId, Number(partyId)));
 
   const invoices = await db.select().from(saleInvoicesTable)
     .where(and(...conditions))
