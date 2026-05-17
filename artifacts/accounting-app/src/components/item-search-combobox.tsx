@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createPortal } from "react-dom";
 
 interface StockItemOption {
   id: number;
@@ -37,7 +38,15 @@ export function ItemSearchCombobox({
 }: ItemSearchComboboxProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  const updateDropdownPosition = useCallback(() => {
+    if (wrapRef.current) {
+      const rect = wrapRef.current.getBoundingClientRect();
+      setDropdownStyle({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: rect.width });
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -49,6 +58,17 @@ export function ItemSearchCombobox({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateDropdownPosition();
+    window.addEventListener("scroll", updateDropdownPosition, true);
+    window.addEventListener("resize", updateDropdownPosition);
+    return () => {
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.removeEventListener("resize", updateDropdownPosition);
+    };
+  }, [open, updateDropdownPosition]);
 
   const filtered = stockItems
     .filter(s => s.name.toLowerCase().includes(query.toLowerCase()))
@@ -82,7 +102,7 @@ export function ItemSearchCombobox({
             onNameChange(v);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { setOpen(true); updateDropdownPosition(); }}
           placeholder={placeholder}
           className={cn("pl-7 text-sm", inputClassName)}
           autoComplete="off"
@@ -104,8 +124,11 @@ export function ItemSearchCombobox({
         </Button>
       )}
 
-      {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-52 overflow-y-auto">
+      {open && createPortal(
+        <div
+          className="fixed z-[9999] bg-background border rounded-md shadow-lg max-h-52 overflow-y-auto"
+          style={{ top: dropdownStyle.top, left: dropdownStyle.left, width: dropdownStyle.width }}
+        >
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
               {query ? `No items matching "${query}"` : "No items found"}
@@ -127,7 +150,8 @@ export function ItemSearchCombobox({
               </button>
             ))
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
