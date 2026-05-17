@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { ledgersTable, journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable } from "@workspace/db/schema";
-import { eq, and, like, gte, lte } from "drizzle-orm";
+import { ledgersTable, journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable, saleInvoicesTable, purchaseInvoicesTable } from "@workspace/db/schema";
+import { eq, and, like, gte, lte, isNotNull } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -135,6 +135,72 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       dr: Number(r.amount),
       cr: 0,
     });
+  }
+
+  // Sale invoice additional fields (CR to this ledger — income earned)
+  const saleConds: any[] = [
+    isNotNull(saleInvoicesTable.otherCharges),
+    eq(saleInvoicesTable.isDeleted, "false"),
+  ];
+  if (from) saleConds.push(gte(saleInvoicesTable.date, from));
+  if (to) saleConds.push(lte(saleInvoicesTable.date, to));
+
+  const saleInvs = await db.select({
+    date: saleInvoicesTable.date,
+    invoiceNumber: saleInvoicesTable.invoiceNumber,
+    partyName: saleInvoicesTable.partyName,
+    otherCharges: saleInvoicesTable.otherCharges,
+  }).from(saleInvoicesTable).where(and(...saleConds));
+
+  for (const inv of saleInvs) {
+    try {
+      const charges = JSON.parse(inv.otherCharges as string || "[]");
+      for (const charge of charges) {
+        if (typeof charge.ledgerId === "number" && charge.ledgerId === Number(id) && Number(charge.amount) > 0) {
+          transactions.push({
+            date: inv.date,
+            type: "sale_invoice",
+            description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+            ref: inv.invoiceNumber,
+            dr: 0,
+            cr: Number(charge.amount),
+          });
+        }
+      }
+    } catch {}
+  }
+
+  // Purchase invoice additional fields (DR to this ledger — expense incurred)
+  const purchConds: any[] = [
+    isNotNull(purchaseInvoicesTable.otherCharges),
+    eq(purchaseInvoicesTable.isDeleted, "false"),
+  ];
+  if (from) purchConds.push(gte(purchaseInvoicesTable.date, from));
+  if (to) purchConds.push(lte(purchaseInvoicesTable.date, to));
+
+  const purchInvs = await db.select({
+    date: purchaseInvoicesTable.date,
+    invoiceNumber: purchaseInvoicesTable.invoiceNumber,
+    partyName: purchaseInvoicesTable.partyName,
+    otherCharges: purchaseInvoicesTable.otherCharges,
+  }).from(purchaseInvoicesTable).where(and(...purchConds));
+
+  for (const inv of purchInvs) {
+    try {
+      const charges = JSON.parse(inv.otherCharges as string || "[]");
+      for (const charge of charges) {
+        if (typeof charge.ledgerId === "number" && charge.ledgerId === Number(id) && Number(charge.amount) > 0) {
+          transactions.push({
+            date: inv.date,
+            type: "purchase_invoice",
+            description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+            ref: inv.invoiceNumber,
+            dr: Number(charge.amount),
+            cr: 0,
+          });
+        }
+      }
+    } catch {}
   }
 
   const sorted = transactions.sort((a, b) => a.date.localeCompare(b.date));

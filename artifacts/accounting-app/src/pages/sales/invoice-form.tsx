@@ -138,10 +138,20 @@ export default function SaleInvoiceForm() {
   const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
   const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
+  const [indirectLedgers, setIndirectLedgers] = useState<{ id: number; name: string; group: string }[]>([]);
 
   useEffect(() => {
     customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
       if (Array.isArray(data)) setBankAccounts(data.map((l: any) => ({ value: `bank_${l.id}`, label: l.name })));
+    }).catch(() => {});
+    Promise.all([
+      customFetch<any>("/api/ledgers?group=Indirect%20Expenses"),
+      customFetch<any>("/api/ledgers?group=Indirect%20Incomes"),
+    ]).then(([exp, inc]) => {
+      setIndirectLedgers([
+        ...(Array.isArray(exp) ? exp : []),
+        ...(Array.isArray(inc) ? inc : []),
+      ].sort((a: any, b: any) => a.name.localeCompare(b.name)));
     }).catch(() => {});
   }, []);
 
@@ -670,7 +680,7 @@ export default function SaleInvoiceForm() {
             </div>
 
             <div className="border rounded-lg p-3 bg-muted/20">
-              <OtherChargesSection charges={charges} onChange={setCharges} />
+              <OtherChargesSection charges={charges} onChange={setCharges} ledgers={indirectLedgers} />
             </div>
 
             <div className="space-y-1">
@@ -694,7 +704,7 @@ export default function SaleInvoiceForm() {
               </>}
               {isInterstate && totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>+ {formatCurrency(totals.igst)}</span></div>}
               {totals.gst === 0 && <div className="flex justify-between text-muted-foreground/60 text-xs"><span>GST</span><span>Nil</span></div>}
-              {chargesTotal > 0 && <div className="flex justify-between text-muted-foreground"><span>Other Charges</span><span>+ {formatCurrency(chargesTotal)}</span></div>}
+              {chargesTotal > 0 && <div className="flex justify-between text-muted-foreground"><span>Additional Fields</span><span>+ {formatCurrency(chargesTotal)}</span></div>}
               <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
             </CardContent>
           </Card>
