@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Package } from "lucide-react";
-import { ItemMultiSearch } from "@/components/item-search-combobox";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
@@ -26,9 +26,10 @@ interface Batch {
 }
 interface StockItem { id: number; name: string; }
 
-function BatchDialog({ batch, stockItems, onSaved, onClose }: {
+function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
   batch?: Batch;
   stockItems: StockItem[];
+  batches: Batch[];
   onSaved: () => void;
   onClose: () => void;
 }) {
@@ -38,24 +39,26 @@ function BatchDialog({ batch, stockItems, onSaved, onClose }: {
     description: batch?.description || "",
     expiryDate: batch?.expiryDate || "",
   });
-  const [selectedItems, setSelectedItems] = useState<number[]>(
-    batch?.items?.map(i => i.id) ?? []
+  const [selectedItem, setSelectedItem] = useState<number | null>(
+    batch?.items?.[0]?.id ?? null
   );
   const [loading, setLoading] = useState(false);
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const toggleItem = (id: number) => {
-    setSelectedItems(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
+  const takenItemIds = new Set(
+    batches
+      .filter(b => b.id !== batch?.id)
+      .flatMap(b => b.items?.map(i => i.id) ?? [])
+  );
+
+  const availableItems = stockItems.filter(i => !takenItemIds.has(i.id));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { toast({ title: "Batch name is required", variant: "destructive" }); return; }
     setLoading(true);
     try {
-      const payload = { ...form, itemIds: selectedItems };
+      const payload = { ...form, itemIds: selectedItem ? [selectedItem] : [] };
       if (batch) {
         await customFetch(`/api/stock-batches/${batch.id}`, {
           method: "PUT",
@@ -93,17 +96,26 @@ function BatchDialog({ batch, stockItems, onSaved, onClose }: {
       </div>
 
       <div className="space-y-1">
-        <Label>Assign Stock Items</Label>
+        <Label>Assign Stock Item</Label>
         {stockItems.length === 0 ? (
           <p className="text-xs text-muted-foreground py-2">No stock items found. Add items first.</p>
         ) : (
-          <ItemMultiSearch
-            stockItems={stockItems}
-            selectedIds={selectedItems}
-            onToggle={toggleItem}
-            placeholder="Search and add items…"
-          />
+          <Select
+            value={selectedItem ? String(selectedItem) : "none"}
+            onValueChange={v => setSelectedItem(v === "none" ? null : Number(v))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a stock item (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— None —</SelectItem>
+              {availableItems.map(item => (
+                <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
+        <p className="text-xs text-muted-foreground">Each batch can only be assigned to one stock item.</p>
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
@@ -125,7 +137,7 @@ export default function Batches() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/stock-batches"] });
 
   const deleteBatch = async (id: number) => {
-    if (!confirm("Delete this batch? Assigned items will be unlinked.")) return;
+    if (!confirm("Delete this batch? The assigned item will be unlinked.")) return;
     try {
       await customFetch(`/api/stock-batches/${id}`, { method: "DELETE" });
       toast({ title: "Batch deleted" });
@@ -153,6 +165,7 @@ export default function Batches() {
             <DialogHeader><DialogTitle>New Batch</DialogTitle></DialogHeader>
             <BatchDialog
               stockItems={stockItems as StockItem[]}
+              batches={list}
               onSaved={invalidate}
               onClose={() => setNewOpen(false)}
             />
@@ -175,7 +188,7 @@ export default function Batches() {
                     <TableHead>Name</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Expiry Date</TableHead>
-                    <TableHead>Items</TableHead>
+                    <TableHead>Assigned Item</TableHead>
                     <TableHead className="w-20"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -186,19 +199,12 @@ export default function Batches() {
                       <TableCell className="text-muted-foreground">{batch.description || "—"}</TableCell>
                       <TableCell>{batch.expiryDate || "—"}</TableCell>
                       <TableCell>
-                        {batch.items?.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {batch.items.slice(0, 3).map(item => (
-                              <Badge key={item.id} variant="secondary" className="text-xs font-normal">
-                                <Package className="h-2.5 w-2.5 mr-1" />{item.name}
-                              </Badge>
-                            ))}
-                            {batch.items.length > 3 && (
-                              <Badge variant="outline" className="text-xs">+{batch.items.length - 3} more</Badge>
-                            )}
-                          </div>
+                        {batch.items?.[0] ? (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            <Package className="h-2.5 w-2.5 mr-1" />{batch.items[0].name}
+                          </Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">No items</span>
+                          <span className="text-xs text-muted-foreground">Not assigned</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -215,6 +221,7 @@ export default function Batches() {
                                 <BatchDialog
                                   batch={editBatch}
                                   stockItems={stockItems as StockItem[]}
+                                  batches={list}
                                   onSaved={invalidate}
                                   onClose={() => setEditBatch(null)}
                                 />

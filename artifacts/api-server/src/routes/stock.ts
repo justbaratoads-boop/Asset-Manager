@@ -57,11 +57,19 @@ router.post("/stock-batches", authMiddleware, async (req, res) => {
   if (existing) {
     return res.status(400).json({ error: `A batch named "${name.trim()}" already exists` });
   }
-  const [batch] = await db.insert(stockBatchesTable).values({ name, description, expiryDate }).returning();
-  if (Array.isArray(itemIds) && itemIds.length > 0) {
-    for (const itemId of itemIds) {
-      await db.update(stockItemsTable).set({ batchId: batch.id }).where(eq(stockItemsTable.id, Number(itemId)));
+  const itemIdList: number[] = Array.isArray(itemIds) ? itemIds.slice(0, 1).map(Number) : [];
+  if (itemIdList.length > 0) {
+    const [taken] = await db.select({ id: stockItemsTable.id, batchId: stockItemsTable.batchId })
+      .from(stockItemsTable)
+      .where(and(eq(stockItemsTable.id, itemIdList[0]), eq(stockItemsTable.isDeleted, "false")))
+      .limit(1);
+    if (taken?.batchId) {
+      return res.status(400).json({ error: "This item is already assigned to another batch" });
     }
+  }
+  const [batch] = await db.insert(stockBatchesTable).values({ name, description, expiryDate }).returning();
+  if (itemIdList.length > 0) {
+    await db.update(stockItemsTable).set({ batchId: batch.id }).where(eq(stockItemsTable.id, itemIdList[0]));
   }
   res.status(201).json(batch);
 });
@@ -72,14 +80,22 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
   if (await isBatchUsedInBills(id)) {
     return res.status(400).json({ error: "Cannot edit: one or more items in this batch are used in bills" });
   }
+  const itemIdList: number[] = Array.isArray(itemIds) ? itemIds.slice(0, 1).map(Number) : [];
+  if (itemIdList.length > 0) {
+    const [taken] = await db.select({ id: stockItemsTable.id, batchId: stockItemsTable.batchId })
+      .from(stockItemsTable)
+      .where(and(eq(stockItemsTable.id, itemIdList[0]), eq(stockItemsTable.isDeleted, "false")))
+      .limit(1);
+    if (taken?.batchId && taken.batchId !== id) {
+      return res.status(400).json({ error: "This item is already assigned to another batch" });
+    }
+  }
   const [batch] = await db.update(stockBatchesTable).set({ name, description, expiryDate })
     .where(eq(stockBatchesTable.id, id)).returning();
   if (!batch) return res.status(404).json({ error: "Not found" });
   await db.update(stockItemsTable).set({ batchId: null }).where(eq(stockItemsTable.batchId, id));
-  if (Array.isArray(itemIds) && itemIds.length > 0) {
-    for (const itemId of itemIds) {
-      await db.update(stockItemsTable).set({ batchId: id }).where(eq(stockItemsTable.id, Number(itemId)));
-    }
+  if (itemIdList.length > 0) {
+    await db.update(stockItemsTable).set({ batchId: id }).where(eq(stockItemsTable.id, itemIdList[0]));
   }
   res.json(batch);
 });
@@ -192,6 +208,15 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
   if (existing) {
     return res.status(400).json({ error: `A stock item named "${name}" already exists` });
   }
+  if (d.batchId) {
+    const [taken] = await db.select({ id: stockItemsTable.id })
+      .from(stockItemsTable)
+      .where(and(eq(stockItemsTable.batchId, Number(d.batchId)), eq(stockItemsTable.isDeleted, "false")))
+      .limit(1);
+    if (taken) {
+      return res.status(400).json({ error: "This batch is already assigned to another stock item" });
+    }
+  }
   const [item] = await db.insert(stockItemsTable).values({
     name,
     categoryId: d.categoryId,
@@ -251,6 +276,17 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
       });
     }
     return res.json({ ...item, usedInBills: true });
+  }
+
+  // Check batch isn't already assigned to a different item
+  if (d.batchId && Number(d.batchId) !== (current.batchId ?? 0)) {
+    const [taken] = await db.select({ id: stockItemsTable.id })
+      .from(stockItemsTable)
+      .where(and(eq(stockItemsTable.batchId, Number(d.batchId)), eq(stockItemsTable.isDeleted, "false")))
+      .limit(1);
+    if (taken && taken.id !== id) {
+      return res.status(400).json({ error: "This batch is already assigned to another stock item" });
+    }
   }
 
   // Full update for items not used in bills
