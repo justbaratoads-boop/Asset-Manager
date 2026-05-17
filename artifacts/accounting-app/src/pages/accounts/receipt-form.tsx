@@ -21,12 +21,16 @@ export default function ReceiptForm() {
   const queryClient = useQueryClient();
   const createMutation = useCreateReceipt();
   const { data: parties = [] } = useListParties();
-  const { data: ledgers = [] } = useListLedgers({});
+  const { data: allLedgers = [] } = useListLedgers({});
   const { data: existing } = useGetReceipt(editId!, { query: { enabled: isEdit } });
 
+  const cashBankLedgers = (allLedgers as any[]).filter(
+    (l: any) => l.group === "Bank Accounts" || l.name === "Cash"
+  );
+
   const [form, setForm] = useState({
-    date: today(), partyId: "", ledgerId: "", paymentMode: "cash",
-    amount: "", narration: "", reference: "",
+    date: today(), partyId: "", ledgerId: "",
+    amount: "", narration: "",
   });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -37,10 +41,8 @@ export default function ReceiptForm() {
       date: e.date || today(),
       partyId: e.partyId ? String(e.partyId) : "",
       ledgerId: e.ledgerId ? String(e.ledgerId) : "",
-      paymentMode: e.paymentMode || "cash",
       amount: String(e.amount || ""),
       narration: e.narration || "",
-      reference: e.reference || "",
     });
   }, [existing]);
 
@@ -52,10 +54,8 @@ export default function ReceiptForm() {
       partyId: form.partyId ? Number(form.partyId) : undefined,
       partyName: party?.name,
       ledgerId: Number(form.ledgerId),
-      paymentMode: form.paymentMode,
       amount: Number(form.amount),
       narration: form.narration,
-      reference: form.reference,
     };
     try {
       if (isEdit) {
@@ -96,18 +96,14 @@ export default function ReceiptForm() {
           <div className="space-y-1 col-span-2">
             <Label>Receipt Ledger *</Label>
             <Select value={form.ledgerId} onValueChange={v => set("ledgerId", v)}>
-              <SelectTrigger><SelectValue placeholder="Select ledger" /></SelectTrigger>
-              <SelectContent>{(ledgers as any[]).map((l: any) => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}</SelectContent>
+              <SelectTrigger><SelectValue placeholder="Select cash / bank account" /></SelectTrigger>
+              <SelectContent>
+                {cashBankLedgers.map((l: any) => (
+                  <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label>Payment Mode</Label>
-            <Select value={form.paymentMode} onValueChange={v => set("paymentMode", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["cash", "upi", "cheque", "bank_transfer"].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1"><Label>Reference</Label><Input value={form.reference} onChange={e => set("reference", e.target.value)} /></div>
           <div className="space-y-1 col-span-2"><Label>Narration</Label><Input value={form.narration} onChange={e => set("narration", e.target.value)} /></div>
         </CardContent>
       </Card>
