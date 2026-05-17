@@ -33,6 +33,7 @@ import PartyForm from "@/pages/accounts/party-form";
 import PartyLedger from "@/pages/accounts/party-ledger";
 import ChartOfAccounts from "@/pages/accounts/chart-of-accounts";
 import LedgerAccounts from "@/pages/accounts/ledgers";
+import LedgerStatement from "@/pages/accounts/ledger-statement";
 import JournalList from "@/pages/accounts/journal";
 import JournalForm from "@/pages/accounts/journal-form";
 import PaymentList from "@/pages/accounts/payments";
@@ -146,6 +147,7 @@ function Router() {
       <PR path="/accounts/parties/:id" component={PartyLedger} />
       <PR path="/accounts/chart-of-accounts" component={ChartOfAccounts} />
       <PR path="/accounts/ledgers" component={LedgerAccounts} />
+      <PR path="/accounts/ledgers/:id" component={LedgerStatement} />
       <PR path="/accounts/journal" component={JournalList} />
       <PR path="/accounts/journal/new" component={JournalForm} />
       <PR path="/accounts/journal/:id/edit" component={JournalForm} />

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, BookOpen, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -210,7 +210,12 @@ export default function LedgerAccounts() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold truncate">{u.name}</p>
+                      <Link
+                        href={u.kind === "ledger" ? `/accounts/ledgers/${u.id}` : `/accounts/parties/${u.id}`}
+                        className="font-semibold truncate hover:text-primary hover:underline"
+                      >
+                        {u.name}
+                      </Link>
                       {u.kind === "ledger" ? (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-sky-200 text-sky-700 bg-sky-50">
                           <BookOpen className="h-2.5 w-2.5" />Ledger
@@ -273,8 +278,15 @@ export default function LedgerAccounts() {
                 ) : filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No accounts found</TableCell></TableRow>
                 ) : paginated.map(u => (
-                  <TableRow key={`${u.kind}-${u.id}`}>
-                    <TableCell className="font-medium">{u.name}</TableCell>
+                  <TableRow key={`${u.kind}-${u.id}`} className="cursor-pointer hover:bg-muted/40">
+                    <TableCell className="font-medium">
+                      <Link
+                        href={u.kind === "ledger" ? `/accounts/ledgers/${u.id}` : `/accounts/parties/${u.id}`}
+                        className="hover:underline hover:text-primary"
+                      >
+                        {u.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       {u.kind === "ledger" ? (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-sky-200 text-sky-700 bg-sky-50">
@@ -308,13 +320,21 @@ export default function LedgerAccounts() {
                       <div className="flex justify-end gap-1">
                         {u.kind === "ledger" ? (
                           <>
+                            <Link href={`/accounts/ledgers/${u.id}`}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" title="View Statement"><Eye className="h-3.5 w-3.5" /></Button>
+                            </Link>
                             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
                             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                           </>
                         ) : (
-                          <Link href={`/accounts/parties/${u.id}/edit`}>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit in Ledger"><Pencil className="h-3.5 w-3.5" /></Button>
-                          </Link>
+                          <>
+                            <Link href={`/accounts/parties/${u.id}`}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" title="View Ledger"><Eye className="h-3.5 w-3.5" /></Button>
+                            </Link>
+                            <Link href={`/accounts/parties/${u.id}/edit`}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit Party"><Pencil className="h-3.5 w-3.5" /></Button>
+                            </Link>
+                          </>
                         )}
                       </div>
                     </TableCell>
