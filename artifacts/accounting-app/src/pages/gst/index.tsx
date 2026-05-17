@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/format";
+import { useLocation } from "wouter";
 
 function GSTR3B({ from, to }: { from: string; to: string }) {
   const { data, isLoading } = useGetGstr3b({ from: from || undefined, to: to || undefined });
@@ -44,6 +45,7 @@ function GSTR3B({ from, to }: { from: string; to: string }) {
 }
 
 function GSTR2B({ from, to }: { from: string; to: string }) {
+  const [, setLocation] = useLocation();
   const { data, isLoading } = useGetGstr2b({ from: from || undefined, to: to || undefined });
   if (isLoading) return <p className="text-muted-foreground">Loading...</p>;
   const d = data as any;
@@ -55,7 +57,11 @@ function GSTR2B({ from, to }: { from: string; to: string }) {
           <TableBody>
             {!d?.invoices?.length ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No data</TableCell></TableRow>
               : d.invoices.map((inv: any) => (
-                <TableRow key={inv.id}>
+                <TableRow
+                  key={inv.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => setLocation(`/purchase/invoices/${inv.id}/edit`)}
+                >
                   <TableCell>{inv.partyName}</TableCell>
                   <TableCell className="font-mono text-xs">{inv.supplierInvoiceNumber || inv.invoiceNumber}</TableCell>
                   <TableCell className="text-right">{formatCurrency(inv.totalTaxable)}</TableCell>

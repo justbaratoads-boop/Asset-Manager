@@ -10,6 +10,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
+import { StockLedgerDialog } from "@/components/stock-ledger-dialog";
 
 const ALL_COLUMNS = [
   { header: "Item", key: "name" },
@@ -29,13 +30,13 @@ const ALL_COLUMNS = [
   { header: "Closing Value", key: "closingValue", format: (v: any) => Number(v).toFixed(2) },
 ];
 
-// Default visible columns (hide return columns unless needed)
 const DEFAULT_VISIBLE = ["name","unit","hsnCode","openingQty","openingValue","purchasedQty","purchasedValue","soldQty","soldValue","closingQty","closingValue"];
 
 export default function StockSummary() {
   const { fy } = useFY();
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
+  const [ledgerItem, setLedgerItem] = useState<{ id: number; name: string } | null>(null);
   const { data, isLoading } = useGetStockSummary({ from: from || undefined, to: to || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-summary", ALL_COLUMNS, DEFAULT_VISIBLE);
   const vis = visibleKeys;
@@ -94,7 +95,11 @@ export default function StockSummary() {
                 : !summary.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No stock items found</TableCell></TableRow>
                   : summary.map((item: any) => (
-                    <TableRow key={item.id}>
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setLedgerItem({ id: item.id, name: item.name })}
+                    >
                       {vis.has("name") && <TableCell className="font-medium max-w-[160px] truncate">{item.name}</TableCell>}
                       {vis.has("unit") && <TableCell className="text-xs">{item.unit}</TableCell>}
                       {vis.has("hsnCode") && <TableCell className="text-xs text-muted-foreground">{item.hsnCode || "-"}</TableCell>}
@@ -130,6 +135,8 @@ export default function StockSummary() {
           </Table>
         </CardContent>
       </Card>
+
+      <StockLedgerDialog item={ledgerItem} onClose={() => setLedgerItem(null)} />
     </div>
   );
 }

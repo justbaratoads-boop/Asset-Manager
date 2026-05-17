@@ -11,6 +11,7 @@ import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
 import { Truck } from "lucide-react";
+import { useLocation } from "wouter";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
@@ -35,6 +36,7 @@ export default function DeliveryReport() {
   const { fy } = useFY();
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
+  const [, setLocation] = useLocation();
   const { data, isLoading } = useGetDeliveryReport({ from: from || undefined, to: to || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("delivery-report", ALL_COLUMNS);
   const vis = visibleKeys;
@@ -101,7 +103,7 @@ export default function DeliveryReport() {
                 : !orders.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No dispatched orders for selected period</TableCell></TableRow>
                   : orders.map((o: any) => (
-                    <TableRow key={o.id}>
+                    <TableRow key={o.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/sales/orders/${o.id}`)}>
                       {vis.has("date") && <TableCell className="text-sm">{formatDate(o.date)}</TableCell>}
                       {vis.has("orderNumber") && <TableCell className="font-mono text-xs">{o.orderNumber}</TableCell>}
                       {vis.has("partyName") && <TableCell className="max-w-[140px] truncate">{o.partyName}</TableCell>}

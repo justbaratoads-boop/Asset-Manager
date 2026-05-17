@@ -10,6 +10,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { cn } from "@/lib/utils";
+import { StockLedgerDialog } from "@/components/stock-ledger-dialog";
 
 const PAGE_SIZE = 20;
 
@@ -41,6 +42,7 @@ function getStatus(item: any): string {
 
 export default function StockAvailabilityReport() {
   const [page, setPage] = useState(1);
+  const [ledgerItem, setLedgerItem] = useState<{ id: number; name: string } | null>(null);
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-availability", ALL_COLUMNS);
   const vis = visibleKeys;
 
@@ -108,7 +110,11 @@ export default function StockAvailabilityReport() {
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-8">No stock items found</TableCell></TableRow>
               ) : paginated.map((item: any, idx: number) => (
-                <TableRow key={item.id} className={cn(item.availableStock < 0 && "bg-red-50", item.availableStock === 0 && "bg-amber-50")}>
+                <TableRow
+                  key={item.id}
+                  className={cn("cursor-pointer hover:bg-muted/50", item.availableStock < 0 && "bg-red-50", item.availableStock === 0 && "bg-amber-50")}
+                  onClick={() => setLedgerItem({ id: item.id, name: item.name })}
+                >
                   {vis.has("idx") && <TableCell className="text-xs text-muted-foreground">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>}
                   {vis.has("name") && <TableCell className="font-medium">{item.name}</TableCell>}
                   {vis.has("unit") && <TableCell className="text-sm">{item.unit}</TableCell>}
@@ -157,6 +163,8 @@ export default function StockAvailabilityReport() {
         <p><span className="font-medium">Reserved</span> — quantity committed to pending sale orders not yet delivered or invoiced.</p>
         <p><span className="font-medium">Available Stock</span> — physical stock minus reserved. Negative means you have over-promised.</p>
       </div>
+
+      <StockLedgerDialog item={ledgerItem} onClose={() => setLedgerItem(null)} />
     </div>
   );
 }

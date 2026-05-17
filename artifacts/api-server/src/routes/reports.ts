@@ -17,6 +17,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
   const d = (date as string) || new Date().toISOString().slice(0, 10);
 
   const sales = await db.select({
+    id: saleInvoicesTable.id,
     type: sql<string>`'Sale Invoice'`,
     number: saleInvoicesTable.invoiceNumber,
     party: saleInvoicesTable.partyName,
@@ -26,6 +27,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
   }).from(saleInvoicesTable).where(and(eq(saleInvoicesTable.date, d), eq(saleInvoicesTable.isDeleted, "false")));
 
   const purchases = await db.select({
+    id: purchaseInvoicesTable.id,
     type: sql<string>`'Purchase Invoice'`,
     number: purchaseInvoicesTable.invoiceNumber,
     party: purchaseInvoicesTable.partyName,
@@ -35,6 +37,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
   }).from(purchaseInvoicesTable).where(and(eq(purchaseInvoicesTable.date, d), eq(purchaseInvoicesTable.isDeleted, "false")));
 
   const pmts = await db.select({
+    id: paymentsTable.id,
     type: sql<string>`'Payment'`,
     number: paymentsTable.voucherNumber,
     party: paymentsTable.partyName,
@@ -44,6 +47,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
   }).from(paymentsTable).where(and(eq(paymentsTable.date, d), eq(paymentsTable.isDeleted, "false")));
 
   const rcts = await db.select({
+    id: receiptsTable.id,
     type: sql<string>`'Receipt'`,
     number: receiptsTable.voucherNumber,
     party: receiptsTable.partyName,
@@ -623,8 +627,8 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
   const pmts = await db.select().from(paymentsTable).where(and(...pmtCond));
   const rcts = await db.select().from(receiptsTable).where(and(...rctCond));
 
-  const out = pmts.map(p => ({ date: p.date, type: "payment" as const, ref: p.voucherNumber, party: p.partyName || "", description: p.narration || `Payment to ${p.partyName || ""}`, cashIn: 0, cashOut: Number(p.amount) }));
-  const inc = rcts.map(r => ({ date: r.date, type: "receipt" as const, ref: r.voucherNumber, party: r.partyName || "", description: r.narration || `Receipt from ${r.partyName || ""}`, cashIn: Number(r.amount), cashOut: 0 }));
+  const out = pmts.map(p => ({ id: p.id, date: p.date, type: "payment" as const, ref: p.voucherNumber, party: p.partyName || "", description: p.narration || `Payment to ${p.partyName || ""}`, cashIn: 0, cashOut: Number(p.amount) }));
+  const inc = rcts.map(r => ({ id: r.id, date: r.date, type: "receipt" as const, ref: r.voucherNumber, party: r.partyName || "", description: r.narration || `Receipt from ${r.partyName || ""}`, cashIn: Number(r.amount), cashOut: 0 }));
   const sorted = [...out, ...inc].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
 
   let balance = 0;
@@ -666,14 +670,14 @@ router.get("/reports/all-transactions", authMiddleware, async (req, res) => {
   ]);
 
   const all = [
-    ...sales.map(i => ({ date: i.date, type: "Sale Invoice", number: i.invoiceNumber, party: i.partyName, amount: Number(i.grandTotal), debit: Number(i.grandTotal), credit: 0 })),
-    ...purchases.map(i => ({ date: i.date, type: "Purchase Invoice", number: i.invoiceNumber, party: i.partyName, amount: Number(i.grandTotal), debit: 0, credit: Number(i.grandTotal) })),
-    ...payments.map(p => ({ date: p.date, type: "Payment", number: p.voucherNumber, party: p.partyName || "", amount: Number(p.amount), debit: Number(p.amount), credit: 0 })),
-    ...receipts.map(r => ({ date: r.date, type: "Receipt", number: r.voucherNumber, party: r.partyName || "", amount: Number(r.amount), debit: 0, credit: Number(r.amount) })),
-    ...journals.map(j => ({ date: j.date, type: "Journal", number: j.voucherNumber, party: j.narration || "", amount: Number(j.totalDebit), debit: Number(j.totalDebit), credit: Number(j.totalCredit) })),
-    ...orders.map(o => ({ date: o.date, type: "Order", number: o.orderNumber, party: o.partyName, amount: Number(o.grandTotal), debit: 0, credit: 0 })),
-    ...creditNotes.map(c => ({ date: c.date, type: "Credit Note", number: c.noteNumber, party: c.partyName, amount: Number(c.amount), debit: 0, credit: Number(c.amount) })),
-    ...debitNotes.map(d => ({ date: d.date, type: "Debit Note", number: d.noteNumber, party: d.partyName, amount: Number(d.amount), debit: Number(d.amount), credit: 0 })),
+    ...sales.map(i => ({ id: i.id, date: i.date, type: "Sale Invoice", number: i.invoiceNumber, party: i.partyName, amount: Number(i.grandTotal), debit: Number(i.grandTotal), credit: 0 })),
+    ...purchases.map(i => ({ id: i.id, date: i.date, type: "Purchase Invoice", number: i.invoiceNumber, party: i.partyName, amount: Number(i.grandTotal), debit: 0, credit: Number(i.grandTotal) })),
+    ...payments.map(p => ({ id: p.id, date: p.date, type: "Payment", number: p.voucherNumber, party: p.partyName || "", amount: Number(p.amount), debit: Number(p.amount), credit: 0 })),
+    ...receipts.map(r => ({ id: r.id, date: r.date, type: "Receipt", number: r.voucherNumber, party: r.partyName || "", amount: Number(r.amount), debit: 0, credit: Number(r.amount) })),
+    ...journals.map(j => ({ id: j.id, date: j.date, type: "Journal", number: j.voucherNumber, party: j.narration || "", amount: Number(j.totalDebit), debit: Number(j.totalDebit), credit: Number(j.totalCredit) })),
+    ...orders.map(o => ({ id: o.id, date: o.date, type: "Order", number: o.orderNumber, party: o.partyName, amount: Number(o.grandTotal), debit: 0, credit: 0 })),
+    ...creditNotes.map(c => ({ id: c.id, date: c.date, type: "Credit Note", number: c.noteNumber, party: c.partyName, amount: Number(c.amount), debit: 0, credit: Number(c.amount) })),
+    ...debitNotes.map(d => ({ id: d.id, date: d.date, type: "Debit Note", number: d.noteNumber, party: d.partyName, amount: Number(d.amount), debit: Number(d.amount), credit: 0 })),
   ].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
 
   res.json({ transactions: all, count: all.length });
@@ -703,10 +707,10 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
   ]);
 
   const all = [
-    ...sales.map(i => ({ date: i.date, type: "Sale Invoice", number: i.invoiceNumber, debit: Number(i.grandTotal), credit: 0 })),
-    ...purchases.map(i => ({ date: i.date, type: "Purchase Invoice", number: i.invoiceNumber, debit: 0, credit: Number(i.grandTotal) })),
-    ...payments.map(p => ({ date: p.date, type: "Payment", number: p.voucherNumber, debit: Number(p.amount), credit: 0 })),
-    ...receipts.map(r => ({ date: r.date, type: "Receipt", number: r.voucherNumber, debit: 0, credit: Number(r.amount) })),
+    ...sales.map(i => ({ id: i.id, date: i.date, type: "Sale Invoice", number: i.invoiceNumber, debit: Number(i.grandTotal), credit: 0 })),
+    ...purchases.map(i => ({ id: i.id, date: i.date, type: "Purchase Invoice", number: i.invoiceNumber, debit: 0, credit: Number(i.grandTotal) })),
+    ...payments.map(p => ({ id: p.id, date: p.date, type: "Payment", number: p.voucherNumber, debit: Number(p.amount), credit: 0 })),
+    ...receipts.map(r => ({ id: r.id, date: r.date, type: "Receipt", number: r.voucherNumber, debit: 0, credit: Number(r.amount) })),
   ].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
 
   let balance = 0;
@@ -940,6 +944,96 @@ router.get("/stock-availability", authMiddleware, async (req, res) => {
     saleRate: Number(r.saleRate),
     minStockLevel: Number(r.minStockLevel),
   })));
+});
+
+router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
+  const itemId = Number(req.params.id);
+  const { from, to } = req.query;
+
+  const item = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, itemId)).limit(1);
+  if (!item.length) { res.status(404).json({ error: "Item not found" }); return; }
+
+  const addDateCond = (conds: any[], dateField: any) => {
+    if (from) conds.push(gte(dateField, from as string));
+    if (to) conds.push(lte(dateField, to as string));
+    return conds;
+  };
+
+  const [purchItems, saleItems, cnItems, dnItems] = await Promise.all([
+    db.select({
+      date: purchaseInvoicesTable.date,
+      number: purchaseInvoicesTable.invoiceNumber,
+      sourceId: purchaseInvoicesTable.id,
+      party: purchaseInvoicesTable.partyName,
+      qty: purchaseInvoiceItemsTable.quantity,
+    }).from(purchaseInvoiceItemsTable)
+      .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
+      .where(and(
+        eq(purchaseInvoiceItemsTable.stockItemId, itemId),
+        eq(purchaseInvoicesTable.isDeleted, "false"),
+        ...addDateCond([], purchaseInvoicesTable.date),
+      )),
+    db.select({
+      date: saleInvoicesTable.date,
+      number: saleInvoicesTable.invoiceNumber,
+      sourceId: saleInvoicesTable.id,
+      party: saleInvoicesTable.partyName,
+      qty: saleInvoiceItemsTable.quantity,
+    }).from(saleInvoiceItemsTable)
+      .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+      .where(and(
+        eq(saleInvoiceItemsTable.stockItemId, itemId),
+        eq(saleInvoicesTable.isDeleted, "false"),
+        ...addDateCond([], saleInvoicesTable.date),
+      )),
+    db.select({
+      date: creditNotesTable.date,
+      number: creditNotesTable.noteNumber,
+      sourceId: creditNotesTable.id,
+      party: creditNotesTable.partyName,
+      qty: creditNoteItemsTable.quantity,
+    }).from(creditNoteItemsTable)
+      .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+      .where(and(
+        eq(creditNoteItemsTable.stockItemId, itemId),
+        eq(creditNotesTable.isDeleted, "false"),
+        ...addDateCond([], creditNotesTable.date),
+      )),
+    db.select({
+      date: debitNotesTable.date,
+      number: debitNotesTable.noteNumber,
+      sourceId: debitNotesTable.id,
+      party: debitNotesTable.partyName,
+      qty: debitNoteItemsTable.quantity,
+    }).from(debitNoteItemsTable)
+      .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+      .where(and(
+        eq(debitNoteItemsTable.stockItemId, itemId),
+        eq(debitNotesTable.isDeleted, "false"),
+        ...addDateCond([], debitNotesTable.date),
+      )),
+  ]);
+
+  const rows = [
+    ...purchItems.map(r => ({ date: r.date, type: "Purchase Invoice", number: r.number, sourceId: r.sourceId, party: r.party, inQty: Number(r.qty), outQty: 0 })),
+    ...saleItems.map(r => ({ date: r.date, type: "Sale Invoice", number: r.number, sourceId: r.sourceId, party: r.party, inQty: 0, outQty: Number(r.qty) })),
+    ...cnItems.map(r => ({ date: r.date, type: "Credit Note", number: r.number, sourceId: r.sourceId, party: r.party, inQty: Number(r.qty), outQty: 0 })),
+    ...dnItems.map(r => ({ date: r.date, type: "Debit Note", number: r.number, sourceId: r.sourceId, party: r.party, inQty: 0, outQty: Number(r.qty) })),
+  ].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+
+  const openingQty = Number(item[0].openingStock ?? 0);
+  let balance = openingQty;
+  const transactions = rows.map(r => {
+    balance += r.inQty - r.outQty;
+    return { ...r, balance };
+  });
+
+  res.json({
+    item: { id: item[0].id, name: item[0].name, unit: item[0].unit },
+    openingQty,
+    closingQty: balance,
+    transactions,
+  });
 });
 
 export default router;

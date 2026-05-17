@@ -10,6 +10,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
+import { useLocation } from "wouter";
 
 function DateFilters({ from, to, setFrom, setTo }: any) {
   return (
@@ -50,6 +51,7 @@ function SaleRegister() {
   const { fy } = useFY();
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
+  const [, setLocation] = useLocation();
   const { data, isLoading } = useGetSaleRegister({ from: from || undefined, to: to || undefined });
   const invoices: any[] = (data as any)?.invoices || [];
   const totals = (data as any)?.totals || {};
@@ -87,7 +89,7 @@ function SaleRegister() {
             : !invoices.length
               ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No data for selected period</TableCell></TableRow>
               : invoices.map((inv: any) => (
-                <TableRow key={inv.id}>
+                <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/sales/invoices/${inv.id}`)}>
                   {vis.has("date") && <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>}
                   {vis.has("invoiceNumber") && <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>}
                   {vis.has("partyName") && <TableCell>{inv.partyName}</TableCell>}
@@ -120,6 +122,7 @@ function PurchaseRegister() {
   const { fy } = useFY();
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
+  const [, setLocation] = useLocation();
   const { data, isLoading } = useGetPurchaseRegister({ from: from || undefined, to: to || undefined });
   const invoices: any[] = (data as any)?.invoices || [];
   const totals = (data as any)?.totals || {};
@@ -157,7 +160,7 @@ function PurchaseRegister() {
             : !invoices.length
               ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No data for selected period</TableCell></TableRow>
               : invoices.map((inv: any) => (
-                <TableRow key={inv.id}>
+                <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/purchase/invoices/${inv.id}/edit`)}>
                   {vis.has("date") && <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>}
                   {vis.has("invoiceNumber") && <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>}
                   {vis.has("supplierInvoiceNumber") && <TableCell className="font-mono text-xs">{inv.supplierInvoiceNumber || "-"}</TableCell>}

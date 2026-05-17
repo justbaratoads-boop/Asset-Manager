@@ -8,6 +8,7 @@ import { formatCurrency, today, formatDate } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useLocation } from "wouter";
 
 const ALL_COLUMNS = [
   { header: "Type", key: "type" },
@@ -17,8 +18,21 @@ const ALL_COLUMNS = [
   { header: "Credit", key: "cr", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
 ];
 
+function navPath(type: string, id: number): string | null {
+  switch (type) {
+    case "Sale Invoice": return `/sales/invoices/${id}`;
+    case "Purchase Invoice": return `/purchase/invoices/${id}/edit`;
+    case "Payment": return `/accounts/payments/${id}/edit`;
+    case "Receipt": return `/accounts/receipts/${id}/edit`;
+    case "Credit Note": return `/accounts/credit-notes/${id}`;
+    case "Debit Note": return `/accounts/debit-notes/${id}`;
+    default: return null;
+  }
+}
+
 export default function DayBook() {
   const [date, setDate] = useState(today());
+  const [, setLocation] = useLocation();
   const { data, isLoading } = useGetDayBook({ date });
   const entries: any[] = (data as any)?.entries || [];
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("day-book", ALL_COLUMNS);
@@ -55,15 +69,22 @@ export default function DayBook() {
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
                 : !entries.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No entries for {formatDate(date)}</TableCell></TableRow>
-                  : entries.map((e: any, i: number) => (
-                    <TableRow key={i}>
-                      {vis.has("type") && <TableCell className="text-sm">{e.type}</TableCell>}
-                      {vis.has("number") && <TableCell className="font-mono text-xs">{e.number}</TableCell>}
-                      {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
-                      {vis.has("dr") && <TableCell className="text-right">{e.dr > 0 ? formatCurrency(e.dr) : ""}</TableCell>}
-                      {vis.has("cr") && <TableCell className="text-right">{e.cr > 0 ? formatCurrency(e.cr) : ""}</TableCell>}
-                    </TableRow>
-                  ))
+                  : entries.map((e: any, i: number) => {
+                    const path = e.id ? navPath(e.type, e.id) : null;
+                    return (
+                      <TableRow
+                        key={i}
+                        className={path ? "cursor-pointer hover:bg-muted/50" : ""}
+                        onClick={() => { if (path) setLocation(path); }}
+                      >
+                        {vis.has("type") && <TableCell className="text-sm">{e.type}</TableCell>}
+                        {vis.has("number") && <TableCell className="font-mono text-xs">{e.number}</TableCell>}
+                        {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
+                        {vis.has("dr") && <TableCell className="text-right">{e.dr > 0 ? formatCurrency(e.dr) : ""}</TableCell>}
+                        {vis.has("cr") && <TableCell className="text-right">{e.cr > 0 ? formatCurrency(e.cr) : ""}</TableCell>}
+                      </TableRow>
+                    );
+                  })
               }
               {entries.length > 0 && (
                 <TableRow className="font-bold bg-muted/30">

@@ -11,6 +11,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
+import { useLocation } from "wouter";
 
 const TYPE_COLORS: Record<string, string> = {
   "Sale Invoice": "bg-green-100 text-green-700",
@@ -35,11 +36,26 @@ const ALL_COLUMNS = [
 
 const ALL_TYPES = ["Sale Invoice", "Purchase Invoice", "Payment", "Receipt", "Journal", "Order", "Credit Note", "Debit Note"];
 
+function navPath(type: string, id: number): string | null {
+  switch (type) {
+    case "Sale Invoice": return `/sales/invoices/${id}`;
+    case "Purchase Invoice": return `/purchase/invoices/${id}/edit`;
+    case "Payment": return `/accounts/payments/${id}/edit`;
+    case "Receipt": return `/accounts/receipts/${id}/edit`;
+    case "Journal": return `/accounts/journal/${id}/edit`;
+    case "Order": return `/sales/orders/${id}`;
+    case "Credit Note": return `/accounts/credit-notes/${id}`;
+    case "Debit Note": return `/accounts/debit-notes/${id}`;
+    default: return null;
+  }
+}
+
 export default function AllTransactions() {
   const { fy } = useFY();
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [, setLocation] = useLocation();
   const { data, isLoading } = useGetAllTransactions({ from: from || undefined, to: to || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("all-transactions", ALL_COLUMNS);
   const vis = visibleKeys;
@@ -100,17 +116,24 @@ export default function AllTransactions() {
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                 : !transactions.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
-                  : transactions.map((t: any, i: number) => (
-                    <TableRow key={i}>
-                      {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
-                      {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
-                      {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
-                      {vis.has("party") && <TableCell className="max-w-xs truncate text-sm">{t.party || "-"}</TableCell>}
-                      {vis.has("amount") && <TableCell className="text-right font-medium">{formatCurrency(t.amount)}</TableCell>}
-                      {vis.has("debit") && <TableCell className="text-right">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
-                      {vis.has("credit") && <TableCell className="text-right">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
-                    </TableRow>
-                  ))
+                  : transactions.map((t: any, i: number) => {
+                    const path = t.id ? navPath(t.type, t.id) : null;
+                    return (
+                      <TableRow
+                        key={i}
+                        className={path ? "cursor-pointer hover:bg-muted/50" : ""}
+                        onClick={() => { if (path) setLocation(path); }}
+                      >
+                        {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
+                        {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
+                        {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
+                        {vis.has("party") && <TableCell className="max-w-xs truncate text-sm">{t.party || "-"}</TableCell>}
+                        {vis.has("amount") && <TableCell className="text-right font-medium">{formatCurrency(t.amount)}</TableCell>}
+                        {vis.has("debit") && <TableCell className="text-right">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
+                        {vis.has("credit") && <TableCell className="text-right">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
+                      </TableRow>
+                    );
+                  })
               }
             </TableBody>
           </Table>

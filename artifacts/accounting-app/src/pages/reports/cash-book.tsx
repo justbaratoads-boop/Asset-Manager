@@ -9,6 +9,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
+import { useLocation } from "wouter";
 
 const ALL_COLUMNS = [
   { header: "Date", key: "date", format: formatDate },
@@ -24,6 +25,7 @@ export default function CashBook() {
   const { fy } = useFY();
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
+  const [, setLocation] = useLocation();
   const { data, isLoading } = useGetCashBook({ from: from || undefined, to: to || undefined });
   const entries: any[] = (data as any)?.entries || [];
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("cash-book", ALL_COLUMNS);
@@ -63,17 +65,26 @@ export default function CashBook() {
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
                 : !entries.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No cash entries for selected period</TableCell></TableRow>
-                  : entries.map((e: any, i: number) => (
-                    <TableRow key={i}>
-                      {vis.has("date") && <TableCell className="text-sm">{formatDate(e.date)}</TableCell>}
-                      {vis.has("description") && <TableCell className="max-w-xs truncate">{e.description || "-"}</TableCell>}
-                      {vis.has("ref") && <TableCell className="font-mono text-xs">{e.ref}</TableCell>}
-                      {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
-                      {vis.has("cashIn") && <TableCell className="text-right text-green-600">{e.cashIn > 0 ? formatCurrency(e.cashIn) : ""}</TableCell>}
-                      {vis.has("cashOut") && <TableCell className="text-right text-red-600">{e.cashOut > 0 ? formatCurrency(e.cashOut) : ""}</TableCell>}
-                      {vis.has("balance") && <TableCell className={`text-right font-medium ${e.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(e.balance)}</TableCell>}
-                    </TableRow>
-                  ))
+                  : entries.map((e: any, i: number) => {
+                    const destPath = e.id
+                      ? (e.type === "payment" ? `/accounts/payments/${e.id}/edit` : `/accounts/receipts/${e.id}/edit`)
+                      : null;
+                    return (
+                      <TableRow
+                        key={i}
+                        className={destPath ? "cursor-pointer hover:bg-muted/50" : ""}
+                        onClick={() => { if (destPath) setLocation(destPath); }}
+                      >
+                        {vis.has("date") && <TableCell className="text-sm">{formatDate(e.date)}</TableCell>}
+                        {vis.has("description") && <TableCell className="max-w-xs truncate">{e.description || "-"}</TableCell>}
+                        {vis.has("ref") && <TableCell className="font-mono text-xs">{e.ref}</TableCell>}
+                        {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
+                        {vis.has("cashIn") && <TableCell className="text-right text-green-600">{e.cashIn > 0 ? formatCurrency(e.cashIn) : ""}</TableCell>}
+                        {vis.has("cashOut") && <TableCell className="text-right text-red-600">{e.cashOut > 0 ? formatCurrency(e.cashOut) : ""}</TableCell>}
+                        {vis.has("balance") && <TableCell className={`text-right font-medium ${e.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(e.balance)}</TableCell>}
+                      </TableRow>
+                    );
+                  })
               }
             </TableBody>
           </Table>

@@ -11,6 +11,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
+import { useLocation } from "wouter";
 
 const ALL_COLUMNS = [
   { header: "Date", key: "date", format: formatDate },
@@ -29,11 +30,22 @@ const TYPE_COLORS: Record<string, string> = {
   "Receipt": "bg-emerald-100 text-emerald-700",
 };
 
+function navPath(type: string, id: number): string | null {
+  switch (type) {
+    case "Sale Invoice": return `/sales/invoices/${id}`;
+    case "Purchase Invoice": return `/purchase/invoices/${id}/edit`;
+    case "Payment": return `/accounts/payments/${id}/edit`;
+    case "Receipt": return `/accounts/receipts/${id}/edit`;
+    default: return null;
+  }
+}
+
 export default function PartyStatement() {
   const { fy } = useFY();
   const [partyId, setPartyId] = useState<string>("");
   const [from, setFrom] = useState(fy.from);
   const [to, setTo] = useState(fy.to);
+  const [, setLocation] = useLocation();
   const { data: parties = [] } = useListParties();
   const { data, isLoading } = useGetPartyStatement({ partyId: partyId || undefined, from: from || undefined, to: to || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("party-statement", ALL_COLUMNS);
@@ -105,17 +117,24 @@ export default function PartyStatement() {
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                   : !transactions.length
                     ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for this party in selected period</TableCell></TableRow>
-                    : transactions.map((t: any, i: number) => (
-                      <TableRow key={i}>
-                        {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
-                        {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
-                        {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
-                        {vis.has("narration") && <TableCell className="text-sm text-muted-foreground">{t.narration || "-"}</TableCell>}
-                        {vis.has("debit") && <TableCell className="text-right text-red-600">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
-                        {vis.has("credit") && <TableCell className="text-right text-green-600">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
-                        {vis.has("balance") && <TableCell className={`text-right font-medium ${t.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}</TableCell>}
-                      </TableRow>
-                    ))
+                    : transactions.map((t: any, i: number) => {
+                      const path = t.id ? navPath(t.type, t.id) : null;
+                      return (
+                        <TableRow
+                          key={i}
+                          className={path ? "cursor-pointer hover:bg-muted/50" : ""}
+                          onClick={() => { if (path) setLocation(path); }}
+                        >
+                          {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
+                          {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
+                          {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
+                          {vis.has("narration") && <TableCell className="text-sm text-muted-foreground">{t.narration || "-"}</TableCell>}
+                          {vis.has("debit") && <TableCell className="text-right text-red-600">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
+                          {vis.has("credit") && <TableCell className="text-right text-green-600">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
+                          {vis.has("balance") && <TableCell className={`text-right font-medium ${t.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}</TableCell>}
+                        </TableRow>
+                      );
+                    })
                 }
                 {transactions.length > 0 && (
                   <TableRow className="font-bold bg-muted/30">
