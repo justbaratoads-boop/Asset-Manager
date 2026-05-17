@@ -25,6 +25,11 @@ const statusColors: Record<string, string> = {
 
 const STATUSES = ["all", "pending", "confirmed", "dispatched", "delivered", "cancelled"];
 
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
+
 export default function OrderList() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -141,6 +146,7 @@ export default function OrderList() {
                 <div className="text-right space-y-1">
                   <p className="font-bold text-base">{formatCurrency(order.grandTotal)}</p>
                   <Badge variant="outline" className={`capitalize text-xs ${statusColors[order.status] || ""}`}>{order.status}</Badge>
+                  {isEdited(order.createdAt, order.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 ml-1">Edited</Badge>}
                 </div>
               </div>
               <div className="flex gap-2 border-t pt-3">
@@ -198,7 +204,12 @@ export default function OrderList() {
                   <TableCell className="text-sm">{formatDate(order.date)}</TableCell>
                   <TableCell className="font-medium">{order.partyName}</TableCell>
                   <TableCell className="text-right">{formatCurrency(order.grandTotal)}</TableCell>
-                  <TableCell><Badge variant="outline" className={`capitalize ${statusColors[order.status] || ""}`}>{order.status}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="outline" className={`capitalize ${statusColors[order.status] || ""}`}>{order.status}</Badge>
+                      {isEdited(order.createdAt, order.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Link href={`/sales/orders/${order.id}`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>

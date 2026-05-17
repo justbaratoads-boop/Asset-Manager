@@ -28,6 +28,11 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className={`capitalize text-xs ${statusStyles[status] || ""}`}>{status}</Badge>;
 }
 
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
+
 export default function SaleInvoiceList() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -120,7 +125,10 @@ export default function SaleInvoiceList() {
                   <p className="font-bold text-base">{inv.partyName || "—"}</p>
                   <p className="text-xs text-muted-foreground font-mono">{inv.invoiceNumber} · {formatDate(inv.date)}</p>
                 </div>
-                <StatusBadge status={inv.status} />
+                <div className="flex flex-col items-end gap-1">
+                  <StatusBadge status={inv.status} />
+                  {isEdited(inv.createdAt, inv.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div>
@@ -184,7 +192,12 @@ export default function SaleInvoiceList() {
                   <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>
                   <TableCell className="text-right text-green-600">{formatCurrency(inv.amountPaid)}</TableCell>
                   <TableCell className="text-right text-red-600">{formatCurrency(inv.balanceDue)}</TableCell>
-                  <TableCell><StatusBadge status={inv.status} /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <StatusBadge status={inv.status} />
+                      {isEdited(inv.createdAt, inv.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Link href={`/sales/invoices/${inv.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
