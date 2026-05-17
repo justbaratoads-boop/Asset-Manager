@@ -214,7 +214,7 @@ export default function DebitNoteForm() {
                 <Label>Supplier *</Label>
                 <Select value={partyId ? String(partyId) : ""} onValueChange={v => { setPartyId(Number(v)); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}>
                   <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                  <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier" || p.type === "both").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
                 </Select>
                 {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
               </div>

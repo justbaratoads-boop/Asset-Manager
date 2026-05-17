@@ -211,7 +211,7 @@ export default function LedgerAccounts() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
-                        href={u.kind === "ledger" ? `/accounts/ledgers/${u.id}` : `/accounts/parties/${u.id}`}
+                        href={u.kind === "ledger" ? `/accounts/ledgers/${u.id}` : `/accounts/parties/${u.id}?from=ledgers`}
                         className="font-semibold truncate hover:text-primary hover:underline"
                       >
                         {u.name}
@@ -281,7 +281,7 @@ export default function LedgerAccounts() {
                   <TableRow key={`${u.kind}-${u.id}`} className="cursor-pointer hover:bg-muted/40">
                     <TableCell className="font-medium">
                       <Link
-                        href={u.kind === "ledger" ? `/accounts/ledgers/${u.id}` : `/accounts/parties/${u.id}`}
+                        href={u.kind === "ledger" ? `/accounts/ledgers/${u.id}` : `/accounts/parties/${u.id}?from=ledgers`}
                         className="hover:underline hover:text-primary"
                       >
                         {u.name}
@@ -328,7 +328,7 @@ export default function LedgerAccounts() {
                           </>
                         ) : (
                           <>
-                            <Link href={`/accounts/parties/${u.id}`}>
+                            <Link href={`/accounts/parties/${u.id}?from=ledgers`}>
                               <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" title="View Ledger"><Eye className="h-3.5 w-3.5" /></Button>
                             </Link>
                             <Link href={`/accounts/parties/${u.id}/edit`}>

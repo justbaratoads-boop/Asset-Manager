@@ -178,7 +178,7 @@ export default function PurchaseOrderForm() {
             </div>
             <Select value={partyId ? String(partyId) : ""} onValueChange={selectParty}>
               <SelectTrigger className={errors.party ? "border-destructive" : ""}><SelectValue placeholder="Select supplier" /></SelectTrigger>
-              <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier" || p.type === "both").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
+              <SelectContent>{(parties as any[]).filter((p: any) => p.type === "supplier").map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
             </Select>
             {errors.party && <p className="text-xs text-destructive">{errors.party}</p>}
           </div>

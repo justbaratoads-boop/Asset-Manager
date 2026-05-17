@@ -1,4 +1,4 @@
-import { useRoute, Link } from "wouter";
+import { useRoute, useSearch, Link } from "wouter";
 import { useGetPartyLedger, useGetParty } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +26,11 @@ const txTypeLabel: Record<string, string> = {
 export default function PartyView() {
   const [, params] = useRoute("/accounts/parties/:id");
   const id = Number(params?.id);
+  const search = useSearch();
+  const backHref = new URLSearchParams(search).get("from") === "ledgers"
+    ? "/accounts/ledgers"
+    : "/accounts/parties";
+
   const { data: party } = useGetParty(id, { query: { enabled: !!id } });
   const { data: ledger, isLoading } = useGetPartyLedger(id, undefined, { query: { enabled: !!id } });
 
@@ -38,7 +43,7 @@ export default function PartyView() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <Link href="/accounts/parties">
+          <Link href={backHref}>
             <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
           </Link>
           <div>

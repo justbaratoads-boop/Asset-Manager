@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { useCreateJournal, useGetJournal, useListLedgers, getListJournalsQueryKey, customFetch } from "@workspace/api-client-react";
+import { useCreateJournal, useGetJournal, useListLedgers, useListParties, getListJournalsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,25 +12,31 @@ import { useToast } from "@/hooks/use-toast";
 
 interface JLine {
   ledgerId: number;
+  partyId: number | null;
   ledgerName: string;
   drAmount: number;
   crAmount: number;
 }
 
-const BLANK_LINE: JLine = { ledgerId: 0, ledgerName: "", drAmount: 0, crAmount: 0 };
+const BLANK_LINE: JLine = { ledgerId: 0, partyId: null, ledgerName: "", drAmount: 0, crAmount: 0 };
 
-function LedgerCombobox({ value, onChange, ledgers }: {
-  value: number;
-  onChange: (id: number, name: string) => void;
-  ledgers: any[];
+type Account = { id: number; name: string; group: string; kind: "ledger" | "party" };
+
+function LedgerCombobox({ ledgerId, partyId, onChange, accounts }: {
+  ledgerId: number;
+  partyId: number | null;
+  onChange: (ledgerId: number, partyId: number | null, name: string) => void;
+  accounts: Account[];
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  const selected = ledgers.find((l: any) => l.id === value);
-  const filtered = ledgers.filter((l: any) =>
-    !search || l.name.toLowerCase().includes(search.toLowerCase()) || (l.group || "").toLowerCase().includes(search.toLowerCase())
+  const selected = partyId != null
+    ? accounts.find(a => a.kind === "party" && a.id === partyId)
+    : accounts.find(a => a.kind === "ledger" && a.id === ledgerId);
+  const filtered = accounts.filter(a =>
+    !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.group.toLowerCase().includes(search.toLowerCase())
   );
 
   useEffect(() => {
@@ -68,16 +74,21 @@ function LedgerCombobox({ value, onChange, ledgers }: {
           <div className="max-h-48 overflow-y-auto py-1">
             {filtered.length === 0 ? (
               <div className="text-center py-3 text-xs text-muted-foreground">No accounts found</div>
-            ) : filtered.map((l: any) => (
+            ) : filtered.map((a) => (
               <button
-                key={l.id}
+                key={`${a.kind}-${a.id}`}
                 type="button"
                 className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center justify-between gap-2
-                  ${value === l.id ? "bg-accent font-medium" : ""}`}
-                onClick={() => { onChange(l.id, l.name); setOpen(false); }}
+                  ${selected?.id === a.id && selected?.kind === a.kind ? "bg-accent font-medium" : ""}`}
+                onClick={() => {
+                  const newLedgerId = a.kind === "ledger" ? a.id : 0;
+                  const newPartyId = a.kind === "party" ? a.id : null;
+                  onChange(newLedgerId, newPartyId, a.name);
+                  setOpen(false);
+                }}
               >
-                <span className="truncate">{l.name}</span>
-                <span className="text-[10px] text-muted-foreground shrink-0">{l.group}</span>
+                <span className="truncate">{a.name}</span>
+                <span className="text-[10px] text-muted-foreground shrink-0">{a.group}</span>
               </button>
             ))}
           </div>
@@ -96,7 +107,12 @@ export default function JournalForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateJournal();
-  const { data: ledgers = [] } = useListLedgers({});
+  const { data: rawLedgers = [] } = useListLedgers({});
+  const { data: rawParties = [] } = useListParties();
+  const allAccounts: Account[] = [
+    ...(rawLedgers as any[]).map((l: any): Account => ({ id: l.id, name: l.name, group: l.group, kind: "ledger" })),
+    ...(rawParties as any[]).map((p: any): Account => ({ id: p.id, name: p.name, group: p.accountGroup || "Parties", kind: "party" })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
   const { data: existing } = useGetJournal(editId!, { query: { enabled: isEdit } } as any);
 
   const [date, setDate] = useState(today());
@@ -112,20 +128,21 @@ export default function JournalForm() {
     setDate(e.date || today());
     setNarration(e.narration || "");
     if (e.lines?.length) {
-      // Convert old format (type + amount) → new format (drAmount / crAmount)
-      const ledgerList = ledgers as any[];
       const rebuilt: JLine[] = e.lines.map((l: any) => {
-        const lInfo = ledgerList.find((x: any) => x.id === l.ledgerId);
+        const acct = l.partyId
+          ? allAccounts.find(a => a.kind === "party" && a.id === l.partyId)
+          : allAccounts.find(a => a.kind === "ledger" && a.id === l.ledgerId);
         return {
           ledgerId: l.ledgerId || 0,
-          ledgerName: lInfo?.name || "",
+          partyId: l.partyId || null,
+          ledgerName: acct?.name || "",
           drAmount: l.type === "dr" ? Number(l.amount) : 0,
           crAmount: l.type === "cr" ? Number(l.amount) : 0,
         };
       });
       setLines(rebuilt.length > 0 ? rebuilt : [{ ...BLANK_LINE }, { ...BLANK_LINE }]);
     }
-  }, [existing, ledgers]);
+  }, [existing, allAccounts.length]);
 
   const totalDr = lines.reduce((s, l) => s + (l.drAmount || 0), 0);
   const totalCr = lines.reduce((s, l) => s + (l.crAmount || 0), 0);
@@ -149,10 +166,11 @@ export default function JournalForm() {
       return;
     }
     // Flatten each line into individual Dr / Cr journal lines
-    const flatLines: { ledgerId: number; type: "dr" | "cr"; amount: number }[] = [];
+    const flatLines: { ledgerId: number; partyId: number | null; type: "dr" | "cr"; amount: number }[] = [];
     for (const l of lines) {
-      if (l.drAmount > 0 && l.ledgerId) flatLines.push({ ledgerId: l.ledgerId, type: "dr", amount: l.drAmount });
-      if (l.crAmount > 0 && l.ledgerId) flatLines.push({ ledgerId: l.ledgerId, type: "cr", amount: l.crAmount });
+      const hasAccount = l.ledgerId > 0 || l.partyId != null;
+      if (l.drAmount > 0 && hasAccount) flatLines.push({ ledgerId: l.ledgerId, partyId: l.partyId ?? null, type: "dr", amount: l.drAmount });
+      if (l.crAmount > 0 && hasAccount) flatLines.push({ ledgerId: l.ledgerId, partyId: l.partyId ?? null, type: "cr", amount: l.crAmount });
     }
     if (flatLines.length < 2) {
       toast({ title: "Incomplete entry", description: "Please fill at least one Dr and one Cr line", variant: "destructive" });
@@ -162,7 +180,7 @@ export default function JournalForm() {
       date, narration,
       totalDebit: totalDr,
       totalCredit: totalCr,
-      lines: flatLines.map(l => ({ ...l, partyId: null })),
+      lines: flatLines,
     };
     try {
       if (isEdit) {
@@ -215,12 +233,14 @@ export default function JournalForm() {
               {lines.map((line, i) => (
                 <div key={i} className="grid grid-cols-[1fr_120px_120px_32px] gap-x-2 items-center">
                   <LedgerCombobox
-                    value={line.ledgerId}
-                    onChange={(id, name) => {
-                      updateLine(i, "ledgerId", id);
+                    ledgerId={line.ledgerId}
+                    partyId={line.partyId}
+                    onChange={(newLedgerId, newPartyId, name) => {
+                      updateLine(i, "ledgerId", newLedgerId);
+                      updateLine(i, "partyId", newPartyId);
                       updateLine(i, "ledgerName", name);
                     }}
-                    ledgers={ledgers as any[]}
+                    accounts={allAccounts}
                   />
                   <Input
                     className="h-8 text-xs text-right"
