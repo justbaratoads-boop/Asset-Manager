@@ -19,6 +19,7 @@ export const ledgersTable = pgTable("ledgers", {
   group: text("group").notNull(),
   nature: text("nature").notNull().default("dr"),
   openingBalance: numeric("opening_balance", { precision: 15, scale: 2 }).notNull().default("0"),
+  isSystem: text("is_system").notNull().default("false"),
   isDeleted: text("is_deleted").notNull().default("false"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

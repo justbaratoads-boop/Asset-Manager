@@ -115,13 +115,14 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   // Find canonical ledger IDs by name (fall back to known defaults)
   const byName = (name: string) => ledgers.find(l => l.name === name)?.id;
   const LEDGER = {
-    cash:       byName("Cash")                ?? 1,
-    ar:         byName("Accounts Receivable") ?? 3,
-    ap:         byName("Accounts Payable")    ?? 5,
-    sales:      byName("Sales")               ?? 9,
-    purchase:   byName("Purchase")            ?? 10,
-    outputGst:  byName("Output GST")          ?? 8,
-    inputGst:   byName("Input GST (ITC)")     ?? 7,
+    cash:        byName("Cash")                ?? 1,
+    ar:          byName("Accounts Receivable") ?? 3,
+    ap:          byName("Accounts Payable")    ?? 5,
+    sales:       byName("Sales")               ?? 9,
+    purchase:    byName("Purchase")            ?? 10,
+    cgstPayable: byName("CGST Payable")        ?? 20,
+    sgstPayable: byName("SGST Payable")        ?? 21,
+    igstPayable: byName("IGST Payable")        ?? 22,
   };
 
   // Build ledger balance map: ledgerId -> { dr, cr }
@@ -138,26 +139,34 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   }
 
   // 2. Sale invoices — double-entry synthesis
-  //    Dr: Accounts Receivable (credit sale: party_id set) or Cash (cash sale: no party)
-  //    Cr: Sales (taxable portion) + Output GST (GST portion)
+  //    Dr: Accounts Receivable (credit sale) or Cash (cash sale: no party)
+  //    Cr: Sales (taxable) + CGST Payable + SGST Payable + IGST Payable
   for (const inv of saleInvoices) {
     const grandTotal = Number(inv.grandTotal);
-    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
-    const taxable = grandTotal - gst;
+    const cgst = Number(inv.totalCgst);
+    const sgst = Number(inv.totalSgst);
+    const igst = Number(inv.totalIgst);
+    const taxable = grandTotal - cgst - sgst - igst;
     add(inv.partyId ? LEDGER.ar : LEDGER.cash, "dr", grandTotal);
     add(LEDGER.sales, "cr", taxable);
-    add(LEDGER.outputGst, "cr", gst);
+    add(LEDGER.cgstPayable, "cr", cgst);
+    add(LEDGER.sgstPayable, "cr", sgst);
+    add(LEDGER.igstPayable, "cr", igst);
   }
 
   // 3. Purchase invoices — double-entry synthesis
-  //    Dr: Purchase (taxable) + Input GST
-  //    Cr: Accounts Payable (credit purchase: party_id set) or Cash (cash purchase)
+  //    Dr: Purchase (taxable) + CGST Payable (ITC) + SGST Payable (ITC) + IGST Payable (ITC)
+  //    Cr: Accounts Payable (credit purchase) or Cash (cash purchase)
   for (const inv of purchaseInvoices) {
     const grandTotal = Number(inv.grandTotal);
-    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
-    const taxable = grandTotal - gst;
+    const cgst = Number(inv.totalCgst);
+    const sgst = Number(inv.totalSgst);
+    const igst = Number(inv.totalIgst);
+    const taxable = grandTotal - cgst - sgst - igst;
     add(LEDGER.purchase, "dr", taxable);
-    add(LEDGER.inputGst, "dr", gst);
+    add(LEDGER.cgstPayable, "dr", cgst);
+    add(LEDGER.sgstPayable, "dr", sgst);
+    add(LEDGER.igstPayable, "dr", igst);
     add(inv.partyId ? LEDGER.ap : LEDGER.cash, "cr", grandTotal);
   }
 
@@ -398,13 +407,14 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
   // Canonical ledger IDs by name
   const byName = (name: string) => ledgers.find(l => l.name === name)?.id;
   const LEDGER = {
-    cash:      byName("Cash")                ?? 1,
-    ar:        byName("Accounts Receivable") ?? 3,
-    ap:        byName("Accounts Payable")    ?? 5,
-    sales:     byName("Sales")               ?? 9,
-    purchase:  byName("Purchase")            ?? 10,
-    outputGst: byName("Output GST")          ?? 8,
-    inputGst:  byName("Input GST (ITC)")     ?? 7,
+    cash:        byName("Cash")                ?? 1,
+    ar:          byName("Accounts Receivable") ?? 3,
+    ap:          byName("Accounts Payable")    ?? 5,
+    sales:       byName("Sales")               ?? 9,
+    purchase:    byName("Purchase")            ?? 10,
+    cgstPayable: byName("CGST Payable")        ?? 20,
+    sgstPayable: byName("SGST Payable")        ?? 21,
+    igstPayable: byName("IGST Payable")        ?? 22,
   };
 
   // Build Dr/Cr balance map from all transaction sources
@@ -420,23 +430,31 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     add(line.ledgerId, line.type as "dr" | "cr", Number(line.amount));
   }
 
-  // 2. Sale invoices: Dr AR/Cash, Cr Sales + Output GST
+  // 2. Sale invoices: Dr AR/Cash, Cr Sales + CGST Payable + SGST Payable + IGST Payable
   for (const inv of saleInvoices) {
     const grandTotal = Number(inv.grandTotal);
-    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
-    const taxable = grandTotal - gst;
+    const cgst = Number(inv.totalCgst);
+    const sgst = Number(inv.totalSgst);
+    const igst = Number(inv.totalIgst);
+    const taxable = grandTotal - cgst - sgst - igst;
     add(inv.partyId ? LEDGER.ar : LEDGER.cash, "dr", grandTotal);
     add(LEDGER.sales, "cr", taxable);
-    add(LEDGER.outputGst, "cr", gst);
+    add(LEDGER.cgstPayable, "cr", cgst);
+    add(LEDGER.sgstPayable, "cr", sgst);
+    add(LEDGER.igstPayable, "cr", igst);
   }
 
-  // 3. Purchase invoices: Dr Purchase + Input GST, Cr AP/Cash
+  // 3. Purchase invoices: Dr Purchase + CGST/SGST/IGST Payable (ITC), Cr AP/Cash
   for (const inv of purchaseInvoices) {
     const grandTotal = Number(inv.grandTotal);
-    const gst = Number(inv.totalCgst) + Number(inv.totalSgst) + Number(inv.totalIgst);
-    const taxable = grandTotal - gst;
+    const cgst = Number(inv.totalCgst);
+    const sgst = Number(inv.totalSgst);
+    const igst = Number(inv.totalIgst);
+    const taxable = grandTotal - cgst - sgst - igst;
     add(LEDGER.purchase, "dr", taxable);
-    add(LEDGER.inputGst, "dr", gst);
+    add(LEDGER.cgstPayable, "dr", cgst);
+    add(LEDGER.sgstPayable, "dr", sgst);
+    add(LEDGER.igstPayable, "dr", igst);
     add(inv.partyId ? LEDGER.ap : LEDGER.cash, "cr", grandTotal);
   }
 

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye, Lock } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -39,7 +39,7 @@ const gstBadge: Record<string, string> = {
 
 // Unified result type across both sources
 type UnifiedAccount =
-  | { kind: "ledger"; id: number; name: string; group: string; nature: string; openingBalance: number; raw: any }
+  | { kind: "ledger"; id: number; name: string; group: string; nature: string; openingBalance: number; isSystem: boolean; raw: any }
   | { kind: "party";  id: number; name: string; group: string; gstType: string; openingBalance: number; balanceType: string; raw: any };
 
 export default function LedgerAccounts() {
@@ -68,7 +68,7 @@ export default function LedgerAccounts() {
   const unified: UnifiedAccount[] = [
     ...(ledgers as any[]).map((l: any): UnifiedAccount => ({
       kind: "ledger", id: l.id, name: l.name, group: l.group, nature: l.nature,
-      openingBalance: Number(l.openingBalance), raw: l,
+      openingBalance: Number(l.openingBalance), isSystem: l.isSystem === "true", raw: l,
     })),
     ...(parties as any[]).map((p: any): UnifiedAccount => ({
       kind: "party", id: p.id, name: p.name, group: p.accountGroup || "Parties",
@@ -101,6 +101,10 @@ export default function LedgerAccounts() {
   };
 
   const openEdit = (l: any) => {
+    if (l.isSystem === "true") {
+      toast({ title: "System account", description: `"${l.name}" is a system ledger and cannot be edited`, variant: "destructive" });
+      return;
+    }
     setEditItem(l);
     setForm({ name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance) });
     setDialogOpen(true);
@@ -241,9 +245,14 @@ export default function LedgerAccounts() {
                     </span>
                   )}
                   {u.kind === "ledger" && (
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <div className="flex gap-1 items-center">
+                      {u.isSystem && (
+                        <span title="System ledger — cannot be edited or deleted" className="text-xs text-amber-600 font-medium flex items-center gap-0.5">
+                          <Lock className="h-3 w-3" />System
+                        </span>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)} disabled={u.isSystem}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => !u.isSystem && setDeleteId(u.id)} disabled={u.isSystem}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   )}
                   {u.kind === "party" && (
@@ -323,8 +332,16 @@ export default function LedgerAccounts() {
                             <Link href={`/accounts/ledgers/${u.id}`}>
                               <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" title="View Statement"><Eye className="h-3.5 w-3.5" /></Button>
                             </Link>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
-                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            {u.isSystem ? (
+                              <span title="System ledger — cannot be edited or deleted" className="inline-flex items-center gap-0.5 text-xs text-amber-600 font-medium px-1.5">
+                                <Lock className="h-3 w-3" />System
+                              </span>
+                            ) : (
+                              <>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                              </>
+                            )}
                           </>
                         ) : (
                           <>

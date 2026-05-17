@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { ledgersTable, journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable, saleInvoicesTable, purchaseInvoicesTable } from "@workspace/db/schema";
+import {
+  ledgersTable, journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable,
+  saleInvoicesTable, purchaseInvoicesTable, saleInvoicePaymentsTable, purchaseInvoicePaymentsTable,
+} from "@workspace/db/schema";
 import { eq, and, ilike, gte, lte, isNotNull } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
@@ -40,6 +43,11 @@ router.get("/ledgers/:id", authMiddleware, async (req, res) => {
 router.put("/ledgers/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const data = req.body;
+  const [existing] = await db.select().from(ledgersTable).where(eq(ledgersTable.id, Number(id))).limit(1);
+  if (!existing) return res.status(404).json({ error: "Ledger not found" });
+  if (existing.isSystem === "true") {
+    return res.status(400).json({ error: `"${existing.name}" is a system ledger and cannot be renamed or modified` });
+  }
   const [ledger] = await db.update(ledgersTable).set({
     name: data.name,
     group: data.group,
@@ -52,9 +60,21 @@ router.put("/ledgers/:id", authMiddleware, async (req, res) => {
 
 router.delete("/ledgers/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
+  const [ledger] = await db.select().from(ledgersTable).where(eq(ledgersTable.id, Number(id))).limit(1);
+  if (!ledger) return res.status(404).json({ error: "Ledger not found" });
+  if (ledger.isSystem === "true") {
+    return res.status(400).json({ error: `"${ledger.name}" is a system ledger and cannot be deleted` });
+  }
   await db.update(ledgersTable).set({ isDeleted: "true" }).where(eq(ledgersTable.id, Number(id)));
   res.json({ ok: true });
 });
+
+// Helper: map payment mode to a ledger ID (matching the trial balance logic)
+function modeToLedgerId(mode: string, allLedgers: { id: number; name: string }[], cashId: number): number {
+  const m = (mode || "").toLowerCase();
+  if (!m || m === "cash" || m === "upi" || m === "cheque") return cashId;
+  return allLedgers.find(l => l.name === mode)?.id ?? cashId;
+}
 
 router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   const { id } = req.params;
@@ -65,9 +85,15 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     .limit(1);
   if (!ledger) return res.status(404).json({ error: "Ledger not found" });
 
+  // Fetch all ledgers for mode→id mapping
+  const allLedgers = await db.select({ id: ledgersTable.id, name: ledgersTable.name })
+    .from(ledgersTable).where(eq(ledgersTable.isDeleted, "false"));
+  const cashLedger = allLedgers.find(l => l.name === "Cash");
+  const cashId = cashLedger?.id ?? 1;
+
   const transactions: any[] = [];
 
-  // Journal lines
+  // ── Journal lines ─────────────────────────────────────────────────────────
   const jConds: any[] = [
     eq(journalLinesTable.ledgerId, Number(id)),
     eq(journalEntriesTable.isDeleted, "false"),
@@ -97,7 +123,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     });
   }
 
-  // Payment vouchers (this ledger is the cash/bank account debited)
+  // ── Payment vouchers (this ledger is the cash/bank account debited) ───────
   const pmtConds: any[] = [
     eq(paymentsTable.ledgerId, Number(id)),
     eq(paymentsTable.isDeleted, "false"),
@@ -117,7 +143,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     });
   }
 
-  // Receipt vouchers (this ledger is the cash/bank account credited)
+  // ── Receipt vouchers (this ledger is the cash/bank account credited) ──────
   const rcptConds: any[] = [
     eq(receiptsTable.ledgerId, Number(id)),
     eq(receiptsTable.isDeleted, "false"),
@@ -137,7 +163,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     });
   }
 
-  // Sale invoice additional fields (CR to this ledger — income earned)
+  // ── Sale invoice other-charges (CR to this ledger — income earned) ────────
   const saleConds: any[] = [
     isNotNull(saleInvoicesTable.otherCharges),
     eq(saleInvoicesTable.isDeleted, "false"),
@@ -170,7 +196,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     } catch {}
   }
 
-  // Purchase invoice additional fields (DR to this ledger — expense incurred)
+  // ── Purchase invoice other-charges (DR to this ledger — expense incurred) ─
   const purchConds: any[] = [
     isNotNull(purchaseInvoicesTable.otherCharges),
     eq(purchaseInvoicesTable.isDeleted, "false"),
@@ -203,9 +229,134 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     } catch {}
   }
 
+  // ── GST ledger entries from sale/purchase invoices ────────────────────────
+  // For CGST Payable / SGST Payable / IGST Payable:
+  //   Sale invoice → Cr (output tax collected)
+  //   Purchase invoice → Dr (input tax credit)
+  const gstField: "totalCgst" | "totalSgst" | "totalIgst" | null =
+    ledger.name === "CGST Payable" ? "totalCgst" :
+    ledger.name === "SGST Payable" ? "totalSgst" :
+    ledger.name === "IGST Payable" ? "totalIgst" : null;
+
+  if (gstField) {
+    const salGstConds: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
+    if (from) salGstConds.push(gte(saleInvoicesTable.date, from));
+    if (to) salGstConds.push(lte(saleInvoicesTable.date, to));
+
+    const saleGstInvs = await db.select({
+      date: saleInvoicesTable.date,
+      invoiceNumber: saleInvoicesTable.invoiceNumber,
+      partyName: saleInvoicesTable.partyName,
+      totalCgst: saleInvoicesTable.totalCgst,
+      totalSgst: saleInvoicesTable.totalSgst,
+      totalIgst: saleInvoicesTable.totalIgst,
+    }).from(saleInvoicesTable).where(and(...salGstConds));
+
+    for (const inv of saleGstInvs) {
+      const amt = Number(inv[gstField]);
+      if (amt > 0) {
+        transactions.push({
+          date: inv.date,
+          type: "sale_invoice",
+          description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+          ref: inv.invoiceNumber,
+          dr: 0,
+          cr: amt,
+        });
+      }
+    }
+
+    const purGstConds: any[] = [eq(purchaseInvoicesTable.isDeleted, "false")];
+    if (from) purGstConds.push(gte(purchaseInvoicesTable.date, from));
+    if (to) purGstConds.push(lte(purchaseInvoicesTable.date, to));
+
+    const purchGstInvs = await db.select({
+      date: purchaseInvoicesTable.date,
+      invoiceNumber: purchaseInvoicesTable.invoiceNumber,
+      partyName: purchaseInvoicesTable.partyName,
+      totalCgst: purchaseInvoicesTable.totalCgst,
+      totalSgst: purchaseInvoicesTable.totalSgst,
+      totalIgst: purchaseInvoicesTable.totalIgst,
+    }).from(purchaseInvoicesTable).where(and(...purGstConds));
+
+    for (const inv of purchGstInvs) {
+      const amt = Number(inv[gstField]);
+      if (amt > 0) {
+        transactions.push({
+          date: inv.date,
+          type: "purchase_invoice",
+          description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+          ref: inv.invoiceNumber,
+          dr: amt,
+          cr: 0,
+        });
+      }
+    }
+  }
+
+  // ── Cash / Bank ledger: inline sale and purchase invoice payments ─────────
+  // Show payments that were routed to this specific ledger via modeToLedgerId.
+  // We fetch all and filter in memory, as mode→ledger mapping requires the full ledger list.
+  const thisMapsHere = (mode: string) => modeToLedgerId(mode, allLedgers, cashId) === Number(id);
+
+  const salePmtJoinConds: any[] = [
+    eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
+    eq(saleInvoicesTable.isDeleted, "false"),
+  ];
+  if (from) salePmtJoinConds.push(gte(saleInvoicesTable.date, from));
+  if (to) salePmtJoinConds.push(lte(saleInvoicesTable.date, to));
+
+  const salePayments = await db.select({
+    date: saleInvoicesTable.date,
+    invoiceNumber: saleInvoicesTable.invoiceNumber,
+    partyName: saleInvoicesTable.partyName,
+    mode: saleInvoicePaymentsTable.mode,
+    amount: saleInvoicePaymentsTable.amount,
+  }).from(saleInvoicePaymentsTable)
+    .innerJoin(saleInvoicesTable, and(...salePmtJoinConds));
+
+  for (const p of salePayments) {
+    if (!thisMapsHere(p.mode)) continue;
+    transactions.push({
+      date: p.date,
+      type: "sale_invoice",
+      description: `Sale Invoice ${p.invoiceNumber}${p.partyName ? ` – ${p.partyName}` : ""}`,
+      ref: p.invoiceNumber,
+      dr: Number(p.amount),
+      cr: 0,
+    });
+  }
+
+  const purchPmtJoinConds: any[] = [
+    eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
+    eq(purchaseInvoicesTable.isDeleted, "false"),
+  ];
+  if (from) purchPmtJoinConds.push(gte(purchaseInvoicesTable.date, from));
+  if (to) purchPmtJoinConds.push(lte(purchaseInvoicesTable.date, to));
+
+  const purchPayments = await db.select({
+    date: purchaseInvoicesTable.date,
+    invoiceNumber: purchaseInvoicesTable.invoiceNumber,
+    partyName: purchaseInvoicesTable.partyName,
+    mode: purchaseInvoicePaymentsTable.mode,
+    amount: purchaseInvoicePaymentsTable.amount,
+  }).from(purchaseInvoicePaymentsTable)
+    .innerJoin(purchaseInvoicesTable, and(...purchPmtJoinConds));
+
+  for (const p of purchPayments) {
+    if (!thisMapsHere(p.mode)) continue;
+    transactions.push({
+      date: p.date,
+      type: "purchase_invoice",
+      description: `Purchase Invoice ${p.invoiceNumber}${p.partyName ? ` – ${p.partyName}` : ""}`,
+      ref: p.invoiceNumber,
+      dr: 0,
+      cr: Number(p.amount),
+    });
+  }
+
   const sorted = transactions.sort((a, b) => a.date.localeCompare(b.date));
 
-  // Dr-nature ledger: opening balance is positive Dr; Cr-nature: negative (Cr side)
   let balance = Number(ledger.openingBalance) * (ledger.nature === "cr" ? -1 : 1);
   const rows = sorted.map(t => {
     balance += t.dr - t.cr;
@@ -220,6 +371,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     ledgerName: ledger.name,
     group: ledger.group,
     nature: ledger.nature,
+    isSystem: ledger.isSystem,
     openingBalance: Number(ledger.openingBalance),
     transactions: rows,
     totalDr,
