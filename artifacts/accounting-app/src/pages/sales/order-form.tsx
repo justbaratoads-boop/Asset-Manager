@@ -192,7 +192,7 @@ export default function OrderForm() {
       queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
       setLocation("/sales/orders");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to save order";
+      const msg = err?.data?.error || "Failed to save order";
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };

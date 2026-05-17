@@ -59,7 +59,7 @@ export default function WalkinSale() {
       queryClient.invalidateQueries({ queryKey: getListSaleInvoicesQueryKey() });
       toast({ title: "Walk-in sale recorded" });
       setLocation("/sales/invoices");
-    } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
+    } catch (err: any) { toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" }); }
   };
 
   return (

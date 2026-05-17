@@ -72,7 +72,7 @@ export default function PaymentForm() {
       queryClient.invalidateQueries({ queryKey: getListPaymentsQueryKey() });
       setLocation("/accounts/payments");
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
     }
   };
 

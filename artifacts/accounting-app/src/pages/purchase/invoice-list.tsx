@@ -262,7 +262,7 @@ function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
       onPaid();
       onClose();
     } catch (err: any) {
-      toast({ title: "Failed to record payment", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to record payment", description: err?.data?.error || "Please try again", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -357,7 +357,7 @@ export default function PurchaseInvoiceList() {
       queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
       toast({ title: "Invoice cancelled" });
     } catch (err: any) {
-      toast({ title: "Failed to cancel", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to cancel", description: err?.data?.error || "Please try again", variant: "destructive" });
     } finally { setCancelId(null); }
   };
 
@@ -367,7 +367,7 @@ export default function PurchaseInvoiceList() {
       queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
       toast({ title: "Invoice restored" });
     } catch (err: any) {
-      toast({ title: "Failed to restore", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to restore", description: err?.data?.error || "Please try again", variant: "destructive" });
     }
   };
 

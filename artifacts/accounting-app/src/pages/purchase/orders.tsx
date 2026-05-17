@@ -210,7 +210,7 @@ function ReceiveGoodsDialog({ id, onClose, onDone }: { id: number | null; onClos
       onDone(result);
       onClose();
     } catch (err: any) {
-      toast({ title: "Failed to record receipt", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to record receipt", description: err?.data?.error || "Please try again", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -354,7 +354,7 @@ export default function PurchaseOrderList() {
       queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
       toast({ title: "Purchase order cancelled" });
     } catch (err: any) {
-      toast({ title: "Failed to cancel", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to cancel", description: err?.data?.error || "Please try again", variant: "destructive" });
     } finally { setCancelId(null); }
   };
 
@@ -364,7 +364,7 @@ export default function PurchaseOrderList() {
       queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
       toast({ title: "Purchase order restored to open" });
     } catch (err: any) {
-      toast({ title: "Failed to restore", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to restore", description: err?.data?.error || "Please try again", variant: "destructive" });
     }
   };
 

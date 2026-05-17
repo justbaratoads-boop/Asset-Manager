@@ -129,7 +129,7 @@ export default function LedgerAccounts() {
       queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
       setDialogOpen(false);
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message || "Failed to save", variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -142,7 +142,7 @@ export default function LedgerAccounts() {
       queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
       toast({ title: "Account deleted" });
     } catch (err: any) {
-      toast({ title: "Cannot delete", description: err?.data?.error || err?.message || "Failed to delete", variant: "destructive" });
+      toast({ title: "Cannot delete", description: err?.data?.error || "Failed to delete", variant: "destructive" });
     } finally {
       setDeleteId(null);
     }

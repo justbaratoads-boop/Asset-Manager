@@ -197,7 +197,7 @@ export default function JournalForm() {
       queryClient.invalidateQueries({ queryKey: getListJournalsQueryKey() });
       setLocation("/accounts/journal");
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
     }
   };
 

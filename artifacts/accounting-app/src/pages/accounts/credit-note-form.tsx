@@ -176,7 +176,7 @@ export default function CreditNoteForm() {
       if (afterSave) afterSave(saved);
       else setLocation("/accounts/credit-notes");
     } catch (err: any) {
-      const msg = err?.data?.error || err.message || "Failed to save";
+      const msg = err?.data?.error || "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setIsSaving(false);

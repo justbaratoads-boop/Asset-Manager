@@ -69,7 +69,7 @@ export function QuickAddItemDialog({ open, onClose, onAdded }: QuickAddItemDialo
       setForm({ ...BLANK });
       onClose();
     } catch (err: any) {
-      toast({ title: "Failed to create item", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to create item", description: err?.data?.error || "Please try again", variant: "destructive" });
     } finally {
       setSaving(false);
     }

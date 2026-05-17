@@ -56,7 +56,7 @@ export default function OrderList() {
       queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
       toast({ title: "Order cancelled" });
     } catch (err: any) {
-      toast({ title: "Failed to cancel order", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to cancel order", description: err?.data?.error || "Please try again", variant: "destructive" });
     } finally { setCancelId(null); }
   };
 
@@ -66,7 +66,7 @@ export default function OrderList() {
       queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
       toast({ title: "Order restored to pending" });
     } catch (err: any) {
-      toast({ title: "Failed to restore order", description: err?.data?.error || err.message, variant: "destructive" });
+      toast({ title: "Failed to restore order", description: err?.data?.error || "Please try again", variant: "destructive" });
     }
   };
 

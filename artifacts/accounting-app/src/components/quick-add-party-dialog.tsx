@@ -104,7 +104,7 @@ export function QuickAddPartyDialog({ open, onOpenChange, defaultAccountGroup, o
       onCreated(party);
       handleClose();
     } catch (err: any) {
-      const msg = err?.data?.error || err.message || "Failed to create";
+      const msg = err?.data?.error || "Failed to create";
       if (err?.data?.code === "DUPLICATE_NAME") setErrors({ name: "A party with this name already exists" });
       else toast({ title: "Error", description: msg, variant: "destructive" });
     } finally { setSaving(false); }

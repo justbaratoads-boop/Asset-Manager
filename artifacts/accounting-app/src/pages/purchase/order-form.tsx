@@ -151,7 +151,7 @@ export default function PurchaseOrderForm() {
       queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
       setLocation("/purchase/orders");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to save";
+      const msg = err?.data?.error || "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };

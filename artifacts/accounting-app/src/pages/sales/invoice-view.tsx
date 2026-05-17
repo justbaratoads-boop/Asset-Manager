@@ -678,7 +678,7 @@ export default function SaleInvoiceView() {
       toast({ title: "Payment recorded successfully" });
       setPayDialogOpen(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to record payment";
+      const msg = err?.data?.error || "Failed to record payment";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setIsSavingPay(false);

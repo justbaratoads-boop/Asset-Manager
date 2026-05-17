@@ -72,7 +72,7 @@ export default function ReceiptForm() {
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       setLocation("/accounts/receipts");
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
     }
   };
 

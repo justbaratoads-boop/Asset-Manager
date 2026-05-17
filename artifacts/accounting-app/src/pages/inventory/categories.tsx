@@ -42,7 +42,7 @@ export default function Categories() {
       setNameError("");
       toast({ title: "Category created" });
     } catch (err: any) {
-      const msg: string = err?.response?.data?.error || err?.message || "Failed to create";
+      const msg: string = err?.data?.error || "Failed to create";
       if (msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("already there")) {
         setNameError(msg);
       } else {
@@ -75,7 +75,7 @@ export default function Categories() {
       toast({ title: "Category renamed" });
       setEditId(null);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || "Failed to rename category";
+      const msg = err?.data?.error || "Failed to rename category";
       toast({ title: "Cannot rename", description: msg, variant: "destructive" });
     } finally {
       setIsSaving(false);
@@ -89,7 +89,7 @@ export default function Categories() {
       queryClient.invalidateQueries({ queryKey: getListStockCategoriesQueryKey() });
       toast({ title: "Category deleted" });
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || "Failed to delete category";
+      const msg = err?.data?.error || "Failed to delete category";
       toast({ title: "Cannot delete", description: msg, variant: "destructive" });
     }
     setDeleteId(null);

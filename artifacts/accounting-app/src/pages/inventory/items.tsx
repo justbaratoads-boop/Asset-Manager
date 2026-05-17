@@ -33,7 +33,7 @@ export default function StockItemList() {
       await deleteMutation.mutateAsync({ id: deleteId });
       queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey() });
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || "Failed to delete";
+      const msg = err?.data?.error || "Failed to delete";
       toast({ title: "Cannot delete", description: msg, variant: "destructive" });
     } finally {
       setDeleteId(null);

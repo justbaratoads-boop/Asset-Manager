@@ -79,7 +79,7 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
       onSaved();
       onClose();
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message || "Failed to save", variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
     } finally { setLoading(false); }
   };
 
@@ -152,7 +152,7 @@ export default function Batches() {
       toast({ title: "Batch deleted" });
       invalidate();
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message || "Failed to delete", variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to delete", variant: "destructive" });
     }
   };
 

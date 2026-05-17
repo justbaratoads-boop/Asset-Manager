@@ -235,7 +235,7 @@ export default function PurchaseInvoiceForm() {
       queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
       setLocation("/purchase/invoices");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to save";
+      const msg = err?.data?.error || "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setIsSaving(false);

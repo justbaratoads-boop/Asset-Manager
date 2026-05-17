@@ -169,7 +169,7 @@ export default function ChartOfAccounts() {
       queryClient.invalidateQueries({ queryKey: ["account-groups"] });
       setGroupDialogOpen(false);
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message || "Failed to save", variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
     } finally {
       setIsSavingGroup(false);
     }
@@ -183,7 +183,7 @@ export default function ChartOfAccounts() {
       queryClient.invalidateQueries({ queryKey: ["account-groups"] });
       toast({ title: "Account group deleted" });
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message || "Cannot delete", variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Cannot delete", variant: "destructive" });
     } finally {
       setIsDeletingGroup(false);
       setDeleteGroupId(null);
@@ -220,7 +220,7 @@ export default function ChartOfAccounts() {
       queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
       setAccountDialogOpen(false);
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message || "Failed to save", variant: "destructive" });
+      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
     } finally {
       setIsSavingAccount(false);
     }

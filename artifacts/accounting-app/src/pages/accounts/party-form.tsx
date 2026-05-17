@@ -203,7 +203,7 @@ export default function PartyForm() {
       setLocation("/accounts/parties");
     } catch (err: any) {
       const code = err?.data?.code || err?.response?.data?.code;
-      const msg = err?.data?.error || err?.response?.data?.error || err.message || "Failed to save";
+      const msg = err?.data?.error || "Failed to save";
       if (code === "DUPLICATE_NAME") {
         setErrors(prev => ({ ...prev, name: msg }));
       } else if (code === "HAS_INVOICES") {

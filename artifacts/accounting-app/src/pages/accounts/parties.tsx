@@ -44,7 +44,7 @@ export default function PartiesList() {
       queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
       toast({ title: "Ledger deleted" });
     } catch (err: any) {
-      const msg = err?.data?.error || err?.message || "Failed to delete";
+      const msg = err?.data?.error || "Failed to delete";
       toast({ title: "Cannot delete", description: msg, variant: "destructive" });
     } finally {
       setDeleteId(null);

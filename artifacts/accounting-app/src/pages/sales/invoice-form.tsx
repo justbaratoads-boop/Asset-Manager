@@ -344,7 +344,7 @@ export default function SaleInvoiceForm() {
       if (then) then(inv);
       else setLocation("/sales/invoices");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || "Failed to save invoice";
+      const msg = err?.data?.error || "Failed to save invoice";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally { setIsSaving(false); }
   };
