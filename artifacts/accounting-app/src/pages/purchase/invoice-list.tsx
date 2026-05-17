@@ -17,6 +17,15 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 
+/** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
+function itemBaseRate(item: any): number {
+  const qty = Number(item.quantity) || 0;
+  const discPct = Number(item.discountPct) || 0;
+  const factor = 1 - discPct / 100;
+  if (qty === 0 || factor === 0) return 0;
+  return Number(item.taxableAmount) / qty / factor;
+}
+
 const PAGE_SIZE = 20;
 
 const statusStyles: Record<string, string> = {
@@ -132,7 +141,7 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
                           {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
                         </td>
                         <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
-                        <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(Number(item.rate))}</td>
+                        <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
                         <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(Number(item.total))}</td>
                       </tr>
                     ))}

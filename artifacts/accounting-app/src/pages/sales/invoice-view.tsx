@@ -13,6 +13,15 @@ import { Printer, ArrowLeft, Copy, IndianRupee, Edit, FileCheck } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 
+/** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
+function itemBaseRate(item: any): number {
+  const qty = Number(item.quantity) || 0;
+  const discPct = Number(item.discountPct) || 0;
+  const factor = 1 - discPct / 100;
+  if (qty === 0 || factor === 0) return 0;
+  return Number(item.taxableAmount) / qty / factor;
+}
+
 const PRINT_SETTINGS_KEY = "print_settings";
 
 function loadPrintSettings() {
@@ -71,7 +80,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
       <td>${item.itemName || ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
       ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
-      <td class="tr">${fmtN(item.rate)}</td>
+      <td class="tr">${fmtN(itemBaseRate(item))}</td>
       <td class="tr">${item.discountPct || 0}%</td>
       <td class="tr">${item.gstPct || 0}%</td>
       <td class="tr"><strong>${fmtN(item.total)}</strong></td>
@@ -398,7 +407,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
                 </td>
                 {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
                 <td className="py-2 text-right">{item.quantity} {item.unit}</td>
-                <td className="py-2 text-right">{formatCurrency(item.rate)}</td>
+                <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
                 <td className="py-2 text-right">{item.discountPct}%</td>
                 <td className="py-2 text-right">{item.gstPct}%</td>
                 <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.total)}</td>
@@ -549,7 +558,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
               <td className="py-1.5">{i + 1}</td>
               <td className="py-1.5">{item.itemName}</td>
               <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
-              <td className="py-1.5 text-right">{formatCurrency(item.rate)}</td>
+              <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item))}</td>
               <td className="py-1.5 text-right font-medium">{formatCurrency(item.total)}</td>
             </tr>
           ))}
