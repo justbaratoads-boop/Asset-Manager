@@ -216,76 +216,71 @@ export default function ReceiptForm() {
 
       {/* Bill-wise Dialog */}
       <Dialog open={billWiseOpen} onOpenChange={setBillWiseOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Bill-wise Entry — Pending Bills</DialogTitle>
+        <DialogContent className="w-[95vw] max-w-2xl p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-4 pt-4 pb-3 border-b">
+            <DialogTitle className="text-base">Bill-wise Entry — Pending Bills</DialogTitle>
           </DialogHeader>
-          {loadingBills ? (
-            <div className="py-8 text-center text-muted-foreground">Loading pending bills...</div>
-          ) : pendingBills.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No pending bills found for this party.</div>
-          ) : (
-            <div className="space-y-3">
-              <div className="rounded-md border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Invoice#</th>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
-                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Total</th>
-                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Balance</th>
-                      <th className="text-right px-3 py-2 font-medium text-muted-foreground w-32">Amount to Receive</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendingBills.map((bill: any, i: number) => {
-                      const entered = Number(billAmounts[bill.id] || 0);
-                      const hasAmount = entered > 0;
-                      return (
-                        <tr key={bill.id} className={`border-t ${hasAmount ? "bg-green-50" : ""}`}>
-                          <td className="px-3 py-2">
-                            <button
-                              type="button"
-                              onClick={() => setBillAmounts(p => ({ ...p, [bill.id]: hasAmount ? "" : String(bill.balanceDue) }))}
-                              className="flex items-center gap-1.5 text-left"
-                            >
-                              {hasAmount
-                                ? <CheckSquare className="h-4 w-4 text-green-600 shrink-0" />
-                                : <Square className="h-4 w-4 text-muted-foreground shrink-0" />
-                              }
-                              <span className="font-mono text-xs">{bill.invoiceNumber}</span>
-                            </button>
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground text-xs">{formatDate(bill.date)}</td>
-                          <td className="px-3 py-2 text-right text-xs">{formatCurrency(bill.grandTotal)}</td>
-                          <td className="px-3 py-2 text-right text-xs font-medium text-amber-600">{formatCurrency(bill.balanceDue)}</td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number" min="0" step="any" inputMode="decimal"
-                              max={bill.balanceDue}
-                              placeholder="0.00"
-                              value={billAmounts[bill.id] || ""}
-                              onChange={e => setBillAmounts(p => ({ ...p, [bill.id]: e.target.value }))}
-                              className="h-7 text-right text-xs w-28 ml-auto"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          <div className="overflow-y-auto max-h-[60vh]">
+            {loadingBills ? (
+              <div className="py-8 text-center text-muted-foreground text-sm">Loading pending bills...</div>
+            ) : pendingBills.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground text-sm">No pending bills found for this party.</div>
+            ) : (
+              <div className="divide-y">
+                {pendingBills.map((bill: any) => {
+                  const entered = Number(billAmounts[bill.id] || 0);
+                  const hasAmount = entered > 0;
+                  return (
+                    <div key={bill.id} className={`px-4 py-3 ${hasAmount ? "bg-green-50" : ""}`}>
+                      {/* Top row: checkbox + invoice# + date */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setBillAmounts(p => ({ ...p, [bill.id]: hasAmount ? "" : String(bill.balanceDue) }))}
+                          className="shrink-0"
+                        >
+                          {hasAmount
+                            ? <CheckSquare className="h-4 w-4 text-green-600" />
+                            : <Square className="h-4 w-4 text-muted-foreground" />
+                          }
+                        </button>
+                        <span className="font-mono text-xs font-semibold flex-1">{bill.invoiceNumber}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(bill.date)}</span>
+                      </div>
+                      {/* Bottom row: totals + amount input */}
+                      <div className="flex items-center gap-2 pl-6">
+                        <div className="flex-1 text-xs text-muted-foreground">
+                          Total: <span className="font-medium text-foreground">{formatCurrency(bill.grandTotal)}</span>
+                        </div>
+                        <div className="text-xs text-amber-600 font-medium">
+                          Due: {formatCurrency(bill.balanceDue)}
+                        </div>
+                        <Input
+                          type="number" min="0" step="any" inputMode="decimal"
+                          max={bill.balanceDue}
+                          placeholder="0.00"
+                          value={billAmounts[bill.id] || ""}
+                          onChange={e => setBillAmounts(p => ({ ...p, [bill.id]: e.target.value }))}
+                          className="h-8 text-right text-xs w-24 shrink-0"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex items-center justify-between text-sm font-semibold px-1">
-                <span className="text-muted-foreground">
-                  {Object.values(billAmounts).filter(v => Number(v) > 0).length} bill{Object.values(billAmounts).filter(v => Number(v) > 0).length !== 1 ? "s" : ""} selected
-                </span>
-                <span>Total: {formatCurrency(billWiseTotal)}</span>
-              </div>
+            )}
+          </div>
+          {pendingBills.length > 0 && (
+            <div className="px-4 py-2.5 border-t bg-muted/30 flex items-center justify-between text-sm font-semibold">
+              <span className="text-muted-foreground text-xs">
+                {Object.values(billAmounts).filter(v => Number(v) > 0).length} bill{Object.values(billAmounts).filter(v => Number(v) > 0).length !== 1 ? "s" : ""} selected
+              </span>
+              <span>Total: {formatCurrency(billWiseTotal)}</span>
             </div>
           )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setBillWiseOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={applyBillWise} disabled={billWiseTotal <= 0}>
+          <DialogFooter className="px-4 py-3 border-t gap-2 flex-row justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => setBillWiseOpen(false)}>Cancel</Button>
+            <Button type="button" size="sm" onClick={applyBillWise} disabled={billWiseTotal <= 0}>
               Apply — {formatCurrency(billWiseTotal)}
             </Button>
           </DialogFooter>
