@@ -4,7 +4,7 @@ import {
   purchaseInvoicesTable, purchaseInvoiceItemsTable, purchaseInvoicePaymentsTable,
   purchaseOrdersTable, purchaseOrderItemsTable, stockItemsTable, stockTransactionsTable
 } from "@workspace/db/schema";
-import { eq, and, like, sql } from "drizzle-orm";
+import { eq, and, ilike, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeVoucherNumber } from "../lib/counter";
 import { adjustBatchStockForItem } from "../lib/batch-stock";
@@ -15,7 +15,7 @@ const router = Router();
 router.get("/purchase-invoices", authMiddleware, async (req, res) => {
   const { search } = req.query;
   const conditions: any[] = [eq(purchaseInvoicesTable.isDeleted, "false")];
-  if (search) conditions.push(like(purchaseInvoicesTable.partyName, `%${search}%`));
+  if (search) conditions.push(ilike(purchaseInvoicesTable.partyName, `%${search}%`));
 
   const invoices = await db.select().from(purchaseInvoicesTable)
     .where(and(...conditions))

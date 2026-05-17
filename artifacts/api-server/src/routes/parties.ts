@@ -6,7 +6,7 @@ import {
   paymentsTable, receiptsTable, journalLinesTable, journalEntriesTable,
   ordersTable, debitNotesTable, creditNotesTable, companySettingsTable
 } from "@workspace/db/schema";
-import { eq, and, like, sql, or, ne } from "drizzle-orm";
+import { eq, and, ilike, sql, or, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -31,7 +31,7 @@ router.get("/parties", authMiddleware, async (req, res) => {
     conditions.push(or(eq(partiesTable.type, type as string), eq(partiesTable.type, "both")));
   }
   if (search) {
-    conditions.push(like(partiesTable.name, `%${search}%`));
+    conditions.push(ilike(partiesTable.name, `%${search}%`));
   }
 
   const parties = await db.select().from(partiesTable)

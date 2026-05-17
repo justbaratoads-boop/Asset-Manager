@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { stockCategoriesTable, stockItemsTable, stockTransactionsTable, stockBatchesTable, stockItemGstHistoryTable } from "@workspace/db/schema";
-import { eq, and, like, sql, ilike } from "drizzle-orm";
+import { eq, and, sql, ilike } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -226,7 +226,7 @@ router.get("/stock-items", authMiddleware, async (req, res) => {
   const { search, categoryId, lowStock } = req.query;
   const conditions: any[] = [eq(stockItemsTable.isDeleted, "false")];
   if (categoryId) conditions.push(eq(stockItemsTable.categoryId, Number(categoryId)));
-  if (search) conditions.push(like(stockItemsTable.name, `%${search}%`));
+  if (search) conditions.push(ilike(stockItemsTable.name, `%${search}%`));
   if (lowStock === "true") {
     conditions.push(sql`physical_stock::numeric <= min_stock_level::numeric`);
   }

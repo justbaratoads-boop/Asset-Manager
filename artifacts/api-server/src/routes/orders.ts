@@ -4,7 +4,7 @@ import {
   ordersTable, orderItemsTable, saleInvoicesTable, saleInvoiceItemsTable,
   stockItemsTable, stockTransactionsTable, companySettingsTable
 } from "@workspace/db/schema";
-import { eq, and, like, sql } from "drizzle-orm";
+import { eq, and, ilike, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeVoucherNumber } from "../lib/counter";
 import { adjustBatchStockForItem } from "../lib/batch-stock";
@@ -14,7 +14,7 @@ const router = Router();
 router.get("/orders", authMiddleware, async (req, res) => {
   const { search, status } = req.query;
   const conditions: any[] = [eq(ordersTable.isDeleted, "false")];
-  if (search) conditions.push(like(ordersTable.partyName, `%${search}%`));
+  if (search) conditions.push(ilike(ordersTable.partyName, `%${search}%`));
   if (status) conditions.push(eq(ordersTable.status, status as string));
 
   const orders = await db.select().from(ordersTable)

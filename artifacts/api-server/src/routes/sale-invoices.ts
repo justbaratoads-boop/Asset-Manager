@@ -5,7 +5,7 @@ import {
 } from "@workspace/db/schema";
 import { adjustBatchStockForItem } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
-import { eq, and, like, gte, lte, sql, ne } from "drizzle-orm";
+import { eq, and, ilike, gte, lte, sql, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber } from "../lib/counter";
 import { companySettingsTable } from "@workspace/db/schema";
@@ -41,7 +41,7 @@ const router = Router();
 router.get("/sale-invoices", authMiddleware, async (req, res) => {
   const { search, from, to, status } = req.query;
   const conditions: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
-  if (search) conditions.push(like(saleInvoicesTable.partyName, `%${search}%`));
+  if (search) conditions.push(ilike(saleInvoicesTable.partyName, `%${search}%`));
   if (from) conditions.push(gte(saleInvoicesTable.date, from as string));
   if (to) conditions.push(lte(saleInvoicesTable.date, to as string));
   if (status) conditions.push(eq(saleInvoicesTable.status, status as string));

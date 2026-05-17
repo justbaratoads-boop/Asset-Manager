@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { ledgersTable, journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable, saleInvoicesTable, purchaseInvoicesTable } from "@workspace/db/schema";
-import { eq, and, like, gte, lte, isNotNull } from "drizzle-orm";
+import { eq, and, ilike, gte, lte, isNotNull } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -10,7 +10,7 @@ router.get("/ledgers", authMiddleware, async (req, res) => {
   const { group, search } = req.query;
   const conditions: any[] = [eq(ledgersTable.isDeleted, "false")];
   if (group) conditions.push(eq(ledgersTable.group, group as string));
-  if (search) conditions.push(like(ledgersTable.name, `%${search}%`));
+  if (search) conditions.push(ilike(ledgersTable.name, `%${search}%`));
 
   const ledgers = await db.select().from(ledgersTable)
     .where(and(...conditions))
