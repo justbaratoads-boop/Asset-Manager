@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, useCreateStockItem, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
+import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useFetch } from "@/hooks/use-fetch";
 import { Link, useLocation, useParams } from "wouter";
@@ -15,6 +15,7 @@ import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save, AlertTriangle } from "lucide-react";
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
+import { QuickAddItemDialog } from "@/components/quick-add-item-dialog";
 import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
@@ -70,45 +71,6 @@ function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
   );
 }
 
-function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (item: any) => void }) {
-  const [name, setName] = useState("");
-  const [unit, setUnit] = useState("pcs");
-  const [purchaseRate, setPurchaseRate] = useState("");
-  const [gstRate, setGstRate] = useState("18");
-  const createItem = useCreateStockItem();
-  const { toast } = useToast();
-
-  const handleSave = async () => {
-    if (!name.trim()) { toast({ title: "Item name is required", variant: "destructive" }); return; }
-    try {
-      const item = await createItem.mutateAsync({ data: { name: name.trim(), unit, saleRate: "0", purchaseRate: purchaseRate || "0", gstApplicable: "true", gstRate, openingStock: "0", minStockLevel: "0" } as any });
-      toast({ title: `Item "${name}" added` });
-      onAdded(item);
-      setName(""); setUnit("pcs"); setPurchaseRate(""); setGstRate("18");
-      onClose();
-    } catch { toast({ title: "Failed to add item", variant: "destructive" }); }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Quick Add Item</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1"><Label>Item Name *</Label><Input value={name} onChange={e => setName(e.target.value)} autoFocus /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Unit</Label><UnitSelect value={unit} onChange={setUnit} className="h-9" /></div>
-            <div className="space-y-1"><Label>GST %</Label><Select value={gstRate} onValueChange={setGstRate}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select></div>
-          </div>
-          <div className="space-y-1"><Label>Purchase Rate</Label><Input type="number" value={purchaseRate} onChange={e => setPurchaseRate(e.target.value)} /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={createItem.isPending}>{createItem.isPending ? "Adding..." : "Add Item"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export default function PurchaseInvoiceForm() {
   const [, setLocation] = useLocation();

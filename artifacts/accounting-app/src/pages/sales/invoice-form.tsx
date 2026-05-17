@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, useCreateStockItem, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
+import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
+import { QuickAddItemDialog } from "@/components/quick-add-item-dialog";
 import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
 
 interface InvoiceItem {
@@ -98,58 +99,6 @@ function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
   );
 }
 
-function QuickAddItemDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (item: any) => void }) {
-  const [name, setName] = useState("");
-  const [unit, setUnit] = useState("pcs");
-  const [saleRate, setSaleRate] = useState("");
-  const [purchaseRate, setPurchaseRate] = useState("");
-  const [gstRate, setGstRate] = useState("18");
-  const createItem = useCreateStockItem();
-  const { toast } = useToast();
-
-  const handleSave = async () => {
-    if (!name.trim()) { toast({ title: "Item name is required", variant: "destructive" }); return; }
-    try {
-      const item = await createItem.mutateAsync({
-        data: { name: name.trim(), unit, saleRate: saleRate || "0", purchaseRate: purchaseRate || "0", gstApplicable: "true", gstRate, openingStock: "0", minStockLevel: "0" } as any,
-      });
-      toast({ title: `Item "${name}" added` });
-      onAdded(item);
-      setName(""); setUnit("pcs"); setSaleRate(""); setPurchaseRate(""); setGstRate("18");
-      onClose();
-    } catch {
-      toast({ title: "Failed to add item", variant: "destructive" });
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Quick Add Item</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1"><Label>Item Name *</Label><Input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="e.g. Cement 50kg" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Unit</Label><UnitSelect value={unit} onChange={setUnit} className="h-9" /></div>
-            <div className="space-y-1"><Label>GST %</Label>
-              <Select value={gstRate} onValueChange={setGstRate}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Sale Rate</Label><Input type="number" value={saleRate} onChange={e => setSaleRate(e.target.value)} placeholder="0.00" /></div>
-            <div className="space-y-1"><Label>Purchase Rate</Label><Input type="number" value={purchaseRate} onChange={e => setPurchaseRate(e.target.value)} placeholder="0.00" /></div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={createItem.isPending}>{createItem.isPending ? "Adding..." : "Add Item"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 const BASE_PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
