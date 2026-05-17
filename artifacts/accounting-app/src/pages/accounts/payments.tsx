@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListPayments, useDeletePayment, getListPaymentsQueryKey } from "@workspace/api-client-react";
+import { useListPayments, useDeletePayment, useListLedgers, getListPaymentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -15,17 +16,22 @@ const PAGE_SIZE = 20;
 
 export default function PaymentList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [viewItem, setViewItem] = useState<any | null>(null);
   const [page, setPage] = useState(1);
   const { data: payments = [], isLoading } = useListPayments({});
+  const { data: ledgers = [] } = useListLedgers({});
   const deleteMutation = useDeletePayment();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const ledgerName = (id: number) => (ledgers as any[]).find((l: any) => l.id === id)?.name || "-";
 
   const handleDelete = async () => {
     if (!deleteId) return;
     await deleteMutation.mutateAsync({ id: deleteId });
     queryClient.invalidateQueries({ queryKey: getListPaymentsQueryKey() });
     setDeleteId(null);
+    toast({ title: "Payment deleted" });
   };
 
   const list = payments as any[];
@@ -54,11 +60,14 @@ export default function PaymentList() {
                 <div>
                   <p className="font-bold text-base">{p.partyName || "—"}</p>
                   <p className="text-xs text-muted-foreground font-mono">{p.voucherNumber} · {formatDate(p.date)}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{p.paymentMode?.replace("_", " ")}</p>
+                  {p.narration && <p className="text-xs text-muted-foreground">{p.narration}</p>}
                 </div>
                 <p className="font-bold text-base text-red-600">{formatCurrency(p.amount)}</p>
               </div>
               <div className="flex gap-2 border-t pt-3">
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewItem(p)}>
+                  <Eye className="h-3.5 w-3.5 mr-1" />View
+                </Button>
                 <Link href={`/accounts/payments/${p.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
@@ -83,7 +92,7 @@ export default function PaymentList() {
                 <TableHead>Voucher#</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Party</TableHead>
-                <TableHead>Mode</TableHead>
+                <TableHead>Ledger</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -98,10 +107,11 @@ export default function PaymentList() {
                   <TableCell className="font-mono text-sm">{p.voucherNumber}</TableCell>
                   <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
                   <TableCell>{p.partyName || "-"}</TableCell>
-                  <TableCell className="capitalize text-sm">{p.paymentMode?.replace("_", " ")}</TableCell>
+                  <TableCell className="text-sm">{ledgerName(p.ledgerId)}</TableCell>
                   <TableCell className="text-right font-medium text-red-600">{formatCurrency(p.amount)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewItem(p)}><Eye className="h-3.5 w-3.5" /></Button>
                       <Link href={`/accounts/payments/${p.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
@@ -113,6 +123,58 @@ export default function PaymentList() {
           <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>
+
+      {/* View Dialog */}
+      <Dialog open={!!viewItem} onOpenChange={o => !o && setViewItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Payment Voucher — {viewItem?.voucherNumber}</DialogTitle>
+          </DialogHeader>
+          {viewItem && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Voucher No.</p>
+                  <p className="font-mono font-medium">{viewItem.voucherNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Date</p>
+                  <p className="font-medium">{formatDate(viewItem.date)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Party</p>
+                  <p className="font-medium">{viewItem.partyName || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Payment Ledger</p>
+                  <p className="font-medium">{ledgerName(viewItem.ledgerId)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Amount</p>
+                  <p className="font-bold text-red-600 text-base">{formatCurrency(viewItem.amount)}</p>
+                </div>
+                {viewItem.narration && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground">Narration</p>
+                    <p className="font-medium">{viewItem.narration}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 pt-2 border-t">
+                <Link href={`/accounts/payments/${viewItem.id}/edit`} className="flex-1">
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setViewItem(null)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+                  </Button>
+                </Link>
+                <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={() => { setDeleteId(viewItem.id); setViewItem(null); }}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
     </div>
   );
