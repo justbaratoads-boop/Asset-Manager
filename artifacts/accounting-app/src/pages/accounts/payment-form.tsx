@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PartySelect } from "@/components/party-select";
 import { today } from "@/lib/format";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -20,26 +21,32 @@ export default function PaymentForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreatePayment();
-  const { data: parties = [] } = useListParties();
+  const { data: allParties = [] } = useListParties();
   const { data: allLedgers = [] } = useListLedgers({});
   const { data: existing } = useGetPayment(editId!, { query: { enabled: isEdit } });
 
+  // Only cash and bank ledgers for payment ledger selector
   const cashBankLedgers = (allLedgers as any[]).filter(
     (l: any) => l.group === "Bank Accounts" || l.name === "Cash"
   );
 
+  // Sundry Creditors (suppliers) for payment voucher
+  const parties = (allParties as any[]).filter(
+    (p: any) => p.accountGroup === "Sundry Creditors" || p.type === "supplier" || p.type === "both"
+  );
+
+  const [partyId, setPartyId] = useState<number | undefined>();
   const [form, setForm] = useState({
-    date: today(), partyId: "", ledgerId: "",
-    amount: "", narration: "",
+    date: today(), ledgerId: "", amount: "", narration: "",
   });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
     if (!existing) return;
     const e = existing as any;
+    setPartyId(e.partyId || undefined);
     setForm({
       date: e.date || today(),
-      partyId: e.partyId ? String(e.partyId) : "",
       ledgerId: e.ledgerId ? String(e.ledgerId) : "",
       amount: String(e.amount || ""),
       narration: e.narration || "",
@@ -48,10 +55,10 @@ export default function PaymentForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const party = (parties as any[]).find((p: any) => p.id === Number(form.partyId));
+    const party = parties.find((p: any) => p.id === partyId);
     const payload = {
       date: form.date,
-      partyId: form.partyId ? Number(form.partyId) : undefined,
+      partyId: partyId || undefined,
       partyName: party?.name,
       ledgerId: Number(form.ledgerId),
       amount: Number(form.amount),
@@ -87,11 +94,13 @@ export default function PaymentForm() {
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.date} onChange={e => set("date", e.target.value)} /></div>
           <div className="space-y-1"><Label>Amount *</Label><Input type="number" required inputMode="decimal" min="0" step="any" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0.00" /></div>
           <div className="space-y-1 col-span-2">
-            <Label>Party</Label>
-            <Select value={form.partyId} onValueChange={v => set("partyId", v)}>
-              <SelectTrigger><SelectValue placeholder="Select party (optional)" /></SelectTrigger>
-              <SelectContent>{(parties as any[]).map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <Label>Party (Sundry Creditor)</Label>
+            <PartySelect
+              value={partyId}
+              onChange={setPartyId}
+              parties={parties}
+              placeholder="Select supplier / party (optional)"
+            />
           </div>
           <div className="space-y-1 col-span-2">
             <Label>Payment Ledger *</Label>
