@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockItemsTable, stockTransactionsTable
+  saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockItemsTable, stockTransactionsTable,
+  ordersTable,
 } from "@workspace/db/schema";
 import { adjustBatchStockForItem } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
@@ -150,6 +151,13 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
         reference: payment.reference || "",
       });
     }
+  }
+
+  // If created from an order, mark the order as confirmed and link the invoice
+  if (data.fromOrderId) {
+    await db.update(ordersTable)
+      .set({ status: "confirmed", convertedInvoiceId: invoice.id })
+      .where(eq(ordersTable.id, Number(data.fromOrderId)));
   }
 
   res.status(201).json({ ...invoice, invoiceNumber });

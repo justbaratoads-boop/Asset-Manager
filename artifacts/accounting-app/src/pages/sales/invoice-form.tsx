@@ -321,6 +321,7 @@ export default function SaleInvoiceForm() {
       items,
       payments,
       otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
+      fromOrderId: fromOrderId ? Number(fromOrderId) : undefined,
     };
   };
 
