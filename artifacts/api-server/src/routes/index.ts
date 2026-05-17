@@ -14,6 +14,7 @@ import gstRouter from "./gst";
 import deliveryRouter from "./delivery";
 import usersRouter from "./users";
 import accountGroupsRouter from "./account-groups";
+import recycleBinRouter from "./recycle-bin";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(gstRouter);
 router.use(deliveryRouter);
 router.use(usersRouter);
 router.use(accountGroupsRouter);
+router.use(recycleBinRouter);
 
 export default router;

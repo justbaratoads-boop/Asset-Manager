@@ -83,6 +83,7 @@ const navigation: NavItem[] = [
       { name: "Company Settings", href: "/settings", perm: "settings_company" },
       { name: "Print Settings", href: "/settings/print", perm: "settings_print" },
       { name: "Users & Roles", href: "/settings/users", perm: "settings_users" },
+      { name: "Recycle Bin", href: "/settings/recycle-bin", perm: "settings_company" },
     ],
   },
 ];

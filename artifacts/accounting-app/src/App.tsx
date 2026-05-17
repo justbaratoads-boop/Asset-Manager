@@ -79,6 +79,7 @@ import DeliveryPage from "@/pages/delivery/index";
 import CompanySettings from "@/pages/settings/company";
 import UsersSettings from "@/pages/settings/users";
 import PrintSettings from "@/pages/settings/print";
+import RecycleBin from "@/pages/settings/recycle-bin";
 
 setupApi();
 
@@ -204,6 +205,7 @@ function Router() {
       <PR path="/settings/company" component={CompanySettings} />
       <PR path="/settings/print" component={PrintSettings} />
       <PR path="/settings/users" component={UsersSettings} />
+      <PR path="/settings/recycle-bin" component={RecycleBin} />
 
       <Route component={NotFound} />
     </Switch>
