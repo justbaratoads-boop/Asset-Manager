@@ -6,8 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Search, Lock, ChevronDown, ChevronRight, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Lock, ChevronDown, ChevronRight, Layers, Info } from "lucide-react";
 import React from "react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { customFetch, useListLedgers, useDeleteLedger, getListLedgersQueryKey } from "@workspace/api-client-react";
@@ -64,7 +65,6 @@ function useAccountGroups() {
 }
 
 const BLANK_GROUP = { name: "", nature: "Asset", statement: "Balance Sheet", parentGroup: "assets" };
-const BLANK_ACCOUNT = { name: "", group: "", nature: "dr", openingBalance: "" };
 
 export default function ChartOfAccounts() {
   const { data: groups = [], isLoading: groupsLoading } = useAccountGroups();
@@ -181,16 +181,6 @@ export default function ChartOfAccounts() {
   };
 
   // --- Account (Ledger) CRUD ---
-  const openNewAccount = (groupName: string) => {
-    const grp = (groups as any[]).find((g: any) => g.name === groupName);
-    setEditAccount(null);
-    setAccountForm({ name: "", group: groupName, nature: grp?.nature === "Asset" || grp?.nature === "Expense" ? "dr" : "cr", openingBalance: "" });
-    setAccountDialogOpen(true);
-    // auto-expand the group once account is added
-    const g = (groups as any[]).find((g: any) => g.name === groupName);
-    if (g) setExpandedGroups(prev => new Set([...prev, g.id]));
-  };
-
   const openEditAccount = (l: any) => {
     setEditAccount(l);
     setAccountForm({ name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance) });
@@ -318,13 +308,6 @@ export default function ChartOfAccounts() {
                               </TableCell>
                               <TableCell onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-end gap-1">
-                                  <Button
-                                    size="icon" variant="ghost" className="h-7 w-7 text-primary"
-                                    title="Add account to this group"
-                                    onClick={() => openNewAccount(g.name)}
-                                  >
-                                    <Plus className="h-3.5 w-3.5" />
-                                  </Button>
                                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditGroup(g)}>
                                     <Pencil className="h-3.5 w-3.5" />
                                   </Button>
@@ -343,11 +326,11 @@ export default function ChartOfAccounts() {
                                 <TableCell colSpan={6} className="p-0">
                                   <div className="border-t border-border/40">
                                     {groupLedgers.length === 0 ? (
-                                      <div className="pl-12 pr-4 py-3 text-sm text-muted-foreground flex items-center gap-3">
-                                        No accounts in this group yet.
-                                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => openNewAccount(g.name)}>
-                                          <Plus className="h-3 w-3" />Add Account
-                                        </Button>
+                                      <div className="pl-12 pr-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                                        <Info className="h-3.5 w-3.5 shrink-0" />
+                                        No accounts yet. Go to{" "}
+                                        <Link href="/accounts/ledgers" className="text-primary underline underline-offset-2 font-medium">Ledger</Link>
+                                        {" "}to add accounts and select this group.
                                       </div>
                                     ) : (
                                       <table className="w-full text-sm">
@@ -380,10 +363,11 @@ export default function ChartOfAccounts() {
                                         </tbody>
                                         <tfoot>
                                           <tr>
-                                            <td colSpan={4} className="pl-12 pr-3 py-2">
-                                              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-primary" onClick={() => openNewAccount(g.name)}>
-                                                <Plus className="h-3 w-3" />Add Account
-                                              </Button>
+                                            <td colSpan={4} className="pl-12 pr-3 py-2.5 text-xs text-muted-foreground flex items-center gap-1.5">
+                                              <Info className="h-3 w-3 shrink-0" />
+                                              To add accounts here, go to{" "}
+                                              <Link href="/accounts/ledgers" className="text-primary underline underline-offset-2 font-medium">Ledger</Link>
+                                              {" "}and select this group.
                                             </td>
                                           </tr>
                                         </tfoot>
@@ -453,11 +437,11 @@ export default function ChartOfAccounts() {
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Account Dialog */}
+      {/* Edit Account Dialog */}
       <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editAccount ? "Edit Account" : "New Ledger Account"}</DialogTitle>
+            <DialogTitle>Edit Account</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-1">
             <div className="space-y-1">

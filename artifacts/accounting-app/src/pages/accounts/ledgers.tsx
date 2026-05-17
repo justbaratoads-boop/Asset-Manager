@@ -342,7 +342,7 @@ export default function LedgerAccounts() {
               <Label>Account Group *</Label>
               <Select value={form.group} onValueChange={v => {
                 const grp = (accountGroups as any[]).find((g: any) => g.name === v);
-                setForm(p => ({ ...p, group: v, nature: grp?.nature || p.nature }));
+                setForm(p => ({ ...p, group: v, nature: grp ? (grp.nature === "Asset" || grp.nature === "Expense" ? "dr" : "cr") : p.nature }));
               }}>
                 <SelectTrigger className={!form.group ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select group..." />
