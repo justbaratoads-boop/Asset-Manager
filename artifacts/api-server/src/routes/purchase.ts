@@ -7,6 +7,7 @@ import {
 import { eq, and, like, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeVoucherNumber } from "../lib/counter";
+import { adjustBatchStockForItem } from "../lib/batch-stock";
 
 const router = Router();
 
@@ -84,6 +85,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
             balanceAfter: String(newStock),
             reference: invoiceNumber,
           });
+          await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
         }
       }
     }
@@ -139,6 +141,19 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
   }).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).returning();
   if (!invoice) return res.status(404).json({ error: "Not found" });
 
+  // Reverse old items' physical + batch stock before replacing
+  const oldItems = await db.select().from(purchaseInvoiceItemsTable).where(eq(purchaseInvoiceItemsTable.invoiceId, Number(req.params.id)));
+  for (const oldItem of oldItems) {
+    if (oldItem.stockItemId) {
+      const [si] = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, oldItem.stockItemId)).limit(1);
+      if (si) {
+        const restored = Math.max(0, Number(si.physicalStock) - Number(oldItem.quantity));
+        await db.update(stockItemsTable).set({ physicalStock: String(restored) }).where(eq(stockItemsTable.id, oldItem.stockItemId));
+        await adjustBatchStockForItem(oldItem.stockItemId, -Number(oldItem.quantity), 0);
+      }
+    }
+  }
+
   // Replace items
   await db.delete(purchaseInvoiceItemsTable).where(eq(purchaseInvoiceItemsTable.invoiceId, Number(req.params.id)));
   if (data.items?.length) {
@@ -159,6 +174,14 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
         igst: String(item.igst || 0),
         total: String(item.total),
       });
+      if (item.stockItemId) {
+        const [si] = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, item.stockItemId)).limit(1);
+        if (si) {
+          const newStock = Number(si.physicalStock) + Number(item.quantity);
+          await db.update(stockItemsTable).set({ physicalStock: String(newStock) }).where(eq(stockItemsTable.id, item.stockItemId));
+          await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
+        }
+      }
     }
   }
 

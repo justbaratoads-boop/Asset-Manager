@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, AlertTriangle } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
@@ -22,6 +22,10 @@ interface Batch {
   name: string;
   description?: string;
   expiryDate?: string;
+  openingStock: number;
+  physicalStock: number;
+  reservedStock: number;
+  availableStock: number;
   items: BatchItem[];
 }
 interface StockItem { id: number; name: string; }
@@ -38,6 +42,7 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
     name: batch?.name || "",
     description: batch?.description || "",
     expiryDate: batch?.expiryDate || "",
+    openingStock: batch ? String(batch.openingStock ?? 0) : "",
   });
   const [selectedItem, setSelectedItem] = useState<number | null>(
     batch?.items?.[0]?.id ?? null
@@ -58,7 +63,11 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
     if (!form.name.trim()) { toast({ title: "Batch name is required", variant: "destructive" }); return; }
     setLoading(true);
     try {
-      const payload = { ...form, itemIds: selectedItem ? [selectedItem] : [] };
+      const payload = {
+        ...form,
+        openingStock: Number(form.openingStock) || 0,
+        itemIds: selectedItem ? [selectedItem] : [],
+      };
       if (batch) {
         await customFetch(`/api/stock-batches/${batch.id}`, {
           method: "PUT",
@@ -90,9 +99,15 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
         <Label>Description</Label>
         <Input value={form.description} onChange={e => set("description", e.target.value)} placeholder="Optional description" />
       </div>
-      <div className="space-y-1">
-        <Label>Expiry Date</Label>
-        <Input type="date" value={form.expiryDate} onChange={e => set("expiryDate", e.target.value)} />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label>Expiry Date</Label>
+          <Input type="date" value={form.expiryDate} onChange={e => set("expiryDate", e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>Opening Stock</Label>
+          <Input type="number" min="0" step="any" value={form.openingStock} onChange={e => set("openingStock", e.target.value)} placeholder="0" />
+        </div>
       </div>
 
       <div className="space-y-1">
@@ -175,7 +190,7 @@ export default function Batches() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">All Batches</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {isLoading ? (
             <p className="text-sm text-muted-foreground py-4 text-center">Loading...</p>
           ) : list.length === 0 ? (
@@ -187,54 +202,71 @@ export default function Batches() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Expiry Date</TableHead>
+                    <TableHead>Expiry</TableHead>
                     <TableHead>Assigned Item</TableHead>
+                    <TableHead className="text-right">Opening</TableHead>
+                    <TableHead className="text-right">Physical</TableHead>
+                    <TableHead className="text-right">Reserved</TableHead>
+                    <TableHead className="text-right">Available</TableHead>
                     <TableHead className="w-20"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginated.map(batch => (
-                    <TableRow key={batch.id}>
-                      <TableCell className="font-medium">{batch.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{batch.description || "—"}</TableCell>
-                      <TableCell>{batch.expiryDate || "—"}</TableCell>
-                      <TableCell>
-                        {batch.items?.[0] ? (
-                          <Badge variant="secondary" className="text-xs font-normal">
-                            <Package className="h-2.5 w-2.5 mr-1" />{batch.items[0].name}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Not assigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Dialog open={editBatch?.id === batch.id} onOpenChange={open => !open && setEditBatch(null)}>
-                            <DialogTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditBatch(batch)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-md">
-                              <DialogHeader><DialogTitle>Edit Batch</DialogTitle></DialogHeader>
-                              {editBatch?.id === batch.id && (
-                                <BatchDialog
-                                  batch={editBatch}
-                                  stockItems={stockItems as StockItem[]}
-                                  batches={list}
-                                  onSaved={invalidate}
-                                  onClose={() => setEditBatch(null)}
-                                />
-                              )}
-                            </DialogContent>
-                          </Dialog>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteBatch(batch.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {paginated.map(batch => {
+                    const avail = Number(batch.availableStock ?? 0);
+                    const isLow = avail <= 0;
+                    return (
+                      <TableRow key={batch.id}>
+                        <TableCell className="font-medium">{batch.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{batch.description || "—"}</TableCell>
+                        <TableCell className="text-sm">{batch.expiryDate || "—"}</TableCell>
+                        <TableCell>
+                          {batch.items?.[0] ? (
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              <Package className="h-2.5 w-2.5 mr-1" />{batch.items[0].name}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm">{Number(batch.openingStock ?? 0)}</TableCell>
+                        <TableCell className="text-right text-sm">{Number(batch.physicalStock ?? 0)}</TableCell>
+                        <TableCell className="text-right text-sm text-amber-600">{Number(batch.reservedStock ?? 0)}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`text-sm font-medium flex items-center justify-end gap-1 ${isLow ? "text-red-600" : "text-green-600"}`}>
+                            {isLow && <AlertTriangle className="h-3 w-3" />}
+                            {avail}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Dialog open={editBatch?.id === batch.id} onOpenChange={open => !open && setEditBatch(null)}>
+                              <DialogTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditBatch(batch)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-md">
+                                <DialogHeader><DialogTitle>Edit Batch</DialogTitle></DialogHeader>
+                                {editBatch?.id === batch.id && (
+                                  <BatchDialog
+                                    batch={editBatch}
+                                    stockItems={stockItems as StockItem[]}
+                                    batches={list}
+                                    onSaved={invalidate}
+                                    onClose={() => setEditBatch(null)}
+                                  />
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteBatch(batch.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />

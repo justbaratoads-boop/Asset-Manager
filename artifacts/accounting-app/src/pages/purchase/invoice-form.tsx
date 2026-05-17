@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, useCreateStockItem, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useFetch } from "@/hooks/use-fetch";
 import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
-import { Plus, Trash2, ArrowLeft, Lock, Save } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Lock, Save, AlertTriangle } from "lucide-react";
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
@@ -118,6 +119,7 @@ export default function PurchaseInvoiceForm() {
   const createMutation = useCreatePurchaseInvoice();
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetPurchaseInvoice(editId!, { query: { enabled: isEdit } });
 
   const [partyId, setPartyId] = useState<number | undefined>();
@@ -313,6 +315,17 @@ export default function PurchaseInvoiceForm() {
                       placeholder="Search item…"
                       inputClassName="h-10"
                     />
+                    {item.stockItemId && (() => {
+                      const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                      if (!b) return null;
+                      const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                      return (
+                        <p className="text-xs px-1 text-sky-600 flex items-center gap-1">
+                          <span className="font-medium">Batch: {b.name}</span>
+                          <span className="text-muted-foreground">· avail: {avail}</span>
+                        </p>
+                      );
+                    })()}
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>{item.stockItemId ? (<div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" />)}</div>
@@ -370,6 +383,17 @@ export default function PurchaseInvoiceForm() {
                             onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
                             placeholder="Search item…"
                           />
+                          {item.stockItemId && (() => {
+                            const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                            if (!b) return null;
+                            const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                            return (
+                              <p className="text-xs mt-0.5 px-1 text-sky-600 flex items-center gap-1">
+                                <span className="font-medium">Batch: {b.name}</span>
+                                <span className="text-muted-foreground">· avail: {avail}</span>
+                              </p>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                         <TableCell>{item.stockItemId ? (<div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>) : (<UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-9" />)}</TableCell>

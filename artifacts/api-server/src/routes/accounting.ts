@@ -8,6 +8,7 @@ import {
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeVoucherNumber } from "../lib/counter";
+import { adjustBatchStockForItem } from "../lib/batch-stock";
 
 const router = Router();
 
@@ -254,6 +255,7 @@ router.post("/credit-notes", authMiddleware, async (req, res) => {
         await db.execute(
           sql`UPDATE stock_items SET opening_stock = opening_stock + ${item.quantity} WHERE id = ${item.stockItemId}`
         );
+        await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
       }
     }
   }
@@ -278,6 +280,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
       await db.execute(
         sql`UPDATE stock_items SET opening_stock = GREATEST(0, opening_stock - ${item.quantity}) WHERE id = ${item.stockItemId}`
       );
+      await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
     }
   }
 
@@ -314,6 +317,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
         await db.execute(
           sql`UPDATE stock_items SET opening_stock = opening_stock + ${item.quantity} WHERE id = ${item.stockItemId}`
         );
+        await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
       }
     }
   }
@@ -371,6 +375,7 @@ router.post("/debit-notes", authMiddleware, async (req, res) => {
         await db.execute(
           sql`UPDATE stock_items SET opening_stock = GREATEST(0, opening_stock - ${item.quantity}) WHERE id = ${item.stockItemId}`
         );
+        await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
       }
     }
   }
@@ -395,6 +400,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
       await db.execute(
         sql`UPDATE stock_items SET opening_stock = opening_stock + ${item.quantity} WHERE id = ${item.stockItemId}`
       );
+      await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
     }
   }
 
@@ -431,6 +437,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
         await db.execute(
           sql`UPDATE stock_items SET opening_stock = GREATEST(0, opening_stock - ${item.quantity}) WHERE id = ${item.stockItemId}`
         );
+        await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
       }
     }
   }

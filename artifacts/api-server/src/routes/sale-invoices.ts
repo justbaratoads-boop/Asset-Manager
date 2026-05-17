@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockItemsTable, stockTransactionsTable
 } from "@workspace/db/schema";
+import { adjustBatchStockForItem } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
 import { eq, and, like, gte, lte, sql, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -133,6 +134,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
             balanceAfter: String(newStock),
             reference: invoiceNumber,
           });
+          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
         }
       }
     }
@@ -227,6 +229,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
           await db.update(stockItemsTable)
             .set({ physicalStock: String(restored) })
             .where(eq(stockItemsTable.id, oldItem.stockItemId));
+          await adjustBatchStockForItem(oldItem.stockItemId, Number(oldItem.quantity), 0);
         }
       }
     }
@@ -267,6 +270,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
             balanceAfter: String(newStock),
             reference: invoice.invoiceNumber,
           });
+          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
         }
       }
     }

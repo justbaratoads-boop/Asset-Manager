@@ -7,6 +7,9 @@ export const stockBatchesTable = pgTable("stock_batches", {
   name: text("name").notNull(),
   description: text("description"),
   expiryDate: text("expiry_date"),
+  openingStock: numeric("opening_stock", { precision: 15, scale: 2 }).notNull().default("0"),
+  physicalStock: numeric("physical_stock", { precision: 15, scale: 2 }).notNull().default("0"),
+  reservedStock: numeric("reserved_stock", { precision: 15, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCreateOrder, useGetOrder, useListParties, useListStockItems, useCreateStockItem, getListOrdersQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
+import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
-import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Lock, AlertTriangle } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -127,6 +128,7 @@ export default function OrderForm() {
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
   const stockAvail = useStockAvailability();
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetOrder(editId!, { query: { enabled: isEdit } });
 
   const [partyId, setPartyId] = useState<number | undefined>();
@@ -302,6 +304,19 @@ export default function OrderForm() {
                     {` ${item.unit}`}
                   </p>
                 )}
+                {item.stockItemId && (() => {
+                  const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                  if (!b) return null;
+                  const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                  const warn = item.quantity > 0 && item.quantity > avail;
+                  return (
+                    <p className={`text-xs px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
+                      <span className="font-medium">Batch: {b.name}</span>
+                      <span className="text-muted-foreground">· avail: {avail}</span>
+                      {warn && <AlertTriangle className="h-3 w-3" />}
+                    </p>
+                  );
+                })()}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
@@ -393,6 +408,19 @@ export default function OrderForm() {
                           {` ${item.unit}`}
                         </p>
                       )}
+                      {item.stockItemId && (() => {
+                        const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                        if (!b) return null;
+                        const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                        const warn = item.quantity > 0 && item.quantity > avail;
+                        return (
+                          <p className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
+                            <span className="font-medium">Batch: {b.name}</span>
+                            <span className="text-muted-foreground">· avail: {avail}</span>
+                            {warn && <AlertTriangle className="h-3 w-3" />}
+                          </p>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                     <TableCell>{item.stockItemId ? (

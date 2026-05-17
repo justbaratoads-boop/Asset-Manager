@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
+import { useFetch } from "@/hooks/use-fetch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,8 @@ const ALL_COLUMNS = [
   { header: "Physical Stock", key: "physicalStock", format: (v: any) => String(Number(v)) },
   { header: "Reserved (Orders)", key: "reservedQty", format: (v: any) => String(Number(v)) },
   { header: "Available Stock", key: "availableStock", format: (v: any) => String(Number(v)) },
+  { header: "Batch", key: "batchName" },
+  { header: "Batch Avail", key: "batchAvail", format: (v: any) => String(Number(v)) },
   { header: "Status", key: "status" },
 ];
 
@@ -45,6 +48,8 @@ export default function StockAvailabilityReport() {
     queryKey: ["stock-availability"],
     queryFn: () => customFetch<any[]>("/api/stock-availability"),
   });
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
+  const batchByItemId = new Map<number, any>((batches as any[]).flatMap((b: any) => (b.items || []).map((i: any) => [i.id, b])));
 
   const list = items as any[];
   const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -53,7 +58,16 @@ export default function StockAvailabilityReport() {
   const totalReserved = list.reduce((s: number, i: any) => s + i.reservedQty, 0);
   const totalAvailable = list.reduce((s: number, i: any) => s + i.availableStock, 0);
 
-  const exportData = list.map((item, idx) => ({ ...item, idx: idx + 1, status: getStatus(item) }));
+  const exportData = list.map((item, idx) => {
+    const batch = batchByItemId.get(item.id);
+    return {
+      ...item,
+      idx: idx + 1,
+      status: getStatus(item),
+      batchName: batch?.name || "",
+      batchAvail: batch ? Number(batch.physicalStock) - Number(batch.reservedStock) : "",
+    };
+  });
 
   return (
     <div className="space-y-4">
@@ -83,6 +97,8 @@ export default function StockAvailabilityReport() {
                 {vis.has("physicalStock") && <TableHead className="text-right">Physical Stock</TableHead>}
                 {vis.has("reservedQty") && <TableHead className="text-right">Reserved (Orders)</TableHead>}
                 {vis.has("availableStock") && <TableHead className="text-right">Available Stock</TableHead>}
+                {vis.has("batchName") && <TableHead>Batch</TableHead>}
+                {vis.has("batchAvail") && <TableHead className="text-right">Batch Avail</TableHead>}
                 {vis.has("status") && <TableHead>Status</TableHead>}
               </TableRow>
             </TableHeader>
@@ -109,6 +125,24 @@ export default function StockAvailabilityReport() {
                       </span>
                     </TableCell>
                   )}
+                  {vis.has("batchName") && (() => {
+                    const batch = batchByItemId.get(item.id);
+                    return (
+                      <TableCell className="text-xs">
+                        {batch ? <span className="font-medium">{batch.name}</span> : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    );
+                  })()}
+                  {vis.has("batchAvail") && (() => {
+                    const batch = batchByItemId.get(item.id);
+                    if (!batch) return <TableCell className="text-right text-muted-foreground">—</TableCell>;
+                    const avail = Number(batch.physicalStock) - Number(batch.reservedStock);
+                    return (
+                      <TableCell className="text-right font-medium">
+                        <span className={cn(avail <= 0 ? "text-amber-600" : "text-green-700")}>{avail.toLocaleString()}</span>
+                      </TableCell>
+                    );
+                  })()}
                   {vis.has("status") && <TableCell>{availBadge(item.availableStock, item.minStockLevel)}</TableCell>}
                 </TableRow>
               ))}

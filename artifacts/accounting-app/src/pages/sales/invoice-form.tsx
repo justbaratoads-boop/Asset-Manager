@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, useCreateStockItem, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
+import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
-import { Plus, Trash2, ArrowLeft, Printer, Send, Save, Lock } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Printer, Send, Save, Lock, AlertTriangle } from "lucide-react";
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
@@ -165,6 +166,7 @@ export default function SaleInvoiceForm() {
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
   const stockAvail = useStockAvailability();
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetSaleInvoice(editId!, { query: { enabled: isEdit } });
 
   const fromOrderId = new URLSearchParams(window.location.search).get("fromOrder");
@@ -474,6 +476,19 @@ export default function SaleInvoiceForm() {
                       {` ${item.unit}`}
                     </p>
                   )}
+                  {item.stockItemId && (() => {
+                    const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                    if (!b) return null;
+                    const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                    const warn = item.quantity > 0 && item.quantity > avail;
+                    return (
+                      <p className={`text-xs px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
+                        <span className="font-medium">Batch: {b.name}</span>
+                        <span className="text-muted-foreground">· avail: {avail}</span>
+                        {warn && <AlertTriangle className="h-3 w-3" />}
+                      </p>
+                    );
+                  })()}
                   <Input
                     className="h-8 text-sm"
                     placeholder="Description (optional)"
@@ -612,6 +627,19 @@ export default function SaleInvoiceForm() {
                             {` ${item.unit}`}
                           </p>
                         )}
+                        {item.stockItemId && (() => {
+                          const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                          if (!b) return null;
+                          const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                          const warn = item.quantity > 0 && item.quantity > avail;
+                          return (
+                            <p className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
+                              <span className="font-medium">Batch: {b.name}</span>
+                              <span className="text-muted-foreground">· avail: {avail}</span>
+                              {warn && <AlertTriangle className="h-3 w-3" />}
+                            </p>
+                          );
+                        })()}
                         <Input
                           className="h-7 text-xs mt-1"
                           placeholder="Description (optional)"

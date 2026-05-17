@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCreateCreditNote, useGetCreditNote, useListParties, useListStockItems, getListCreditNotesQueryKey, customFetch } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
+import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
-import { Plus, Trash2, ArrowLeft, Printer, Lock } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Printer, Lock, AlertTriangle } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
@@ -67,6 +68,7 @@ export default function CreditNoteForm() {
   const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
   const stockAvail = useStockAvailability();
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetCreditNote(editId!, { query: { enabled: isEdit } });
 
   const [partyId, setPartyId] = useState<number | undefined>();
@@ -255,6 +257,17 @@ export default function CreditNoteForm() {
                       {` ${item.unit}`}
                     </p>
                   )}
+                  {item.stockItemId && (() => {
+                    const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                    if (!b) return null;
+                    const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                    return (
+                      <p className="text-xs px-1 text-sky-600 flex items-center gap-1">
+                        <span className="font-medium">Batch: {b.name}</span>
+                        <span className="text-muted-foreground">· avail: {avail}</span>
+                      </p>
+                    );
+                  })()}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Qty</Label>
@@ -321,6 +334,17 @@ export default function CreditNoteForm() {
                             {` ${item.unit}`}
                           </p>
                         )}
+                        {item.stockItemId && (() => {
+                          const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                          if (!b) return null;
+                          const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                          return (
+                            <p className="text-xs mt-0.5 px-1 text-sky-600 flex items-center gap-1">
+                              <span className="font-medium">Batch: {b.name}</span>
+                              <span className="text-muted-foreground">· avail: {avail}</span>
+                            </p>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                       <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" /></TableCell>

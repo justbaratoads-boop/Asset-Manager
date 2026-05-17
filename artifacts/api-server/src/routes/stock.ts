@@ -43,13 +43,17 @@ router.get("/stock-batches", authMiddleware, async (_req, res) => {
 
   const result = batches.map(b => ({
     ...b,
+    openingStock: Number(b.openingStock),
+    physicalStock: Number(b.physicalStock),
+    reservedStock: Number(b.reservedStock),
+    availableStock: Number(b.physicalStock) - Number(b.reservedStock),
     items: items.filter(i => i.batchId === b.id).map(i => ({ id: i.id, name: i.name })),
   }));
   res.json(result);
 });
 
 router.post("/stock-batches", authMiddleware, async (req, res) => {
-  const { name, description, expiryDate, itemIds } = req.body;
+  const { name, description, expiryDate, itemIds, openingStock } = req.body;
   const [existing] = await db.select({ id: stockBatchesTable.id })
     .from(stockBatchesTable)
     .where(ilike(stockBatchesTable.name, name.trim()))
@@ -67,7 +71,8 @@ router.post("/stock-batches", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "This item is already assigned to another batch" });
     }
   }
-  const [batch] = await db.insert(stockBatchesTable).values({ name, description, expiryDate }).returning();
+  const opening = String(Number(openingStock) || 0);
+  const [batch] = await db.insert(stockBatchesTable).values({ name, description, expiryDate, openingStock: opening, physicalStock: opening }).returning();
   if (itemIdList.length > 0) {
     await db.update(stockItemsTable).set({ batchId: batch.id }).where(eq(stockItemsTable.id, itemIdList[0]));
   }
@@ -76,7 +81,7 @@ router.post("/stock-batches", authMiddleware, async (req, res) => {
 
 router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
-  const { name, description, expiryDate, itemIds } = req.body;
+  const { name, description, expiryDate, itemIds, openingStock } = req.body;
   if (await isBatchUsedInBills(id)) {
     return res.status(400).json({ error: "Cannot edit: one or more items in this batch are used in bills" });
   }
@@ -90,8 +95,18 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "This item is already assigned to another batch" });
     }
   }
-  const [batch] = await db.update(stockBatchesTable).set({ name, description, expiryDate })
-    .where(eq(stockBatchesTable.id, id)).returning();
+  // Adjust physical stock by the opening stock delta if opening changed
+  const [existing] = await db.select({ openingStock: stockBatchesTable.openingStock, physicalStock: stockBatchesTable.physicalStock })
+    .from(stockBatchesTable).where(eq(stockBatchesTable.id, id)).limit(1);
+  const newOpening = openingStock !== undefined ? Number(openingStock) : Number(existing?.openingStock || 0);
+  const delta = newOpening - Number(existing?.openingStock || 0);
+  const newPhysical = Math.max(0, Number(existing?.physicalStock || 0) + delta);
+
+  const [batch] = await db.update(stockBatchesTable).set({
+    name, description, expiryDate,
+    openingStock: String(newOpening),
+    physicalStock: String(newPhysical),
+  }).where(eq(stockBatchesTable.id, id)).returning();
   if (!batch) return res.status(404).json({ error: "Not found" });
   await db.update(stockItemsTable).set({ batchId: null }).where(eq(stockItemsTable.batchId, id));
   if (itemIdList.length > 0) {

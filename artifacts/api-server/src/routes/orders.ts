@@ -7,6 +7,7 @@ import {
 import { eq, and, like, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeVoucherNumber } from "../lib/counter";
+import { adjustBatchStockForItem } from "../lib/batch-stock";
 
 const router = Router();
 
@@ -67,6 +68,9 @@ router.post("/orders", authMiddleware, async (req, res) => {
         total: String(item.total),
         description: item.description || null,
       });
+      if (item.stockItemId) {
+        await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity));
+      }
     }
   }
 
@@ -152,6 +156,12 @@ router.post("/orders/:id/cancel", authMiddleware, async (req, res) => {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Not found" });
   if (order.status === "cancelled") return res.status(400).json({ error: "Already cancelled" });
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  for (const item of items) {
+    if (item.stockItemId) {
+      await adjustBatchStockForItem(item.stockItemId, 0, -Number(item.quantity));
+    }
+  }
   await db.update(ordersTable).set({ status: "cancelled" }).where(eq(ordersTable.id, Number(req.params.id)));
   res.json({ ok: true, status: "cancelled" });
 });
@@ -160,6 +170,12 @@ router.post("/orders/:id/uncancel", authMiddleware, async (req, res) => {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Not found" });
   if (order.status !== "cancelled") return res.status(400).json({ error: "Order is not cancelled" });
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  for (const item of items) {
+    if (item.stockItemId) {
+      await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity));
+    }
+  }
   await db.update(ordersTable).set({ status: "pending" }).where(eq(ordersTable.id, Number(req.params.id)));
   res.json({ ok: true, status: "pending" });
 });
