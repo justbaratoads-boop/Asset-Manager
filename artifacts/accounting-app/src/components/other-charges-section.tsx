@@ -93,9 +93,9 @@ interface Props {
 export function OtherChargesSection({ charges, onChange, ledgers }: Props) {
   const add = () => onChange([...charges, { ledgerId: 0, ledgerName: "", amount: 0 }]);
   const remove = (i: number) => onChange(charges.filter((_, j) => j !== i));
-  const update = (i: number, field: keyof OtherCharge, value: any) => {
+  const update = (i: number, partial: Partial<OtherCharge>) => {
     const updated = [...charges];
-    updated[i] = { ...updated[i], [field]: value };
+    updated[i] = { ...updated[i], ...partial };
     onChange(updated);
   };
   const total = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
@@ -119,10 +119,7 @@ export function OtherChargesSection({ charges, onChange, ledgers }: Props) {
         <div key={i} className="flex gap-2 items-center">
           <LedgerSelect
             value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
-            onChange={(ledgerId, ledgerName) => {
-              update(i, "ledgerId", ledgerId);
-              update(i, "ledgerName", ledgerName);
-            }}
+            onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
             ledgers={ledgers}
           />
           <div className="relative w-32 shrink-0">
@@ -133,7 +130,7 @@ export function OtherChargesSection({ charges, onChange, ledgers }: Props) {
               min="0"
               step="any"
               value={charge.amount || ""}
-              onChange={e => update(i, "amount", Number(e.target.value) || 0)}
+              onChange={e => update(i, { amount: Number(e.target.value) || 0 })}
               placeholder="0.00"
               className="pl-7 h-9 text-sm"
             />
