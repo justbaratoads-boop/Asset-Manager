@@ -31,8 +31,6 @@ function loadPrintSettings() {
 
 const BASE_PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
-  { value: "upi", label: "UPI" },
-  { value: "cheque", label: "Cheque" },
 ];
 
 function statusBadge(status: string) {
@@ -458,11 +456,15 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
       {invoice.payments?.length > 0 && (
         <div className="mt-4 pt-4 border-t">
           <p className="text-sm font-semibold mb-2">Payment Details</p>
-          {invoice.payments.map((p: any, i: number) => (
-            <p key={i} className="text-sm text-gray-500 capitalize">
-              {p.mode?.replace("_", " ")}: {formatCurrency(p.amount)}{p.reference ? ` (Ref: ${p.reference})` : ""}
-            </p>
-          ))}
+          {invoice.payments.map((p: any, i: number) => {
+            const modeLabel = allPaymentModes.find(m => m.value === p.mode)?.label
+              ?? (p.mode === "receipt_voucher" ? "Receipt Voucher" : p.mode?.replace(/_/g, " ") ?? "");
+            return (
+              <p key={i} className="text-sm text-gray-500 capitalize">
+                {modeLabel}: {formatCurrency(p.amount)}{p.reference ? ` (Ref: ${p.reference})` : ""}
+              </p>
+            );
+          })}
         </div>
       )}
 

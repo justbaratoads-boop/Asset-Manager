@@ -103,8 +103,6 @@ function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
 
 const BASE_PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
-  { value: "upi", label: "UPI" },
-  { value: "cheque", label: "Cheque" },
 ];
 
 export default function SaleInvoiceForm() {
