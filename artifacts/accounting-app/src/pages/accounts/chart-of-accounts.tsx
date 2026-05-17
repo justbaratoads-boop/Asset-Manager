@@ -87,7 +87,7 @@ export default function ChartOfAccounts() {
   // Account (ledger) dialog
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<any>(null);
-  const [accountForm, setAccountForm] = useState(BLANK_ACCOUNT);
+  const [accountForm, setAccountForm] = useState({ name: "", group: "", nature: "dr", openingBalance: "" });
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [deleteAccountId, setDeleteAccountId] = useState<number | null>(null);
 
