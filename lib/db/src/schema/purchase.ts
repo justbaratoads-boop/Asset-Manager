@@ -89,6 +89,7 @@ export const purchaseOrderItemsTable = pgTable("purchase_order_items", {
   igst: numeric("igst", { precision: 15, scale: 2 }).notNull().default("0"),
   batchId: integer("batch_id"),
   total: numeric("total", { precision: 15, scale: 2 }).notNull(),
+  receivedQty: numeric("received_qty", { precision: 15, scale: 3 }).notNull().default("0"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

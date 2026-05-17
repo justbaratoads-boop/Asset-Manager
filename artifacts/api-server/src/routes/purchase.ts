@@ -458,19 +458,43 @@ router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => 
 
   const receivedMap = new Map((receivedItems || []).map((r: any) => [Number(r.itemId), Number(r.receivedQty) || 0]));
 
-  let anyReceived = false;
-  let allReceived = true;
+  // Validate: new receipt qty must not exceed remaining qty (ordered - already received)
   for (const item of orderItems) {
-    const rqty = receivedMap.get(item.id) || 0;
-    if (rqty > 0) anyReceived = true;
-    if (rqty < Number(item.quantity)) allReceived = false;
+    const alreadyReceived = Number(item.receivedQty) || 0;
+    const remaining = Number(item.quantity) - alreadyReceived;
+    const nowReceiving = receivedMap.get(item.id) || 0;
+    if (nowReceiving > remaining) {
+      return res.status(400).json({ error: `"${item.itemName}": cannot receive ${nowReceiving} — only ${remaining} remaining` });
+    }
   }
+
+  let anyReceived = false;
+  let allFullyReceived = true;
+  const updatedReceivedQtys: Map<number, number> = new Map();
+
+  for (const item of orderItems) {
+    const alreadyReceived = Number(item.receivedQty) || 0;
+    const nowReceiving = receivedMap.get(item.id) || 0;
+    const newTotal = alreadyReceived + nowReceiving;
+    if (nowReceiving > 0) anyReceived = true;
+    if (newTotal < Number(item.quantity)) allFullyReceived = false;
+    updatedReceivedQtys.set(item.id, newTotal);
+  }
+
   if (!anyReceived) return res.status(400).json({ error: "At least one item must have a received quantity > 0" });
 
-  const newStatus = allReceived ? "received" : "partially_received";
-  await db.update(purchaseOrdersTable).set({ status: newStatus }).where(eq(purchaseOrdersTable.id, order.id));
+  const newStatus = allFullyReceived ? "received" : "partially_received";
 
-  // Auto-create purchase invoice for received items only
+  // Update order status and each item's cumulative receivedQty
+  await db.update(purchaseOrdersTable).set({ status: newStatus }).where(eq(purchaseOrdersTable.id, order.id));
+  for (const item of orderItems) {
+    const newTotal = updatedReceivedQtys.get(item.id) ?? Number(item.receivedQty);
+    await db.update(purchaseOrderItemsTable)
+      .set({ receivedQty: String(newTotal) })
+      .where(eq(purchaseOrderItemsTable.id, item.id));
+  }
+
+  // Auto-create purchase invoice for this batch of received items only
   const invoiceNumber = await makeInvoiceNumber("PUR");
   let grandTotal = 0, totalTaxable = 0, totalCgst = 0, totalSgst = 0, totalIgst = 0;
 
@@ -535,7 +559,6 @@ router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => 
 
   for (const item of invoiceItemsToInsert) {
     await db.insert(purchaseInvoiceItemsTable).values({ invoiceId: invoice.id, ...item });
-    // Stock was already updated when the purchase order was created
   }
 
   res.json({ ok: true, status: newStatus, invoiceId: invoice.id, invoiceNumber });

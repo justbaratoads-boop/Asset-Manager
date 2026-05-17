@@ -169,9 +169,15 @@ function ReceiveGoodsDialog({ id, onClose, onDone }: { id: number | null; onClos
 
   const items: any[] = order?.items || [];
 
+  // remaining = ordered - already received (from previous partial receipts)
+  const getRemaining = (item: any) => Math.max(0, Number(item.quantity) - (Number(item.receivedQty) || 0));
+
   const handleSelectAll = () => {
     const all: Record<number, string> = {};
-    items.forEach((item: any) => { all[item.id] = String(Number(item.quantity)); });
+    items.forEach((item: any) => {
+      const rem = getRemaining(item);
+      if (rem > 0) all[item.id] = String(rem);
+    });
     setReceivedQtys(all);
   };
 
@@ -192,11 +198,12 @@ function ReceiveGoodsDialog({ id, onClose, onDone }: { id: number | null; onClos
       toast({ title: "Enter received quantity for at least one item", variant: "destructive" });
       return;
     }
-    // Validate received qty ≤ ordered qty
+    // Validate: new receipt must not exceed remaining qty
     for (const item of items) {
       const rqty = Number(receivedQtys[item.id]) || 0;
-      if (rqty > Number(item.quantity)) {
-        toast({ title: `"${item.itemName}": received qty cannot exceed ordered qty (${Number(item.quantity)} ${item.unit})`, variant: "destructive" });
+      const remaining = getRemaining(item);
+      if (rqty > remaining) {
+        toast({ title: `"${item.itemName}": only ${remaining} ${item.unit} remaining`, variant: "destructive" });
         return;
       }
     }
@@ -256,17 +263,21 @@ function ReceiveGoodsDialog({ id, onClose, onDone }: { id: number | null; onClos
                   <tr className="bg-muted/40 border-b">
                     <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Item</th>
                     <th className="text-center px-2 py-2 text-xs font-semibold text-muted-foreground">Ordered</th>
-                    <th className="text-center px-2 py-2 text-xs font-semibold text-muted-foreground w-28">Received</th>
+                    <th className="text-center px-2 py-2 text-xs font-semibold text-muted-foreground">Remaining</th>
+                    <th className="text-center px-2 py-2 text-xs font-semibold text-muted-foreground w-28">Receive Now</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {items.map((item: any) => {
                     const orderedQty = Number(item.quantity);
+                    const alreadyReceived = Number(item.receivedQty) || 0;
+                    const remaining = Math.max(0, orderedQty - alreadyReceived);
                     const rqty = Number(receivedQtys[item.id]) || 0;
-                    const isOver = rqty > orderedQty;
-                    const isFull = rqty === orderedQty && rqty > 0;
+                    const isOver = rqty > remaining;
+                    const isFull = rqty === remaining && rqty > 0;
+                    const isFullyDone = remaining === 0;
                     return (
-                      <tr key={item.id} className={isFull ? "bg-green-50" : ""}>
+                      <tr key={item.id} className={isFullyDone ? "bg-muted/30 opacity-60" : isFull ? "bg-green-50" : ""}>
                         <td className="px-3 py-2.5">
                           <p className="font-medium">{item.itemName}</p>
                           <p className="text-xs text-muted-foreground">{formatCurrency(Number(item.rate))} / {item.unit}</p>
@@ -274,19 +285,34 @@ function ReceiveGoodsDialog({ id, onClose, onDone }: { id: number | null; onClos
                         <td className="px-2 py-2.5 text-center text-muted-foreground text-sm">
                           {orderedQty} {item.unit}
                         </td>
+                        <td className="px-2 py-2.5 text-center text-sm">
+                          {isFullyDone ? (
+                            <span className="text-green-600 font-medium text-xs">Done</span>
+                          ) : (
+                            <span className={remaining < orderedQty ? "text-amber-600 font-semibold" : "text-foreground"}>
+                              {remaining} {item.unit}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-2 py-2.5">
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            max={orderedQty}
-                            step="any"
-                            value={receivedQtys[item.id] ?? ""}
-                            onChange={e => setReceivedQtys(prev => ({ ...prev, [item.id]: e.target.value }))}
-                            className={`h-8 text-center text-sm ${isOver ? "border-destructive" : isFull ? "border-green-400 bg-green-50" : ""}`}
-                            placeholder="0"
-                          />
-                          {isOver && <p className="text-xs text-destructive mt-0.5 text-center">Max {orderedQty}</p>}
+                          {isFullyDone ? (
+                            <div className="h-8 flex items-center justify-center text-xs text-muted-foreground">—</div>
+                          ) : (
+                            <>
+                              <Input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                max={remaining}
+                                step="any"
+                                value={receivedQtys[item.id] ?? ""}
+                                onChange={e => setReceivedQtys(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                className={`h-8 text-center text-sm ${isOver ? "border-destructive" : isFull ? "border-green-400 bg-green-50" : ""}`}
+                                placeholder="0"
+                              />
+                              {isOver && <p className="text-xs text-destructive mt-0.5 text-center">Max {remaining}</p>}
+                            </>
+                          )}
                         </td>
                       </tr>
                     );
