@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,6 +75,16 @@ export default function ChartOfAccounts() {
 
   const [search, setSearch] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+
+  // Auto-expand any group that has at least one ledger
+  useEffect(() => {
+    if (!(groups as any[]).length || !(ledgers as any[]).length) return;
+    const ledgerGroupNames = new Set((ledgers as any[]).map((l: any) => l.group));
+    const toExpand = (groups as any[])
+      .filter((g: any) => ledgerGroupNames.has(g.name))
+      .map((g: any) => g.id);
+    if (toExpand.length) setExpandedGroups(prev => new Set([...prev, ...toExpand]));
+  }, [groups, ledgers]);
 
   // Group dialog
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);

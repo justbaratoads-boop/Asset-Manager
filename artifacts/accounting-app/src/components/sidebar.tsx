@@ -36,7 +36,7 @@ const navigation: NavItem[] = [
       { name: "Journal Entries", href: "/accounts/journal", perm: "accounts_journal" },
       { name: "Payments", href: "/accounts/payments", perm: "accounts_payments" },
       { name: "Receipts", href: "/accounts/receipts", perm: "accounts_receipts" },
-      { name: "Ledger", href: "/accounts/parties", perm: "accounts_parties" },
+      { name: "Ledger Accounts", href: "/accounts/ledgers", perm: "accounts_parties" },
       { name: "Credit Notes", href: "/accounts/credit-notes", perm: "accounts_credit_notes" },
       { name: "Debit Notes", href: "/accounts/debit-notes", perm: "accounts_debit_notes" },
     ],
