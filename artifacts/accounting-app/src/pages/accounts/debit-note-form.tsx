@@ -125,7 +125,7 @@ export default function DebitNoteForm() {
     grand: items.reduce((s, i) => s + i.total, 0),
   };
 
-  const chargesTotal = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
 
   const updateItem = (index: number, field: keyof NoteItem, value: any) => {
@@ -388,7 +388,7 @@ export default function DebitNoteForm() {
             <div className="flex justify-between"><span className="text-muted-foreground">Taxable</span><span>{formatCurrency(totals.taxable)}</span></div>
             {totals.cgst > 0 && <><div className="flex justify-between"><span className="text-muted-foreground">CGST</span><span>{formatCurrency(totals.cgst)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>{formatCurrency(totals.sgst)}</span></div></>}
             {totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>{formatCurrency(totals.igst)}</span></div>}
-            {chargesTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Other Charges</span><span>+ {formatCurrency(chargesTotal)}</span></div>}
+            {chargesTotal !== 0 && <div className="flex justify-between"><span className="text-muted-foreground">Other Charges</span><span className={chargesTotal < 0 ? "text-red-600" : ""}>{chargesTotal < 0 ? "− " : "+ "}{formatCurrency(Math.abs(chargesTotal))}</span></div>}
             <div className="flex justify-between font-bold text-base border-t pt-2"><span>Debit Amount</span><span className="text-red-600">{formatCurrency(grandTotal)}</span></div>
             <p className="text-xs text-muted-foreground pt-1">Items will be removed from inventory on save.</p>
           </CardContent>

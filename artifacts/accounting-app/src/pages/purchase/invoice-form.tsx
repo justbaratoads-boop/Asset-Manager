@@ -131,7 +131,7 @@ export default function PurchaseInvoiceForm() {
     grand: items.reduce((s, i) => s + i.total, 0),
   };
 
-  const chargesTotal = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
 
   const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
@@ -460,7 +460,7 @@ export default function PurchaseInvoiceForm() {
                 <div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>{formatCurrency(totals.sgst)}</span></div>
               </>}
               {isInterstate && totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>{formatCurrency(totals.igst)}</span></div>}
-              {chargesTotal > 0 && <div className="flex justify-between text-muted-foreground"><span>Additional Fields</span><span>+ {formatCurrency(chargesTotal)}</span></div>}
+              {chargesTotal !== 0 && <div className="flex justify-between text-muted-foreground"><span>Additional Fields</span><span className={chargesTotal < 0 ? "text-red-600" : ""}>{chargesTotal < 0 ? "− " : "+ "}{formatCurrency(Math.abs(chargesTotal))}</span></div>}
               <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
             </CardContent>
           </Card>

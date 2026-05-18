@@ -8,6 +8,7 @@ export interface OtherCharge {
   ledgerId: number;
   ledgerName: string;
   amount: number;
+  type?: "add" | "deduct";
 }
 
 export interface ChargeLedger { id: number; name: string; group: string; }
@@ -87,18 +88,26 @@ function LedgerSelect({ value, onChange, ledgers }: {
 interface Props {
   charges: OtherCharge[];
   onChange: (charges: OtherCharge[]) => void;
-  ledgers: ChargeLedger[];
+  ledgers?: ChargeLedger[];
 }
 
-export function OtherChargesSection({ charges, onChange, ledgers }: Props) {
-  const add = () => onChange([...charges, { ledgerId: 0, ledgerName: "", amount: 0 }]);
+export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) {
+  const add = () => onChange([...charges, { ledgerId: 0, ledgerName: "", amount: 0, type: "add" }]);
   const remove = (i: number) => onChange(charges.filter((_, j) => j !== i));
   const update = (i: number, partial: Partial<OtherCharge>) => {
     const updated = [...charges];
     updated[i] = { ...updated[i], ...partial };
     onChange(updated);
   };
-  const total = charges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const toggleType = (i: number) => {
+    const current = charges[i].type ?? "add";
+    update(i, { type: current === "add" ? "deduct" : "add" });
+  };
+
+  const netTotal = charges.reduce((s, c) => {
+    const amt = Number(c.amount) || 0;
+    return s + ((c.type ?? "add") === "deduct" ? -amt : amt);
+  }, 0);
 
   return (
     <div className="space-y-2">
@@ -111,46 +120,91 @@ export function OtherChargesSection({ charges, onChange, ledgers }: Props) {
 
       {charges.length === 0 && (
         <p className="text-xs text-muted-foreground py-1">
-          No additional fields. Click "Add Field" to add freight charges, labour, etc.
+          No additional fields. Click "Add Field" to add freight charges, labour, discounts, etc.
         </p>
       )}
 
-      {charges.map((charge, i) => (
-        <div key={i} className="flex gap-2 items-center">
-          <LedgerSelect
-            value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
-            onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
-            ledgers={ledgers}
-          />
-          <div className="relative w-32 shrink-0">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">₹</span>
-            <Input
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="any"
-              value={charge.amount || ""}
-              onChange={e => update(i, { amount: Number(e.target.value) || 0 })}
-              placeholder="0.00"
-              className="pl-7 h-9 text-sm"
-            />
-          </div>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9 text-destructive shrink-0"
-            onClick={() => remove(i)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ))}
+      {charges.map((charge, i) => {
+        const isDeduct = (charge.type ?? "add") === "deduct";
+        return (
+          <div key={i} className="flex gap-2 items-center">
+            {ledgers.length > 0 && (
+              <LedgerSelect
+                value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
+                onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
+                ledgers={ledgers}
+              />
+            )}
+            {ledgers.length === 0 && (
+              <Input
+                placeholder="Label (e.g. Freight)"
+                value={charge.ledgerName}
+                onChange={e => update(i, { ledgerName: e.target.value })}
+                className="flex-1 h-9 text-sm"
+              />
+            )}
 
-      {charges.length > 0 && total > 0 && (
-        <div className="flex justify-between text-sm font-medium pt-1 border-t border-border/50">
-          <span className="text-muted-foreground">Additional Fields Total</span>
-          <span>{formatCurrency(total)}</span>
+            <button
+              type="button"
+              onClick={() => toggleType(i)}
+              title={isDeduct ? "Currently deducting — click to switch to Add" : "Currently adding — click to switch to Deduct"}
+              className={`h-9 w-20 shrink-0 rounded border text-xs font-semibold transition-colors focus:outline-none focus:ring-1 focus:ring-ring
+                ${isDeduct
+                  ? "border-red-300 bg-red-50 text-red-600 hover:bg-red-100"
+                  : "border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
+                }`}
+            >
+              {isDeduct ? "− Deduct" : "+ Add"}
+            </button>
+
+            <div className="relative w-28 shrink-0">
+              <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm pointer-events-none font-medium
+                ${isDeduct ? "text-red-500" : "text-muted-foreground"}`}>₹</span>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="any"
+                value={charge.amount || ""}
+                onChange={e => update(i, { amount: Number(e.target.value) || 0 })}
+                placeholder="0.00"
+                className={`pl-7 h-9 text-sm ${isDeduct ? "text-red-600" : ""}`}
+              />
+            </div>
+
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 text-destructive shrink-0"
+              onClick={() => remove(i)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      })}
+
+      {charges.length > 0 && (
+        <div className="space-y-0.5 pt-1 border-t border-border/50">
+          {charges.map((c, i) => {
+            const isDeduct = (c.type ?? "add") === "deduct";
+            const amt = Number(c.amount) || 0;
+            if (amt === 0) return null;
+            const label = c.ledgerName || `Field ${i + 1}`;
+            return (
+              <div key={i} className="flex justify-between text-xs text-muted-foreground">
+                <span>{label}</span>
+                <span className={isDeduct ? "text-red-600" : "text-green-700"}>
+                  {isDeduct ? "− " : "+ "}{formatCurrency(amt)}
+                </span>
+              </div>
+            );
+          })}
+          <div className={`flex justify-between text-sm font-medium pt-1 border-t border-border/30 ${netTotal < 0 ? "text-red-600" : ""}`}>
+            <span className="text-muted-foreground">Net Additional</span>
+            <span>{netTotal < 0 ? "− " : netTotal > 0 ? "+ " : ""}{formatCurrency(Math.abs(netTotal))}</span>
+          </div>
         </div>
       )}
     </div>
