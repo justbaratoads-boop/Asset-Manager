@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useLocation, useParams } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { useCreatePayment, useGetPayment, useListParties, useListLedgers, getListPaymentsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -144,7 +144,7 @@ export default function PaymentForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
       <div className="flex items-center gap-3">
-        <Link href="/accounts/payments"><Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
+        <Button type="button" variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
         <h1 className="text-xl font-bold">{isEdit ? "Edit Payment Voucher" : "New Payment Voucher"}</h1>
       </div>
       <Card>

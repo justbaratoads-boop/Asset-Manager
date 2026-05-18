@@ -34,9 +34,7 @@ export default function DebitNoteView() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-4 print:hidden">
-        <Link href="/accounts/debit-notes">
-          <Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
-        </Link>
+        <Button type="button" variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
         <Button onClick={() => window.print()} className="gap-2"><Printer className="h-4 w-4" />Print</Button>
         <Link href={`/accounts/debit-notes/${id}/edit`}>
           <Button variant="outline" size="sm">Edit</Button>

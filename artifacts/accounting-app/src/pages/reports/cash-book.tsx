@@ -67,7 +67,11 @@ export default function CashBook() {
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No cash entries for selected period</TableCell></TableRow>
                   : entries.map((e: any, i: number) => {
                     const destPath = e.id
-                      ? (e.type === "payment" ? `/accounts/payments/${e.id}/edit` : `/accounts/receipts/${e.id}/edit`)
+                      ? e.type === "payment" ? `/accounts/payments/${e.id}/edit`
+                      : e.type === "receipt" ? `/accounts/receipts/${e.id}/edit`
+                      : e.type === "sale-invoice" ? `/sales/invoices/${e.id}`
+                      : e.type === "purchase-invoice" ? `/purchase/invoices/${e.id}/edit`
+                      : null
                       : null;
                     return (
                       <TableRow

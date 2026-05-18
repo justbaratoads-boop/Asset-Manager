@@ -621,15 +621,50 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
   const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), eq(paymentsTable.paymentMode, "cash")];
   const rctCond: any[] = [eq(receiptsTable.isDeleted, "false"), eq(receiptsTable.paymentMode, "cash")];
-  if (from) { pmtCond.push(gte(paymentsTable.date, from as string)); rctCond.push(gte(receiptsTable.date, from as string)); }
-  if (to) { pmtCond.push(lte(paymentsTable.date, to as string)); rctCond.push(lte(receiptsTable.date, to as string)); }
+  const saleInvPmtCond: any[] = [eq(saleInvoicePaymentsTable.mode, "cash"), eq(saleInvoicesTable.isDeleted, "false")];
+  const purInvPmtCond: any[] = [eq(purchaseInvoicePaymentsTable.mode, "cash"), eq(purchaseInvoicesTable.isDeleted, "false")];
+  if (from) {
+    pmtCond.push(gte(paymentsTable.date, from as string));
+    rctCond.push(gte(receiptsTable.date, from as string));
+    saleInvPmtCond.push(gte(saleInvoicesTable.date, from as string));
+    purInvPmtCond.push(gte(purchaseInvoicesTable.date, from as string));
+  }
+  if (to) {
+    pmtCond.push(lte(paymentsTable.date, to as string));
+    rctCond.push(lte(receiptsTable.date, to as string));
+    saleInvPmtCond.push(lte(saleInvoicesTable.date, to as string));
+    purInvPmtCond.push(lte(purchaseInvoicesTable.date, to as string));
+  }
 
-  const pmts = await db.select().from(paymentsTable).where(and(...pmtCond));
-  const rcts = await db.select().from(receiptsTable).where(and(...rctCond));
+  const [pmts, rcts, saleInvPmts, purInvPmts] = await Promise.all([
+    db.select().from(paymentsTable).where(and(...pmtCond)),
+    db.select().from(receiptsTable).where(and(...rctCond)),
+    db.select({
+      id: saleInvoicesTable.id,
+      date: saleInvoicesTable.date,
+      ref: saleInvoicesTable.invoiceNumber,
+      party: saleInvoicesTable.partyName,
+      amount: saleInvoicePaymentsTable.amount,
+    }).from(saleInvoicePaymentsTable)
+      .innerJoin(saleInvoicesTable, eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id))
+      .where(and(...saleInvPmtCond)),
+    db.select({
+      id: purchaseInvoicesTable.id,
+      date: purchaseInvoicesTable.date,
+      ref: purchaseInvoicesTable.invoiceNumber,
+      party: purchaseInvoicesTable.partyName,
+      amount: purchaseInvoicePaymentsTable.amount,
+    }).from(purchaseInvoicePaymentsTable)
+      .innerJoin(purchaseInvoicesTable, eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id))
+      .where(and(...purInvPmtCond)),
+  ]);
 
   const out = pmts.map(p => ({ id: p.id, date: p.date, type: "payment" as const, ref: p.voucherNumber, party: p.partyName || "", description: p.narration || `Payment to ${p.partyName || ""}`, cashIn: 0, cashOut: Number(p.amount) }));
   const inc = rcts.map(r => ({ id: r.id, date: r.date, type: "receipt" as const, ref: r.voucherNumber, party: r.partyName || "", description: r.narration || `Receipt from ${r.partyName || ""}`, cashIn: Number(r.amount), cashOut: 0 }));
-  const sorted = [...out, ...inc].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+  const saleInvInc = saleInvPmts.map(p => ({ id: p.id, date: p.date, type: "sale-invoice" as const, ref: p.ref, party: p.party || "", description: `Cash collection — ${p.ref}`, cashIn: Number(p.amount), cashOut: 0 }));
+  const purInvOut = purInvPmts.map(p => ({ id: p.id, date: p.date, type: "purchase-invoice" as const, ref: p.ref, party: p.party || "", description: `Cash payment — ${p.ref}`, cashIn: 0, cashOut: Number(p.amount) }));
+
+  const sorted = [...out, ...inc, ...saleInvInc, ...purInvOut].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
 
   let balance = 0;
   const entries = sorted.map(e => {
@@ -637,7 +672,9 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
     return { ...e, balance };
   });
 
-  res.json({ entries, totalOut: out.reduce((s, r) => s + r.cashOut, 0), totalIn: inc.reduce((s, r) => s + r.cashIn, 0) });
+  const totalIn = inc.reduce((s, r) => s + r.cashIn, 0) + saleInvInc.reduce((s, r) => s + r.cashIn, 0);
+  const totalOut2 = out.reduce((s, r) => s + r.cashOut, 0) + purInvOut.reduce((s, r) => s + r.cashOut, 0);
+  res.json({ entries, totalOut: totalOut2, totalIn });
 });
 
 router.get("/reports/all-transactions", authMiddleware, async (req, res) => {

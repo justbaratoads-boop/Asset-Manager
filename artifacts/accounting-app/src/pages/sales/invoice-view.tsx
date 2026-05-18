@@ -751,9 +751,7 @@ export default function SaleInvoiceView() {
       {/* Action bar */}
       <div className="flex items-center justify-between gap-2 print:hidden">
         <div className="flex items-center gap-2">
-          <Link href="/sales/invoices">
-            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
-          </Link>
+          <Button variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${statusBadge(inv.status)}`}>
             {inv.status}
           </span>
