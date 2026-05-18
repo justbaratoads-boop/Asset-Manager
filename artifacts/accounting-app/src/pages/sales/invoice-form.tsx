@@ -373,7 +373,7 @@ export default function SaleInvoiceForm() {
             </div>
 
             {/* Party + Date */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {billType === "credit" ? (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
@@ -726,24 +726,26 @@ export default function SaleInvoiceForm() {
                 <p className="text-xs text-muted-foreground py-1 italic">No payment recorded — balance will be due.</p>
               )}
               {payRows.map((row, i) => (
-                <div key={i} className="flex gap-1.5 items-center">
+                <div key={i} className="flex flex-wrap gap-1.5 items-center">
                   <Select value={row.mode} onValueChange={v => updatePayRow(i, "mode", v)}>
-                    <SelectTrigger className="h-8 text-xs w-[120px] shrink-0"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs w-full sm:w-[120px] shrink-0"><SelectValue /></SelectTrigger>
                     <SelectContent>{allPaymentModes.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                   </Select>
-                  <div className="relative flex-1 min-w-[80px]">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
-                    <Input className="pl-5 h-8 text-sm" type="number" inputMode="decimal" min="0" step="any"
-                      value={row.amount}
-                      onChange={e => { updatePayRow(i, "amount", e.target.value); setErrors(p => { const n = { ...p }; delete n.payment; return n; }); }}
-                      placeholder="0.00" />
+                  <div className="flex gap-1.5 items-center flex-1 min-w-0">
+                    <div className="relative flex-1 min-w-[70px]">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
+                      <Input className="pl-5 h-8 text-sm" type="number" inputMode="decimal" min="0" step="any"
+                        value={row.amount}
+                        onChange={e => { updatePayRow(i, "amount", e.target.value); setErrors(p => { const n = { ...p }; delete n.payment; return n; }); }}
+                        placeholder="0.00" />
+                    </div>
+                    <Input className="h-8 text-xs flex-1 min-w-[60px]" placeholder="Ref / UTR" value={row.reference}
+                      onChange={e => updatePayRow(i, "reference", e.target.value)} />
+                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0"
+                      onClick={() => setPayRows(p => p.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <Input className="h-8 text-xs flex-1 min-w-[72px]" placeholder="Ref / UTR" value={row.reference}
-                    onChange={e => updatePayRow(i, "reference", e.target.value)} />
-                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0"
-                    onClick={() => setPayRows(p => p.filter((_, j) => j !== i))}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
                 </div>
               ))}
               {errors.payment && <p className="text-xs text-destructive">{errors.payment}</p>}

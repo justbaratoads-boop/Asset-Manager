@@ -210,7 +210,7 @@ export default function DebitNoteForm() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardContent className="p-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Supplier *</Label>
                 <PartySelect
@@ -226,7 +226,7 @@ export default function DebitNoteForm() {
                 <Label>Date</Label>
                 <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
               </div>
-              <div className="space-y-1 col-span-2">
+              <div className="space-y-1 sm:col-span-2">
                 <Label>Reason *</Label>
                 <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Goods returned to supplier, quality issue..." rows={2} className={errors.reason ? "border-destructive" : ""} />
                 {errors.reason && <p className="text-xs text-destructive">{errors.reason}</p>}

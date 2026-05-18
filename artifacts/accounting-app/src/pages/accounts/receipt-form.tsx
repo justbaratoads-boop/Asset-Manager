@@ -150,7 +150,7 @@ export default function ReceiptForm() {
         <h1 className="text-xl font-bold">{isEdit ? "Edit Receipt Voucher" : "New Receipt Voucher"}</h1>
       </div>
       <Card>
-        <CardContent className="p-4 grid grid-cols-2 gap-4">
+        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.date} onChange={e => set("date", e.target.value)} /></div>
           <div className="space-y-1">
             <Label>Amount *</Label>
@@ -167,14 +167,14 @@ export default function ReceiptForm() {
               </p>
             )}
           </div>
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Party (Sundry Debtor)</Label>
             <PartySelect value={partyId} onChange={handlePartyChange} parties={parties} placeholder="Select customer / party (optional)" />
           </div>
 
           {/* Bill-wise button */}
           {partyId && !isEdit && (
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Button type="button" variant="outline" size="sm" onClick={openBillWise} className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50">
                 <ListChecks className="h-4 w-4" />
                 Bill-wise Entry
@@ -200,14 +200,14 @@ export default function ReceiptForm() {
             </div>
           )}
 
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Receipt Ledger *</Label>
             <Select value={form.ledgerId} onValueChange={v => set("ledgerId", v)}>
               <SelectTrigger><SelectValue placeholder="Select cash / bank account" /></SelectTrigger>
               <SelectContent>{cashBankLedgers.map((l: any) => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 col-span-2"><Label>Narration</Label><Input value={form.narration} onChange={e => set("narration", e.target.value)} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Narration</Label><Input value={form.narration} onChange={e => set("narration", e.target.value)} /></div>
         </CardContent>
       </Card>
       <Button type="submit" disabled={createMutation.isPending || !form.ledgerId}>

@@ -102,8 +102,8 @@ export default function ItemForm() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Item Details</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-1 col-span-2">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Name *</Label>
             <Input required value={form.name} onChange={e => set("name", e.target.value)} disabled={usedInBills} />
           </div>
@@ -127,7 +127,7 @@ export default function ItemForm() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">GST Settings</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex items-center gap-3">
             <Switch checked={form.gstApplicable} onCheckedChange={v => set("gstApplicable", v)} />
             <Label className="cursor-pointer">GST Applicable</Label>
@@ -154,7 +154,7 @@ export default function ItemForm() {
 
       <Card className={usedInBills ? "opacity-50" : ""}>
         <CardHeader><CardTitle className="text-base">Pricing & Stock</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1">
             <Label>Purchase Rate</Label>
             <Input type="number" inputMode="decimal" min="0" step="any" value={form.purchaseRate} onChange={e => set("purchaseRate", e.target.value)} disabled={usedInBills} placeholder="0.00" />

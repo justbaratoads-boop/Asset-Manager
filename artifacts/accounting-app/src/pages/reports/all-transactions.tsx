@@ -91,7 +91,7 @@ export default function AllTransactions() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Transactions</p><p className="text-xl font-bold">{transactions.length}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Debit</p><p className="text-xl font-bold">{formatCurrency(totalDebit)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Credit</p><p className="text-xl font-bold">{formatCurrency(totalCredit)}</p></CardContent></Card>

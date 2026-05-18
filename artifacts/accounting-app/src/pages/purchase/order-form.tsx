@@ -171,7 +171,7 @@ export default function PurchaseOrderForm() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Supplier & Date</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label>Supplier *</Label>

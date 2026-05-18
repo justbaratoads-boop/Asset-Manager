@@ -61,7 +61,7 @@ export default function StockSummary() {
         <div className="flex items-center gap-2"><Label>To</Label><Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" /></div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Purchase Value</p><p className="text-xl font-bold">{formatCurrency(totalPurchasedValue)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Sale Value</p><p className="text-xl font-bold">{formatCurrency(totalSoldValue)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Closing Stock Value</p><p className="text-xl font-bold text-primary">{formatCurrency(totalClosingValue)}</p></CardContent></Card>

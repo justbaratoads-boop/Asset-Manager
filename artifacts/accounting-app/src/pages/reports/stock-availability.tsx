@@ -82,7 +82,7 @@ export default function StockAvailabilityReport() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground mb-1">Total Physical Stock</p><p className="text-2xl font-bold">{totalPhysical.toLocaleString()}</p><p className="text-xs text-muted-foreground mt-1">Units in warehouse</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground mb-1">Reserved (Pending Orders)</p><p className="text-2xl font-bold text-amber-600">{totalReserved.toLocaleString()}</p><p className="text-xs text-muted-foreground mt-1">Ordered, not yet delivered</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground mb-1">Available Stock</p><p className={cn("text-2xl font-bold", totalAvailable < 0 ? "text-red-600" : "text-green-600")}>{totalAvailable.toLocaleString()}</p><p className="text-xs text-muted-foreground mt-1">Free to sell</p></CardContent></Card>

@@ -78,20 +78,20 @@ export default function CompanySettings() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Basic Information</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-1 col-span-2"><Label>Company Name *</Label><Input required value={form.name} onChange={e => set("name", e.target.value)} /></div>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1 sm:col-span-2"><Label>Company Name *</Label><Input required value={form.name} onChange={e => set("name", e.target.value)} /></div>
           <div className="space-y-1"><Label>GSTIN</Label><Input value={form.gstin} onChange={e => set("gstin", e.target.value.toUpperCase())} placeholder="27AADCS0472N1Z1" /></div>
           <div className="space-y-1"><Label>PAN</Label><Input value={form.pan} onChange={e => set("pan", e.target.value.toUpperCase())} /></div>
           <div className="space-y-1"><Label>Phone</Label><Input value={form.phone} onChange={e => set("phone", e.target.value)} /></div>
           <div className="space-y-1"><Label>Email</Label><Input type="email" value={form.email} onChange={e => set("email", e.target.value)} /></div>
-          <div className="space-y-1 col-span-2"><Label>Website</Label><Input value={form.website} onChange={e => set("website", e.target.value)} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Website</Label><Input value={form.website} onChange={e => set("website", e.target.value)} /></div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Address</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-1 col-span-2"><Label>Address</Label><Input value={form.address} onChange={e => set("address", e.target.value)} /></div>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1 sm:col-span-2"><Label>Address</Label><Input value={form.address} onChange={e => set("address", e.target.value)} /></div>
           <div className="space-y-1"><Label>City</Label><Input value={form.city} onChange={e => set("city", e.target.value)} /></div>
           <div className="space-y-1"><Label>State *</Label>
             <Select value={form.state} onValueChange={v => set("state", v)} required>
@@ -105,7 +105,7 @@ export default function CompanySettings() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Bank Details</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1"><Label>Bank Name</Label><Input value={form.bankName} onChange={e => set("bankName", e.target.value)} /></div>
           <div className="space-y-1"><Label>Account Number</Label><Input value={form.bankAccount} onChange={e => set("bankAccount", e.target.value)} /></div>
           <div className="space-y-1"><Label>IFSC Code</Label><Input value={form.bankIfsc} onChange={e => set("bankIfsc", e.target.value.toUpperCase())} /></div>
@@ -115,7 +115,7 @@ export default function CompanySettings() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Invoice Preferences</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1"><Label>Invoice Prefix</Label><Input value={form.invoicePrefix} onChange={e => set("invoicePrefix", e.target.value)} /></div>
           <div className="space-y-1"><Label>PO Prefix</Label><Input value={form.poPrefix} onChange={e => set("poPrefix", e.target.value)} /></div>
           <div className="space-y-1"><Label>Financial Year Start</Label>
@@ -127,7 +127,7 @@ export default function CompanySettings() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Bill Footer / Thank You Message</Label>
             <Textarea value={form.billFooter || ""} onChange={e => set("billFooter", e.target.value)} placeholder="e.g. Thank you for your business! All disputes subject to local jurisdiction." rows={2} />
           </div>

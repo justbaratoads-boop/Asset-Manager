@@ -115,7 +115,7 @@ function AssignBillDialog() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Driver */}
             <div className="space-y-1">
               <Label>Driver</Label>
@@ -332,8 +332,8 @@ function DriversTab() {
           <DialogContent>
             <DialogHeader><DialogTitle>Add Driver</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1 col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1 sm:col-span-2">
                   <Label>Name *</Label>
                   <Input required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Full name" />
                 </div>
@@ -345,7 +345,7 @@ function DriversTab() {
                   <Label>License Number</Label>
                   <Input value={form.licenseNumber} onChange={e => setForm(p => ({ ...p, licenseNumber: e.target.value }))} placeholder="DL-XXXXXXXXXX" />
                 </div>
-                <div className="space-y-1 col-span-2">
+                <div className="space-y-1 sm:col-span-2">
                   <Label>Notes</Label>
                   <Input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
                 </div>
@@ -437,7 +437,7 @@ function VehiclesTab() {
           <DialogContent>
             <DialogHeader><DialogTitle>Add Vehicle</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label>Vehicle Number *</Label>
                   <Input required value={form.vehicleNumber} onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))} placeholder="MH-12 AB 1234" />

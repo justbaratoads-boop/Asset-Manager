@@ -212,7 +212,7 @@ export default function OrderForm() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Party & Date</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label>Party *</Label>
@@ -230,7 +230,7 @@ export default function OrderForm() {
           <div className="space-y-1"><Label>Order Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} className={errors.date ? "border-destructive" : ""} /></div>
           <div className="space-y-1"><Label>Delivery Date</Label><Input type="date" min={date} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} /></div>
           <div className="space-y-1"><Label>Phone</Label><Input value={partyPhone} onChange={e => setPartyPhone(e.target.value)} placeholder="Auto-filled from party" /></div>
-          <div className="space-y-1 col-span-2"><Label>Delivery Address</Label><Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Auto-filled from party" /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Delivery Address</Label><Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Auto-filled from party" /></div>
         </CardContent>
       </Card>
 
@@ -433,12 +433,12 @@ export default function OrderForm() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Dispatch Details</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1"><Label>Driver Name</Label><Input value={driverName} onChange={e => setDriverName(e.target.value)} placeholder="Optional" /></div>
           <div className="space-y-1"><Label>Vehicle Name</Label><Input value={vehicleName} onChange={e => setVehicleName(e.target.value)} placeholder="e.g. Tempo, Truck" /></div>
           <div className="space-y-1"><Label>Vehicle No.</Label><Input value={vehicleNo} onChange={e => setVehicleNo(e.target.value.toUpperCase())} placeholder="MH12AB1234" /></div>
           <div className="space-y-1"><Label>Notes</Label><Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="General notes" /></div>
-          <div className="space-y-1 col-span-2"><Label>Dispatch Notes</Label><Textarea value={dispatchNotes} onChange={e => setDispatchNotes(e.target.value)} placeholder="Special dispatch instructions..." rows={2} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Dispatch Notes</Label><Textarea value={dispatchNotes} onChange={e => setDispatchNotes(e.target.value)} placeholder="Special dispatch instructions..." rows={2} /></div>
         </CardContent>
       </Card>
 

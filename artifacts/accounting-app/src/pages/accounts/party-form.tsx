@@ -254,8 +254,8 @@ export default function PartyForm() {
       {/* Basic Info */}
       <Card>
         <CardHeader><CardTitle className="text-base">Basic Information</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-1 col-span-2">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Name *</Label>
             <Input
               value={form.name}
@@ -267,7 +267,7 @@ export default function PartyForm() {
             {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
 
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Account Group *</Label>
             <AccountGroupSelect
               value={form.accountGroup}
@@ -306,8 +306,8 @@ export default function PartyForm() {
       {/* Address */}
       <Card>
         <CardHeader><CardTitle className="text-base">Address</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-1 col-span-2">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Address</Label>
             <Input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Street / Area" disabled={hasInvoices} />
           </div>
@@ -350,7 +350,7 @@ export default function PartyForm() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {(["registered", "unregistered", "composition"] as const).map(t => (
               <button
                 key={t}
@@ -406,7 +406,7 @@ export default function PartyForm() {
               disabled={hasInvoices}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Opening Balance</Label>
               <Input
