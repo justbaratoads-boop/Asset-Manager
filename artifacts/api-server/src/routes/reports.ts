@@ -932,10 +932,32 @@ router.get("/reports/delivery-report", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/stock-current", authMiddleware, async (req, res) => {
-  const items = await db.select().from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false")).orderBy(stockItemsTable.name);
-  res.json(items.map(i => ({
-    id: i.id, name: i.name, unit: i.unit, hsnCode: i.hsnCode,
+  const result = await db.execute(sql`
+    SELECT
+      si.id,
+      si.name,
+      si.unit,
+      si.hsn_code AS "hsnCode",
+      si.physical_stock::numeric AS "unbatchedStock",
+      COALESCE(SUM(sb.physical_stock::numeric), 0) AS "batchedStock",
+      si.physical_stock::numeric + COALESCE(SUM(sb.physical_stock::numeric), 0) AS "physicalStock",
+      si.min_stock_level::numeric AS "minStockLevel",
+      si.purchase_rate::numeric AS "purchaseRate",
+      si.sale_rate::numeric AS "saleRate"
+    FROM stock_items si
+    LEFT JOIN stock_batches sb ON sb.stock_item_id = si.id
+    WHERE si.is_deleted = 'false'
+    GROUP BY si.id, si.name, si.unit, si.hsn_code, si.physical_stock, si.min_stock_level, si.purchase_rate, si.sale_rate
+    ORDER BY si.name
+  `);
+  res.json((result.rows as any[]).map(i => ({
+    id: Number(i.id),
+    name: i.name,
+    unit: i.unit,
+    hsnCode: i.hsnCode,
     physicalStock: Number(i.physicalStock),
+    unbatchedStock: Number(i.unbatchedStock),
+    batchedStock: Number(i.batchedStock),
     minStockLevel: Number(i.minStockLevel),
     purchaseRate: Number(i.purchaseRate),
     saleRate: Number(i.saleRate),
@@ -951,12 +973,19 @@ router.get("/stock-availability", authMiddleware, async (req, res) => {
       si.name,
       si.unit,
       si.hsn_code AS "hsnCode",
-      si.physical_stock::numeric AS "physicalStock",
+      si.physical_stock::numeric AS "unbatchedStock",
+      si.physical_stock::numeric + COALESCE(batch_totals.total, 0) AS "physicalStock",
       si.purchase_rate::numeric AS "purchaseRate",
       si.sale_rate::numeric AS "saleRate",
       si.min_stock_level::numeric AS "minStockLevel",
-      COALESCE(reserved.qty, 0)::numeric AS "reservedQty"
+      COALESCE(reserved.qty, 0)::numeric AS "reservedQty",
+      COALESCE(reserved_unbatched.qty, 0)::numeric AS "reservedUnbatched"
     FROM stock_items si
+    LEFT JOIN (
+      SELECT stock_item_id, SUM(physical_stock::numeric) AS total
+      FROM stock_batches
+      GROUP BY stock_item_id
+    ) AS batch_totals ON batch_totals.stock_item_id = si.id
     LEFT JOIN (
       SELECT oi.stock_item_id, SUM(oi.quantity::numeric) AS qty
       FROM order_items oi
@@ -966,6 +995,16 @@ router.get("/stock-availability", authMiddleware, async (req, res) => {
         AND o.is_deleted = 'false'
       GROUP BY oi.stock_item_id
     ) AS reserved ON reserved.stock_item_id = si.id
+    LEFT JOIN (
+      SELECT oi.stock_item_id, SUM(oi.quantity::numeric) AS qty
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      WHERE o.converted_invoice_id IS NULL
+        AND o.status = 'pending'
+        AND o.is_deleted = 'false'
+        AND oi.batch_id IS NULL
+      GROUP BY oi.stock_item_id
+    ) AS reserved_unbatched ON reserved_unbatched.stock_item_id = si.id
     WHERE si.is_deleted = 'false'
     ORDER BY si.name
   `);
@@ -974,9 +1013,11 @@ router.get("/stock-availability", authMiddleware, async (req, res) => {
     name: r.name,
     unit: r.unit,
     hsnCode: r.hsnCode,
+    unbatchedStock: Number(r.unbatchedStock),
     physicalStock: Number(r.physicalStock),
     reservedQty: Number(r.reservedQty),
     availableStock: Number(r.physicalStock) - Number(r.reservedQty),
+    unbatchedAvailable: Number(r.unbatchedStock) - Number(r.reservedUnbatched),
     purchaseRate: Number(r.purchaseRate),
     saleRate: Number(r.saleRate),
     minStockLevel: Number(r.minStockLevel),

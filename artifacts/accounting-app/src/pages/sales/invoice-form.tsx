@@ -446,7 +446,7 @@ export default function SaleInvoiceForm() {
                       <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(index, "batchId", v === "none" ? undefined : Number(v))}>
                         <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">— none —</SelectItem>
+                          <SelectItem value="none">— none —{item.stockItemId && stockAvail[item.stockItemId] ? ` · avail: ${stockAvail[item.stockItemId].unbatchedAvailable}` : ""}</SelectItem>
                           {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
                             const avail = Number(b.physicalStock) - Number(b.reservedStock);
                             const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
@@ -600,7 +600,7 @@ export default function SaleInvoiceForm() {
                             <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(index, "batchId", v === "none" ? undefined : Number(v))}>
                               <SelectTrigger className="h-6 text-xs py-0 flex-1 min-w-0"><SelectValue placeholder="— none —" /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="none">— none —</SelectItem>
+                                <SelectItem value="none">— none —{item.stockItemId && stockAvail[item.stockItemId] ? ` · avail: ${stockAvail[item.stockItemId].unbatchedAvailable}` : ""}</SelectItem>
                                 {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
                                   const avail = Number(b.physicalStock) - Number(b.reservedStock);
                                   const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);

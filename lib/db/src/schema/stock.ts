@@ -50,6 +50,7 @@ export const stockItemsTable = pgTable("stock_items", {
 export const stockTransactionsTable = pgTable("stock_transactions", {
   id: serial("id").primaryKey(),
   itemId: integer("item_id").notNull(),
+  batchId: integer("batch_id"),
   type: text("type").notNull(),
   quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
   balanceAfter: numeric("balance_after", { precision: 15, scale: 2 }).notNull(),

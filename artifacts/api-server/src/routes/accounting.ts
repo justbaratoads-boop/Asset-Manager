@@ -9,7 +9,7 @@ import {
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeVoucherNumber } from "../lib/counter";
-import { adjustBatchStockForItem } from "../lib/batch-stock";
+import { adjustStock } from "../lib/batch-stock";
 
 const router = Router();
 
@@ -303,10 +303,7 @@ router.post("/credit-notes", authMiddleware, async (req, res) => {
       });
 
       if (item.stockItemId) {
-        await db.execute(
-          sql`UPDATE stock_items SET opening_stock = opening_stock + ${item.quantity} WHERE id = ${item.stockItemId}`
-        );
-        await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
+        await adjustStock(item.stockItemId, item.batchId || null, Number(item.quantity));
       }
     }
   }
@@ -328,10 +325,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
   const oldItems = await db.select().from(creditNoteItemsTable).where(eq(creditNoteItemsTable.noteId, id));
   for (const item of oldItems) {
     if (item.stockItemId) {
-      await db.execute(
-        sql`UPDATE stock_items SET opening_stock = GREATEST(0, opening_stock - ${item.quantity}) WHERE id = ${item.stockItemId}`
-      );
-      await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
+      await adjustStock(item.stockItemId, (item as any).batchId || null, -Number(item.quantity));
     }
   }
 
@@ -365,10 +359,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
         total: String(item.total),
       });
       if (item.stockItemId) {
-        await db.execute(
-          sql`UPDATE stock_items SET opening_stock = opening_stock + ${item.quantity} WHERE id = ${item.stockItemId}`
-        );
-        await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
+        await adjustStock(item.stockItemId, item.batchId || null, Number(item.quantity));
       }
     }
   }
@@ -423,10 +414,7 @@ router.post("/debit-notes", authMiddleware, async (req, res) => {
       });
 
       if (item.stockItemId) {
-        await db.execute(
-          sql`UPDATE stock_items SET opening_stock = GREATEST(0, opening_stock - ${item.quantity}) WHERE id = ${item.stockItemId}`
-        );
-        await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
+        await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
       }
     }
   }
@@ -448,10 +436,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
   const oldItems = await db.select().from(debitNoteItemsTable).where(eq(debitNoteItemsTable.noteId, id));
   for (const item of oldItems) {
     if (item.stockItemId) {
-      await db.execute(
-        sql`UPDATE stock_items SET opening_stock = opening_stock + ${item.quantity} WHERE id = ${item.stockItemId}`
-      );
-      await adjustBatchStockForItem(item.stockItemId, Number(item.quantity), 0);
+      await adjustStock(item.stockItemId, (item as any).batchId || null, Number(item.quantity));
     }
   }
 
@@ -485,10 +470,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
         total: String(item.total),
       });
       if (item.stockItemId) {
-        await db.execute(
-          sql`UPDATE stock_items SET opening_stock = GREATEST(0, opening_stock - ${item.quantity}) WHERE id = ${item.stockItemId}`
-        );
-        await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0);
+        await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
       }
     }
   }

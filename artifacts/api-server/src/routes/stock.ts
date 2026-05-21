@@ -227,21 +227,35 @@ router.get("/stock-items", authMiddleware, async (req, res) => {
   const conditions: any[] = [eq(stockItemsTable.isDeleted, "false")];
   if (categoryId) conditions.push(eq(stockItemsTable.categoryId, Number(categoryId)));
   if (search) conditions.push(ilike(stockItemsTable.name, `%${search}%`));
-  if (lowStock === "true") {
-    conditions.push(sql`physical_stock::numeric <= min_stock_level::numeric`);
-  }
 
-  const items = await db.select().from(stockItemsTable)
+  const items = await db.select({
+    item: stockItemsTable,
+    batchStock: sql<string>`COALESCE(SUM(${stockBatchesTable.physicalStock}::numeric), 0)`,
+  })
+    .from(stockItemsTable)
+    .leftJoin(stockBatchesTable, eq(stockBatchesTable.stockItemId, stockItemsTable.id))
     .where(and(...conditions))
+    .groupBy(stockItemsTable.id)
     .orderBy(stockItemsTable.name);
 
-  res.json(items.map(i => ({
-    ...i,
-    physicalStock: Number(i.physicalStock),
-    minStockLevel: Number(i.minStockLevel),
-    purchaseRate: Number(i.purchaseRate),
-    saleRate: Number(i.saleRate),
-  })));
+  let result = items.map(({ item: i, batchStock }) => {
+    const unbatched = Number(i.physicalStock);
+    const batched = Number(batchStock);
+    return {
+      ...i,
+      unbatchedStock: unbatched,
+      physicalStock: unbatched + batched,
+      minStockLevel: Number(i.minStockLevel),
+      purchaseRate: Number(i.purchaseRate),
+      saleRate: Number(i.saleRate),
+    };
+  });
+
+  if (lowStock === "true") {
+    result = result.filter(i => i.physicalStock <= i.minStockLevel);
+  }
+
+  res.json(result);
 });
 
 router.post("/stock-items", authMiddleware, async (req, res) => {
@@ -276,9 +290,15 @@ router.get("/stock-items/:id", authMiddleware, async (req, res) => {
   const [item] = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, id)).limit(1);
   if (!item) return res.status(404).json({ error: "Not found" });
   const usedInBills = await isItemUsedInBills(id);
+  const [batchSum] = await db.select({
+    total: sql<string>`COALESCE(SUM(physical_stock::numeric), 0)`,
+  }).from(stockBatchesTable).where(eq(stockBatchesTable.stockItemId, id));
+  const unbatched = Number(item.physicalStock);
+  const batched = Number(batchSum?.total ?? 0);
   res.json({
     ...item,
-    physicalStock: Number(item.physicalStock),
+    unbatchedStock: unbatched,
+    physicalStock: unbatched + batched,
     saleRate: Number(item.saleRate),
     purchaseRate: Number(item.purchaseRate),
     usedInBills,

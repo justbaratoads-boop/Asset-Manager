@@ -7,7 +7,7 @@ import {
 import { eq, and, ilike, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeVoucherNumber } from "../lib/counter";
-import { adjustBatchStockForItem } from "../lib/batch-stock";
+import { adjustReservedStock } from "../lib/batch-stock";
 
 const router = Router();
 
@@ -70,7 +70,7 @@ router.post("/orders", authMiddleware, async (req, res) => {
         description: item.description || null,
       });
       if (item.stockItemId) {
-        await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity), item.batchId || null);
+        await adjustReservedStock(item.batchId || null, Number(item.quantity));
       }
     }
   }
@@ -160,7 +160,7 @@ router.post("/orders/:id/cancel", authMiddleware, async (req, res) => {
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
   for (const item of items) {
     if (item.stockItemId) {
-      await adjustBatchStockForItem(item.stockItemId, 0, -Number(item.quantity), (item as any).batchId || null);
+      await adjustReservedStock((item as any).batchId || null, -Number(item.quantity));
     }
   }
   await db.update(ordersTable).set({ status: "cancelled" }).where(eq(ordersTable.id, Number(req.params.id)));
@@ -174,7 +174,7 @@ router.post("/orders/:id/uncancel", authMiddleware, async (req, res) => {
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
   for (const item of items) {
     if (item.stockItemId) {
-      await adjustBatchStockForItem(item.stockItemId, 0, Number(item.quantity), (item as any).batchId || null);
+      await adjustReservedStock((item as any).batchId || null, Number(item.quantity));
     }
   }
   await db.update(ordersTable).set({ status: "pending" }).where(eq(ordersTable.id, Number(req.params.id)));

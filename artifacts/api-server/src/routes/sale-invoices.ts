@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockItemsTable, stockTransactionsTable,
+  saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockTransactionsTable,
   ordersTable,
 } from "@workspace/db/schema";
-import { adjustBatchStockForItem } from "../lib/batch-stock";
+import { adjustStock } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
 import { eq, and, ilike, gte, lte, sql, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -126,19 +126,15 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
       });
 
       if (item.stockItemId) {
-        const [si] = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, item.stockItemId)).limit(1);
-        if (si) {
-          const newStock = Number(si.physicalStock) - Number(item.quantity);
-          await db.update(stockItemsTable).set({ physicalStock: String(newStock) }).where(eq(stockItemsTable.id, item.stockItemId));
-          await db.insert(stockTransactionsTable).values({
-            itemId: item.stockItemId,
-            type: "sale",
-            quantity: String(item.quantity),
-            balanceAfter: String(newStock),
-            reference: invoiceNumber,
-          });
-          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0, item.batchId || null);
-        }
+        const newBalance = await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
+        await db.insert(stockTransactionsTable).values({
+          itemId: item.stockItemId,
+          batchId: item.batchId || null,
+          type: "sale",
+          quantity: String(item.quantity),
+          balanceAfter: String(newBalance),
+          reference: invoiceNumber,
+        });
       }
     }
   }
@@ -232,15 +228,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
 
     for (const oldItem of oldItems) {
       if (oldItem.stockItemId) {
-        const [si] = await db.select().from(stockItemsTable)
-          .where(eq(stockItemsTable.id, oldItem.stockItemId)).limit(1);
-        if (si) {
-          const restored = Number(si.physicalStock) + Number(oldItem.quantity);
-          await db.update(stockItemsTable)
-            .set({ physicalStock: String(restored) })
-            .where(eq(stockItemsTable.id, oldItem.stockItemId));
-          await adjustBatchStockForItem(oldItem.stockItemId, Number(oldItem.quantity), 0, (oldItem as any).batchId || null);
-        }
+        await adjustStock(oldItem.stockItemId, (oldItem as any).batchId || null, Number(oldItem.quantity));
       }
     }
 
@@ -267,22 +255,15 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
       });
 
       if (item.stockItemId) {
-        const [si] = await db.select().from(stockItemsTable)
-          .where(eq(stockItemsTable.id, item.stockItemId)).limit(1);
-        if (si) {
-          const newStock = Number(si.physicalStock) - Number(item.quantity);
-          await db.update(stockItemsTable)
-            .set({ physicalStock: String(newStock) })
-            .where(eq(stockItemsTable.id, item.stockItemId));
-          await db.insert(stockTransactionsTable).values({
-            itemId: item.stockItemId,
-            type: "sale",
-            quantity: String(item.quantity),
-            balanceAfter: String(newStock),
-            reference: invoice.invoiceNumber,
-          });
-          await adjustBatchStockForItem(item.stockItemId, -Number(item.quantity), 0, item.batchId || null);
-        }
+        const newBalance = await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
+        await db.insert(stockTransactionsTable).values({
+          itemId: item.stockItemId,
+          batchId: item.batchId || null,
+          type: "sale",
+          quantity: String(item.quantity),
+          balanceAfter: String(newBalance),
+          reference: invoice.invoiceNumber,
+        });
       }
     }
   }

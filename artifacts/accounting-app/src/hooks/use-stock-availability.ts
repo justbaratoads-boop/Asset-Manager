@@ -3,8 +3,10 @@ import { customFetch } from "@workspace/api-client-react";
 
 export type StockAvailInfo = {
   physicalStock: number;
+  unbatchedStock: number;
   reservedQty: number;
   availableStock: number;
+  unbatchedAvailable: number;
 };
 
 export function useStockAvailability(): Record<number, StockAvailInfo> {
@@ -17,8 +19,10 @@ export function useStockAvailability(): Record<number, StockAvailInfo> {
         for (const item of data) {
           map[item.id] = {
             physicalStock: item.physicalStock,
+            unbatchedStock: item.unbatchedStock ?? item.physicalStock,
             reservedQty: item.reservedQty,
             availableStock: item.availableStock,
+            unbatchedAvailable: item.unbatchedAvailable ?? item.availableStock,
           };
         }
         setStockAvail(map);

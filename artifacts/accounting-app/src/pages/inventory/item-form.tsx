@@ -44,7 +44,7 @@ export default function ItemForm() {
       purchaseRate: String(e.purchaseRate || ""),
       saleRate: String(e.saleRate || ""),
       minStockLevel: String(e.minStockLevel || ""),
-      physicalStock: String(e.physicalStock || e.openingStock || ""),
+      physicalStock: String((e as any).unbatchedStock ?? e.physicalStock ?? e.openingStock ?? ""),
       barcode: e.barcode || "",
       gstApplicable: e.gstApplicable === "true" || e.gstApplicable === true,
       gstRate: String(e.gstRate || "18"),
@@ -168,8 +168,9 @@ export default function ItemForm() {
             <Input type="number" inputMode="decimal" min="0" step="any" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} disabled={usedInBills} placeholder="0" />
           </div>
           <div className="space-y-1">
-            <Label>{isEdit ? "Physical Stock" : "Opening Stock"}</Label>
+            <Label>{isEdit ? "Unbatched Physical Stock" : "Opening Stock (Unbatched)"}</Label>
             <Input type="number" inputMode="decimal" min="0" step="any" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} disabled={usedInBills} placeholder="0" />
+            <p className="text-xs text-muted-foreground">Stock not assigned to any batch. Total stock = this + sum of all batch stocks.</p>
           </div>
         </CardContent>
       </Card>
