@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useListLedgers, useListParties, useCreateLedger, useUpdateLedger, useDeleteLedger, getListLedgersQueryKey, getListPartiesQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect, useRef } from "react";
+import { useListLedgers, useListParties, useCreateLedger, useUpdateLedger, useDeleteLedger, getListLedgersQueryKey, getListPartiesQueryKey, useGetCompanySettings } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { formatCurrency } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye, Lock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { formatCurrency, INDIAN_STATES } from "@/lib/format";
+import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye, Lock, Info } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +19,17 @@ import { customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 
 const PAGE_SIZE = 25;
-const BLANK = { name: "", group: "", nature: "dr", openingBalance: "" };
+const BLANK_LEDGER = { name: "", group: "", nature: "dr", openingBalance: "" };
+const BLANK_PARTY = {
+  name: "", accountGroup: "Sundry Debtors",
+  gstType: "unregistered",
+  address: "", city: "", state: "", pincode: "",
+  gstin: "", pan: "", phone: "", email: "",
+  paymentTerms: "",
+  openingBalance: "", balanceType: "dr",
+  creditLimitEnabled: false, creditLimit: "",
+};
+const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 function useAccountGroups() {
   return useQuery({
@@ -37,10 +48,73 @@ const gstBadge: Record<string, string> = {
   composition:  "bg-blue-100 text-blue-700 border-blue-300",
 };
 
-// Unified result type across both sources
 type UnifiedAccount =
   | { kind: "ledger"; id: number; name: string; group: string; nature: string; openingBalance: number; isSystem: boolean; raw: any }
   | { kind: "party";  id: number; name: string; group: string; gstType: string; openingBalance: number; balanceType: string; raw: any };
+
+// Searchable account group combobox
+function AccountGroupSelect({ value, onChange, groups, error }: {
+  value: string; onChange: (v: string) => void; groups: any[]; error?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const filtered = groups.filter(g => !search || g.name.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => { setOpen(o => !o); setSearch(""); }}
+        className={`w-full flex items-center justify-between h-10 rounded-md border px-3 py-2 text-sm bg-background
+          ${error ? "border-destructive" : "border-input"} ${!value ? "text-muted-foreground" : ""}`}
+      >
+        <span className="truncate">{value || "Select account group..."}</span>
+        <Search className="h-4 w-4 text-muted-foreground ml-2 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
+          <div className="p-2 border-b">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                autoFocus
+                className="w-full h-8 pl-8 pr-3 text-sm rounded border border-input bg-background outline-none"
+                placeholder="Search groups..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <div className="text-center py-4 text-sm text-muted-foreground">No groups found</div>
+            ) : filtered.map((g: any) => (
+              <button
+                key={g.id}
+                type="button"
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2
+                  ${value === g.name ? "bg-accent font-medium" : ""}`}
+                onClick={() => { onChange(g.name); setOpen(false); }}
+              >
+                <span className="flex-1 truncate">{g.name}</span>
+                <span className="text-xs text-muted-foreground shrink-0">({g.nature})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LedgerAccounts() {
   const [search, setSearch] = useState("");
@@ -48,23 +122,34 @@ export default function LedgerAccounts() {
   const [sourceFilter, setSourceFilter] = useState<"all" | "ledger" | "party">("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogType, setDialogType] = useState<"ledger" | "party">("ledger");
   const [editItem, setEditItem] = useState<any>(null);
-  const [form, setForm] = useState(BLANK);
+
+  // Ledger form state
+  const [ledgerForm, setLedgerForm] = useState(BLANK_LEDGER);
+
+  // Party form state
+  const [partyForm, setPartyForm] = useState(BLANK_PARTY);
+  const [partyErrors, setPartyErrors] = useState<Record<string, string>>({});
+
   const [isSaving, setIsSaving] = useState(false);
   const [page, setPage] = useState(1);
 
   const { data: ledgers = [], isLoading: ledgersLoading } = useListLedgers({});
   const { data: parties = [], isLoading: partiesLoading } = useListParties();
   const { data: accountGroups = [] } = useAccountGroups();
+  const { data: companySettings } = useGetCompanySettings();
   const deleteMutation = useDeleteLedger();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const isLoading = ledgersLoading || partiesLoading;
+  const companyState = (companySettings as any)?.state || "";
+  const isOutOfState = companyState && partyForm.state && companyState !== partyForm.state;
+  const needsGstin = partyForm.gstType === "registered" || partyForm.gstType === "composition";
 
   useEffect(() => { setPage(1); }, [search, groupFilter, sourceFilter]);
 
-  // Build unified list
   const unified: UnifiedAccount[] = [
     ...(ledgers as any[]).map((l: any): UnifiedAccount => ({
       kind: "ledger", id: l.id, name: l.name, group: l.group, nature: l.nature,
@@ -80,15 +165,12 @@ export default function LedgerAccounts() {
   const filtered = unified.filter(u => {
     if (sourceFilter !== "all" && u.kind !== sourceFilter) return false;
     if (groupFilter !== "all" && u.group !== groupFilter) return false;
-    if (q) {
-      return u.name.toLowerCase().includes(q) || u.group.toLowerCase().includes(q);
-    }
+    if (q) return u.name.toLowerCase().includes(q) || u.group.toLowerCase().includes(q);
     return true;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // All groups: from account groups + party account groups
   const allGroups = Array.from(new Set([
     ...(accountGroups as any[]).map((g: any) => g.name),
     ...(parties as any[]).map((p: any) => p.accountGroup).filter(Boolean),
@@ -96,46 +178,102 @@ export default function LedgerAccounts() {
 
   const openNew = () => {
     setEditItem(null);
-    setForm({ ...BLANK, group: (accountGroups as any[])[0]?.name || "" });
+    setDialogType("ledger");
+    setLedgerForm({ ...BLANK_LEDGER, group: (accountGroups as any[])[0]?.name || "" });
+    setPartyForm(BLANK_PARTY);
+    setPartyErrors({});
     setDialogOpen(true);
   };
 
-  const openEdit = (l: any) => {
+  const openEditLedger = (l: any) => {
     if (l.isSystem === "true") {
       toast({ title: "System account", description: `"${l.name}" is a system ledger and cannot be edited`, variant: "destructive" });
       return;
     }
-    setEditItem(l);
-    setForm({ name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance) });
+    setEditItem({ ...l, kind: "ledger" });
+    setDialogType("ledger");
+    setLedgerForm({ name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance) });
     setDialogOpen(true);
   };
 
+  const setParty = (k: string, v: string | boolean) => {
+    setPartyForm(prev => ({ ...prev, [k]: v }));
+    setPartyErrors(prev => { const n = { ...prev }; delete n[k]; return n; });
+  };
+
+  const validateParty = () => {
+    const e: Record<string, string> = {};
+    if (!partyForm.name.trim()) e.name = "Name is required";
+    if (!partyForm.accountGroup) e.accountGroup = "Account group is required";
+    if (!partyForm.state) e.state = "State is required";
+    if (partyForm.phone && !/^\d{10}$/.test(partyForm.phone)) e.phone = "Phone must be exactly 10 digits";
+    if (partyForm.gstType !== "unregistered") {
+      if (!partyForm.gstin) e.gstin = "GSTIN is required";
+      else if (!GSTIN_REGEX.test(partyForm.gstin.toUpperCase())) e.gstin = "Invalid GSTIN format";
+    }
+    return e;
+  };
+
   const handleSave = async () => {
-    if (!form.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
-    if (!form.group) { toast({ title: "Account group is required", variant: "destructive" }); return; }
-    setIsSaving(true);
-    try {
-      if (editItem) {
-        await customFetch(`/api/ledgers/${editItem.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, openingBalance: Number(form.openingBalance) || 0 }),
-        });
-        toast({ title: "Account updated" });
-      } else {
-        await customFetch("/api/ledgers", {
+    if (dialogType === "ledger") {
+      if (!ledgerForm.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
+      if (!ledgerForm.group) { toast({ title: "Account group is required", variant: "destructive" }); return; }
+      setIsSaving(true);
+      try {
+        if (editItem) {
+          await customFetch(`/api/ledgers/${editItem.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...ledgerForm, openingBalance: Number(ledgerForm.openingBalance) || 0 }),
+          });
+          toast({ title: "Account updated" });
+        } else {
+          await customFetch("/api/ledgers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...ledgerForm, openingBalance: Number(ledgerForm.openingBalance) || 0 }),
+          });
+          toast({ title: "Account created" });
+        }
+        queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
+        setDialogOpen(false);
+      } catch (err: any) {
+        toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      const errs = validateParty();
+      if (Object.keys(errs).length > 0) { setPartyErrors(errs); return; }
+      setIsSaving(true);
+      try {
+        const payload = {
+          ...partyForm,
+          gstin: partyForm.gstType !== "unregistered" ? partyForm.gstin.toUpperCase() : undefined,
+          paymentTerms: partyForm.paymentTerms || undefined,
+          openingBalance: Number(partyForm.openingBalance) || 0,
+          creditLimitEnabled: partyForm.creditLimitEnabled,
+          creditLimit: partyForm.creditLimitEnabled && partyForm.creditLimit ? Number(partyForm.creditLimit) : undefined,
+        };
+        await customFetch("/api/parties", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, openingBalance: Number(form.openingBalance) || 0 }),
+          body: JSON.stringify(payload),
         });
-        toast({ title: "Account created" });
+        toast({ title: "Ledger created" });
+        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+        setDialogOpen(false);
+      } catch (err: any) {
+        const code = err?.data?.code;
+        const msg = err?.data?.error || "Failed to save";
+        if (code === "DUPLICATE_NAME") {
+          setPartyErrors(prev => ({ ...prev, name: msg }));
+        } else {
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        }
+      } finally {
+        setIsSaving(false);
       }
-      queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
-      setDialogOpen(false);
-    } catch (err: any) {
-      toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -168,7 +306,6 @@ export default function LedgerAccounts() {
 
       <Card>
         <CardContent className="p-4 space-y-4">
-          {/* Search + filters */}
           <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -181,9 +318,7 @@ export default function LedgerAccounts() {
               />
             </div>
             <Select value={sourceFilter} onValueChange={v => setSourceFilter(v as any)}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Sources</SelectItem>
                 <SelectItem value="ledger">Ledger Accounts</SelectItem>
@@ -191,14 +326,10 @@ export default function LedgerAccounts() {
               </SelectContent>
             </Select>
             <Select value={groupFilter} onValueChange={setGroupFilter}>
-              <SelectTrigger className="w-52">
-                <SelectValue placeholder="All Groups" />
-              </SelectTrigger>
+              <SelectTrigger className="w-52"><SelectValue placeholder="All Groups" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Groups</SelectItem>
-                {allGroups.map(g => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
+                {allGroups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -247,11 +378,11 @@ export default function LedgerAccounts() {
                   {u.kind === "ledger" && (
                     <div className="flex gap-1 items-center">
                       {u.isSystem && (
-                        <span title="System ledger — cannot be edited or deleted" className="text-xs text-amber-600 font-medium flex items-center gap-0.5">
+                        <span title="System ledger" className="text-xs text-amber-600 font-medium flex items-center gap-0.5">
                           <Lock className="h-3 w-3" />System
                         </span>
                       )}
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)} disabled={u.isSystem}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLedger(u.raw)} disabled={u.isSystem}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => !u.isSystem && setDeleteId(u.id)} disabled={u.isSystem}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   )}
@@ -333,12 +464,12 @@ export default function LedgerAccounts() {
                               <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" title="View Statement"><Eye className="h-3.5 w-3.5" /></Button>
                             </Link>
                             {u.isSystem ? (
-                              <span title="System ledger — cannot be edited or deleted" className="inline-flex items-center gap-0.5 text-xs text-amber-600 font-medium px-1.5">
+                              <span title="System ledger" className="inline-flex items-center gap-0.5 text-xs text-amber-600 font-medium px-1.5">
                                 <Lock className="h-3 w-3" />System
                               </span>
                             ) : (
                               <>
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLedger(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                               </>
                             )}
@@ -364,55 +495,267 @@ export default function LedgerAccounts() {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Ledger Account Dialog */}
+      {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className={dialogType === "party" && !editItem ? "max-w-2xl max-h-[90vh] overflow-y-auto" : "max-w-sm"}>
           <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Ledger Account" : "New Ledger Account"}</DialogTitle>
+            <DialogTitle>{editItem ? "Edit Ledger Account" : "New Account"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-1">
-            <div className="space-y-1">
-              <Label>Account Name *</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. HDFC Bank Account" autoFocus />
+
+          {/* Type toggle — only for new accounts */}
+          {!editItem && (
+            <div className="flex gap-2 rounded-lg border p-1 bg-muted/40">
+              <button
+                type="button"
+                onClick={() => setDialogType("ledger")}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors
+                  ${dialogType === "ledger" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <BookOpen className="h-3.5 w-3.5" />Ledger Account
+              </button>
+              <button
+                type="button"
+                onClick={() => setDialogType("party")}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors
+                  ${dialogType === "party" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Users className="h-3.5 w-3.5" />Party / Ledger
+              </button>
             </div>
-            <div className="space-y-1">
-              <Label>Account Group *</Label>
-              <Select value={form.group} onValueChange={v => {
-                const grp = (accountGroups as any[]).find((g: any) => g.name === v);
-                setForm(p => ({ ...p, group: v, nature: grp ? (grp.nature === "Asset" || grp.nature === "Expense" ? "dr" : "cr") : p.nature }));
-              }}>
-                <SelectTrigger className={!form.group ? "border-destructive" : ""}>
-                  <SelectValue placeholder="Select group..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(accountGroups as any[]).map((g: any) => (
-                    <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Nature</Label>
-              <Select value={form.nature} onValueChange={v => setForm(p => ({ ...p, nature: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dr">Debit (Dr)</SelectItem>
-                  <SelectItem value="cr">Credit (Cr)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Auto-set from the group you choose</p>
-            </div>
-            <div className="space-y-1">
-              <Label>Opening Balance</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
-                <Input className="pl-7" type="number" value={form.openingBalance} onChange={e => setForm(p => ({ ...p, openingBalance: e.target.value }))} placeholder="0.00" />
+          )}
+
+          {/* ---- LEDGER FORM ---- */}
+          {dialogType === "ledger" && (
+            <div className="space-y-4 py-1">
+              <div className="space-y-1">
+                <Label>Account Name *</Label>
+                <Input value={ledgerForm.name} onChange={e => setLedgerForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. HDFC Bank Account" autoFocus />
+              </div>
+              <div className="space-y-1">
+                <Label>Account Group *</Label>
+                <Select value={ledgerForm.group} onValueChange={v => {
+                  const grp = (accountGroups as any[]).find((g: any) => g.name === v);
+                  setLedgerForm(p => ({ ...p, group: v, nature: grp ? (grp.nature === "Asset" || grp.nature === "Expense" ? "dr" : "cr") : p.nature }));
+                }}>
+                  <SelectTrigger className={!ledgerForm.group ? "border-destructive" : ""}>
+                    <SelectValue placeholder="Select group..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(accountGroups as any[]).map((g: any) => (
+                      <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Nature</Label>
+                <Select value={ledgerForm.nature} onValueChange={v => setLedgerForm(p => ({ ...p, nature: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dr">Debit (Dr)</SelectItem>
+                    <SelectItem value="cr">Credit (Cr)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Auto-set from the group you choose</p>
+              </div>
+              <div className="space-y-1">
+                <Label>Opening Balance</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                  <Input className="pl-7" type="number" value={ledgerForm.openingBalance} onChange={e => setLedgerForm(p => ({ ...p, openingBalance: e.target.value }))} placeholder="0.00" />
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* ---- PARTY FORM ---- */}
+          {dialogType === "party" && !editItem && (
+            <div className="space-y-4">
+              {/* Basic Info */}
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">Basic Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Name *</Label>
+                    <Input
+                      value={partyForm.name}
+                      onChange={e => setParty("name", e.target.value)}
+                      placeholder="Party / Company name"
+                      className={partyErrors.name ? "border-destructive" : ""}
+                      autoFocus
+                    />
+                    {partyErrors.name && <p className="text-xs text-destructive">{partyErrors.name}</p>}
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Account Group *</Label>
+                    <AccountGroupSelect
+                      value={partyForm.accountGroup}
+                      onChange={v => setParty("accountGroup", v)}
+                      groups={accountGroups as any[]}
+                      error={partyErrors.accountGroup}
+                    />
+                    {partyErrors.accountGroup && <p className="text-xs text-destructive">{partyErrors.accountGroup}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Mobile</Label>
+                    <Input
+                      value={partyForm.phone}
+                      onChange={e => setParty("phone", e.target.value)}
+                      placeholder="10-digit mobile"
+                      maxLength={10}
+                      className={partyErrors.phone ? "border-destructive" : ""}
+                    />
+                    {partyErrors.phone && <p className="text-xs text-destructive">{partyErrors.phone}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email</Label>
+                    <Input type="email" value={partyForm.email} onChange={e => setParty("email", e.target.value)} placeholder="email@example.com" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>PAN</Label>
+                    <Input value={partyForm.pan} onChange={e => setParty("pan", e.target.value.toUpperCase())} placeholder="AADCS0472N" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Payment Terms</Label>
+                    <Input value={partyForm.paymentTerms} onChange={e => setParty("paymentTerms", e.target.value)} placeholder="e.g. Net 30 days" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address */}
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">Address</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Address</Label>
+                    <Input value={partyForm.address} onChange={e => setParty("address", e.target.value)} placeholder="Street / Area" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>City</Label>
+                    <Input value={partyForm.city} onChange={e => setParty("city", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>State *</Label>
+                    <Select value={partyForm.state} onValueChange={v => setParty("state", v)}>
+                      <SelectTrigger className={partyErrors.state ? "border-destructive" : ""}>
+                        <SelectValue placeholder="Select state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {partyErrors.state && <p className="text-xs text-destructive">{partyErrors.state}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Pincode</Label>
+                    <Input value={partyForm.pincode} onChange={e => setParty("pincode", e.target.value)} maxLength={6} />
+                  </div>
+                  {isOutOfState && (
+                    <div className="sm:col-span-2 flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                      <Info className="h-4 w-4 shrink-0" />
+                      Out of State party — IGST will apply on transactions
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* GST Info */}
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">GST Information</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["registered", "unregistered", "composition"] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setParty("gstType", t)}
+                      className={`rounded-lg border-2 px-2 py-2 text-xs font-medium capitalize transition-colors text-left
+                        ${partyForm.gstType === t
+                          ? t === "registered" ? "border-green-500 bg-green-50 text-green-800"
+                          : t === "unregistered" ? "border-gray-400 bg-gray-50 text-gray-700"
+                          : "border-blue-500 bg-blue-50 text-blue-800"
+                          : "border-input bg-background text-muted-foreground hover:border-muted-foreground"
+                        }`}
+                    >
+                      <span className="block font-semibold capitalize">{t}</span>
+                      <span className="block text-[10px] mt-0.5 opacity-70">
+                        {t === "registered" ? "Has GSTIN" : t === "unregistered" ? "No GSTIN" : "Composition"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {needsGstin && (
+                  <div className="space-y-1">
+                    <Label>GSTIN *</Label>
+                    <Input
+                      value={partyForm.gstin}
+                      onChange={e => setParty("gstin", e.target.value.toUpperCase())}
+                      placeholder="27AADCS0472N1Z1"
+                      className={`font-mono ${partyErrors.gstin ? "border-destructive" : ""}`}
+                      maxLength={15}
+                    />
+                    {partyErrors.gstin && <p className="text-xs text-destructive">{partyErrors.gstin}</p>}
+                    {partyForm.gstin && GSTIN_REGEX.test(partyForm.gstin) && (
+                      <p className="text-xs text-green-600">✓ Valid GSTIN format</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Financial */}
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">Financial</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Opening Balance</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={partyForm.openingBalance}
+                      onChange={e => setParty("openingBalance", e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Balance Type</Label>
+                    <Select value={partyForm.balanceType} onValueChange={v => setParty("balanceType", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dr">Dr — Receivable</SelectItem>
+                        <SelectItem value="cr">Cr — Payable</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="rounded-lg border p-3 bg-muted/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Credit Limit</p>
+                      <p className="text-xs text-muted-foreground">Maximum outstanding allowed</p>
+                    </div>
+                    <Switch checked={partyForm.creditLimitEnabled} onCheckedChange={v => setParty("creditLimitEnabled", v)} />
+                  </div>
+                  {partyForm.creditLimitEnabled && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Credit Limit Amount (₹)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={partyForm.creditLimit}
+                        onChange={e => setParty("creditLimit", e.target.value)}
+                        placeholder="e.g. 50000"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={isSaving}>{isSaving ? "Saving..." : editItem ? "Update" : "Create Account"}</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : editItem ? "Update" : dialogType === "party" ? "Create Ledger" : "Create Account"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
