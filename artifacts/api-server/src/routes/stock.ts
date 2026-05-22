@@ -30,8 +30,11 @@ async function isBatchUsedInBills(batchId: number): Promise<boolean> {
 }
 
 // ---- BATCHES ----
-router.get("/stock-batches", authMiddleware, async (_req, res) => {
-  const batches = await db.select().from(stockBatchesTable).orderBy(stockBatchesTable.name);
+router.get("/stock-batches", authMiddleware, async (req, res) => {
+  const itemId = req.query.itemId ? Number(req.query.itemId) : undefined;
+  const batches = await db.select().from(stockBatchesTable)
+    .where(itemId ? eq(stockBatchesTable.stockItemId, itemId) : undefined)
+    .orderBy(stockBatchesTable.name);
   const items = await db.select({
     id: stockItemsTable.id,
     name: stockItemsTable.name,

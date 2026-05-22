@@ -10,9 +10,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
-import { ArrowLeft, History } from "lucide-react";
+import { ArrowLeft, History, Layers, Package, PackageOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
+
+interface BatchStock {
+  id: number;
+  name: string;
+  physicalStock: number;
+  reservedStock: number;
+  availableStock: number;
+  expiryDate?: string;
+}
 
 interface GstHistoryEntry {
   id: number;
@@ -45,6 +54,7 @@ export default function ItemDetail() {
   const { data: item, isLoading } = useGetStockItem(id, { query: { enabled: !!id } });
   const { data: txs = [] } = useGetStockItemTransactions(id, { query: { enabled: !!id } });
   const { data: gstHistory } = useFetch<GstHistoryData>(`/api/stock-items/${id}/gst-history`, !!id);
+  const { data: batches = [] } = useFetch<BatchStock[]>(`/api/stock-batches?itemId=${id}`, !!id);
   const adjustMutation = useAdjustStock();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -65,6 +75,10 @@ export default function ItemDetail() {
   if (!item) return <div className="text-center p-8 text-muted-foreground">Item not found</div>;
 
   const it = item as any;
+  const unbatchedStock = Number(it.unbatchedStock ?? it.physicalStock ?? 0);
+  const batchedStock = (batches as BatchStock[]).reduce((s, b) => s + Number(b.physicalStock), 0);
+  const totalStock = unbatchedStock + batchedStock;
+
   const currentGst = it.gstApplicable === "true" || it.gstApplicable === true
     ? `${it.gstRate}%`
     : "Not applicable";
@@ -230,11 +244,63 @@ export default function ItemDetail() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Current Stock</p><p className="text-2xl font-bold">{it.physicalStock} {it.unit}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Stock</p><p className="text-2xl font-bold">{totalStock} {it.unit}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Min Level</p><p className="text-2xl font-bold">{it.minStockLevel}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Purchase Rate</p><p className="text-2xl font-bold">{formatCurrency(it.purchaseRate)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Sale Rate</p><p className="text-2xl font-bold">{formatCurrency(it.saleRate)}</p></CardContent></Card>
       </div>
+
+      {/* Stock Calculator */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            Stock Calculator
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1 max-w-sm">
+            {/* Unbatched / main stock row */}
+            <div className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm">
+                <PackageOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span>Main Stock <span className="text-xs text-muted-foreground">(unbatched)</span></span>
+              </div>
+              <span className="font-semibold tabular-nums">{unbatchedStock} {it.unit}</span>
+            </div>
+
+            {/* Per-batch rows */}
+            {(batches as BatchStock[]).map(b => (
+              <div key={b.id} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2">
+                <div className="flex items-center gap-2 text-sm min-w-0">
+                  <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate">{b.name}</span>
+                  {b.expiryDate && (
+                    <span className="text-xs text-muted-foreground shrink-0">exp {b.expiryDate}</span>
+                  )}
+                </div>
+                <span className="font-semibold tabular-nums shrink-0 ml-4">{b.physicalStock} {it.unit}</span>
+              </div>
+            ))}
+
+            {(batches as BatchStock[]).length === 0 && (
+              <p className="text-xs text-muted-foreground px-3 py-1">No batches assigned to this item.</p>
+            )}
+
+            {/* Divider + Total */}
+            <div className="border-t pt-2 mt-1">
+              <div className="flex items-center justify-between px-3 py-1.5 rounded-md bg-primary/5 border border-primary/20">
+                <span className="text-sm font-semibold">
+                  {(batches as BatchStock[]).length > 0
+                    ? `Main + ${(batches as BatchStock[]).length} batch${(batches as BatchStock[]).length > 1 ? "es" : ""} = Total`
+                    : "Total Stock"}
+                </span>
+                <span className="text-lg font-bold text-primary tabular-nums">{totalStock} {it.unit}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Transaction History</CardTitle></CardHeader>
