@@ -263,7 +263,7 @@ export default function SaleInvoiceForm() {
   const clearItem = (index: number) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = calcItem({ ...updated[index], stockItemId: undefined, batchId: undefined, gstLocked: false }, isInterstate);
+      updated[index] = calcItem({ ...updated[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false }, isInterstate);
       return updated;
     });
   };

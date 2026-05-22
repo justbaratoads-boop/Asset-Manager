@@ -36,10 +36,18 @@ export function ItemSearchCombobox({
   placeholder = "Search item…",
   inputClassName,
 }: ItemSearchComboboxProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => (stockItemId ? "" : itemName));
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Sync local query with itemName prop when no item is locked
+  // (handles external resets like clearItem, and loading existing invoices)
+  useEffect(() => {
+    if (!stockItemId) {
+      setQuery(itemName);
+    }
+  }, [itemName, stockItemId]);
 
   const updateDropdownPosition = useCallback(() => {
     if (wrapRef.current) {
@@ -53,11 +61,13 @@ export function ItemSearchCombobox({
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
         setQuery("");
+        // Discard free-form text — only inventory items are valid
+        if (!stockItemId) onNameChange("");
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [stockItemId, onNameChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -95,7 +105,7 @@ export function ItemSearchCombobox({
       <div className="relative flex-1">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
         <Input
-          value={query || itemName}
+          value={query}
           onChange={e => {
             const v = e.target.value;
             setQuery(v);
@@ -107,7 +117,7 @@ export function ItemSearchCombobox({
           className={cn("pl-7 text-sm", inputClassName)}
           autoComplete="off"
         />
-        {(query || itemName) && (
+        {query && (
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"

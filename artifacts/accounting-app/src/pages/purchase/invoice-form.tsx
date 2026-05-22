@@ -187,7 +187,7 @@ export default function PurchaseInvoiceForm() {
   };
 
   const clearItem = (index: number) => {
-    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: undefined, batchId: undefined, gstLocked: false }, isInterstate); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false }, isInterstate); return u; });
   };
 
   const handleQuickAdded = (newItem: any) => {

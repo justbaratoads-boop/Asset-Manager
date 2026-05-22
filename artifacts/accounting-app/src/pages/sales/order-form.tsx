@@ -18,6 +18,7 @@ import { Plus, Trash2, ArrowLeft, Lock, AlertTriangle } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { QuickAddItemDialog } from "@/components/quick-add-item-dialog";
+import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { useToast } from "@/hooks/use-toast";
 
 interface OrderItem {
@@ -160,6 +161,10 @@ export default function OrderForm() {
     }
   };
 
+  const clearItem = (index: number) => {
+    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false }); return u; });
+  };
+
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
@@ -247,15 +252,16 @@ export default function OrderForm() {
                   <span className="text-sm font-semibold text-muted-foreground">Item {i + 1}</span>
                   <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                 </div>
-                <div className="flex gap-2">
-                  <Select onValueChange={v => selectStock(i, v)}>
-                    <SelectTrigger className="h-10 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
-                    <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <Button type="button" size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Quick add" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}><Plus className="h-4 w-4" /></Button>
-                </div>
-                {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
-                {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
+                <ItemSearchCombobox
+                  stockItems={stockItems as any[]}
+                  itemName={item.itemName}
+                  stockItemId={item.stockItemId}
+                  onNameChange={v => updateItem(i, "itemName", v)}
+                  onItemSelect={si => selectStock(i, String(si.id))}
+                  onClear={() => clearItem(i)}
+                  onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
+                  inputClassName="h-10"
+                />
                 <Input
                   className="h-8 text-sm"
                   placeholder="Description (optional)"
@@ -364,17 +370,15 @@ export default function OrderForm() {
                 {items.map((item, i) => (
                   <TableRow key={i}>
                     <TableCell>
-                      <div className="flex gap-1 items-center">
-                        <Select onValueChange={v => selectStock(i, v)}>
-                          <SelectTrigger className="h-9 text-sm flex-1"><SelectValue placeholder="Select item" /></SelectTrigger>
-                          <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                        <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" title="Quick add item" onClick={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}>
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      {!item.stockItemId && <Input className="h-9 mt-1 text-sm" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
-                      {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
+                      <ItemSearchCombobox
+                        stockItems={stockItems as any[]}
+                        itemName={item.itemName}
+                        stockItemId={item.stockItemId}
+                        onNameChange={v => updateItem(i, "itemName", v)}
+                        onItemSelect={si => selectStock(i, String(si.id))}
+                        onClear={() => clearItem(i)}
+                        onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
+                      />
                       <Input
                         className="h-7 text-xs mt-1"
                         placeholder="Description (optional)"

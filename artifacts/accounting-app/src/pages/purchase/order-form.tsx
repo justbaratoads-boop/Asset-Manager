@@ -16,6 +16,9 @@ import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
+import { QuickAddItemDialog } from "@/components/quick-add-item-dialog";
+import { ItemSearchCombobox } from "@/components/item-search-combobox";
+import { getListStockItemsQueryKey } from "@workspace/api-client-react";
 
 interface POItem {
   stockItemId?: number;
@@ -89,6 +92,8 @@ export default function PurchaseOrderForm() {
   const [items, setItems] = useState<POItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAddParty, setShowAddParty] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!existing || !isEdit) return;
@@ -124,6 +129,18 @@ export default function PurchaseOrderForm() {
     if (si) {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
       setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }); return u; });
+    }
+  };
+
+  const clearItem = (index: number) => {
+    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false }); return u; });
+  };
+
+  const handleQuickAdded = (newItem: any) => {
+    queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
+    if (quickAddForIndex !== null) {
+      const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calcItem({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true }); return u; });
     }
   };
 
@@ -205,12 +222,16 @@ export default function PurchaseOrderForm() {
                   <span className="text-sm font-semibold text-muted-foreground">Item {i + 1}</span>
                   <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                 </div>
-                <Select onValueChange={v => selectStock(i, v)}>
-                  <SelectTrigger className="h-10 text-sm w-full"><SelectValue placeholder="Select item" /></SelectTrigger>
-                  <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                </Select>
-                {!item.stockItemId && <Input className="h-10 text-sm" placeholder="Item name *" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
-                {item.stockItemId && <div className="text-sm text-muted-foreground px-1 -mt-1">{item.itemName}</div>}
+                <ItemSearchCombobox
+                  stockItems={stockItems as any[]}
+                  itemName={item.itemName}
+                  stockItemId={item.stockItemId}
+                  onNameChange={v => updateItem(i, "itemName", v)}
+                  onItemSelect={si => selectStock(i, String(si.id))}
+                  onClear={() => clearItem(i)}
+                  onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
+                  inputClassName="h-10"
+                />
                 {item.stockItemId && stockAvail[item.stockItemId] && (
                   <p className="text-xs px-1 -mt-1">
                     <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>
@@ -319,12 +340,15 @@ export default function PurchaseOrderForm() {
                 {items.map((item, i) => (
                   <TableRow key={i}>
                     <TableCell>
-                      <Select onValueChange={v => selectStock(i, v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select item" /></SelectTrigger>
-                        <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                      {!item.stockItemId && <Input className="h-7 mt-1 text-xs" placeholder="Item name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />}
-                      {item.stockItemId && <div className="text-xs text-muted-foreground mt-1 px-1">{item.itemName}</div>}
+                      <ItemSearchCombobox
+                        stockItems={stockItems as any[]}
+                        itemName={item.itemName}
+                        stockItemId={item.stockItemId}
+                        onNameChange={v => updateItem(i, "itemName", v)}
+                        onItemSelect={si => selectStock(i, String(si.id))}
+                        onClear={() => clearItem(i)}
+                        onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
+                      />
                       {item.stockItemId && stockAvail[item.stockItemId] && (
                         <p className="text-xs mt-0.5 px-1">
                           <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>
@@ -397,6 +421,11 @@ export default function PurchaseOrderForm() {
         onOpenChange={setShowAddParty}
         defaultAccountGroup="Sundry Creditors"
         onCreated={p => { setPartyId(p.id); setPartyName(p.name); setErrors(prev => { const n = { ...prev }; delete n.party; return n; }); }}
+      />
+      <QuickAddItemDialog
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        onCreated={handleQuickAdded}
       />
     </form>
   );
