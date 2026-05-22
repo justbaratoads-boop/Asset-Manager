@@ -43,6 +43,11 @@ const PAYMENT_MODES = [
   { value: "cheque", label: "Cheque" },
 ];
 
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
+
 function StatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className={`capitalize text-xs ${statusStyles[status] || ""}`}>{status || "confirmed"}</Badge>;
 }
@@ -441,6 +446,7 @@ export default function PurchaseInvoiceList() {
                 <div className="text-right space-y-1">
                   <p className="font-bold text-base">{formatCurrency(inv.grandTotal)}</p>
                   <StatusBadge status={inv.status} />
+                  {isEdited(inv.createdAt, inv.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -511,7 +517,12 @@ export default function PurchaseInvoiceList() {
                   <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>
                   <TableCell className="text-right text-green-600">{formatCurrency(inv.amountPaid)}</TableCell>
                   <TableCell className="text-right text-red-600">{formatCurrency(inv.balanceDue)}</TableCell>
-                  <TableCell><StatusBadge status={inv.status} /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <StatusBadge status={inv.status} />
+                      {isEdited(inv.createdAt, inv.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">
                       <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewId(inv.id)}>

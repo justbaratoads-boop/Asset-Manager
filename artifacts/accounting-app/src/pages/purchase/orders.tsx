@@ -34,6 +34,11 @@ const statusLabels: Record<string, string> = {
 
 const STATUSES = ["all", "open", "partially_received", "received", "cancelled"];
 
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
+
 // ─── View Sheet ────────────────────────────────────────────────────────────────
 function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: () => void }) {
   const [data, setData] = useState<any>(null);
@@ -492,6 +497,7 @@ export default function PurchaseOrderList() {
                   <Badge variant="outline" className={`capitalize text-xs ${statusStyles[o.status] || ""}`}>
                     {statusLabels[o.status] || o.status}
                   </Badge>
+                  {isEdited(o.createdAt, o.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
                 </div>
               </div>
               <div className="flex gap-2 border-t pt-3">
@@ -553,9 +559,12 @@ export default function PurchaseOrderList() {
                   <TableCell className="font-medium">{o.partyName}</TableCell>
                   <TableCell className="text-right font-medium">{formatCurrency(o.grandTotal)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={`capitalize text-xs ${statusStyles[o.status] || ""}`}>
-                      {statusLabels[o.status] || o.status}
-                    </Badge>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <Badge variant="outline" className={`capitalize text-xs ${statusStyles[o.status] || ""}`}>
+                        {statusLabels[o.status] || o.status}
+                      </Badge>
+                      {isEdited(o.createdAt, o.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
+                    </div>
                   </TableCell>
                   <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">

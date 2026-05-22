@@ -9,7 +9,13 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Pencil, Trash2, Eye } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
 
 const PAGE_SIZE = 20;
 
@@ -56,6 +62,7 @@ export default function DebitNotesList() {
                   <p className="font-bold text-base">{n.partyName}</p>
                   <p className="text-xs text-muted-foreground font-mono">{n.noteNumber} · {formatDate(n.date)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.reason}</p>
+                  {isEdited(n.createdAt, n.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 mt-0.5">Edited</Badge>}
                 </div>
                 <p className="font-bold text-base text-red-600 shrink-0">{formatCurrency(n.amount)}</p>
               </div>
@@ -99,7 +106,10 @@ export default function DebitNotesList() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No debit notes</TableCell></TableRow>
               ) : paginated.map((n: any) => (
                 <TableRow key={n.id}>
-                  <TableCell className="font-mono text-sm">{n.noteNumber}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {n.noteNumber}
+                    {isEdited(n.createdAt, n.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 ml-1">Edited</Badge>}
+                  </TableCell>
                   <TableCell className="text-sm">{formatDate(n.date)}</TableCell>
                   <TableCell>{n.partyName}</TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{n.reason}</TableCell>

@@ -13,6 +13,11 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
+
 const PAGE_SIZE = 20;
 
 export default function JournalList() {
@@ -61,6 +66,7 @@ export default function JournalList() {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground font-mono">{j.voucherNumber} · {formatDate(j.date)}</p>
                   <p className="font-medium text-sm mt-0.5 truncate">{j.narration}</p>
+                  {isEdited(j.createdAt, j.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 mt-1">Edited</Badge>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -113,7 +119,10 @@ export default function JournalList() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No journal entries</TableCell></TableRow>
               ) : paginated.map((j: any) => (
                 <TableRow key={j.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setViewId(j.id)}>
-                  <TableCell className="font-mono text-sm font-medium">{j.voucherNumber}</TableCell>
+                  <TableCell className="font-mono text-sm font-medium">
+                    {j.voucherNumber}
+                    {isEdited(j.createdAt, j.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 ml-1">Edited</Badge>}
+                  </TableCell>
                   <TableCell className="text-sm">{formatDate(j.date)}</TableCell>
                   <TableCell className="text-sm max-w-xs truncate">{j.narration}</TableCell>
                   <TableCell className="text-right font-medium text-sky-700">{formatCurrency(j.totalDebit)}</TableCell>

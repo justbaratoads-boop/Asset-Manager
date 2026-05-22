@@ -16,6 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 20;
 
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
+
 const gstBadge: Record<string, string> = {
   registered:   "bg-green-100 text-green-700 border-green-300",
   unregistered: "bg-gray-100 text-gray-600 border-gray-300",
@@ -97,6 +102,7 @@ export default function PartiesList() {
                       {party.gstType}
                     </Badge>
                     {party.city && <span className="text-xs text-muted-foreground">{party.city}, {party.state}</span>}
+                    {isEdited(party.createdAt, party.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -154,6 +160,7 @@ export default function PartiesList() {
                   <TableCell>
                     <p className="font-medium">{party.name}</p>
                     {party.gstin && <p className="text-xs font-mono text-muted-foreground">{party.gstin}</p>}
+                    {isEdited(party.createdAt, party.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 mt-0.5">Edited</Badge>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{party.accountGroup}</TableCell>
                   <TableCell>

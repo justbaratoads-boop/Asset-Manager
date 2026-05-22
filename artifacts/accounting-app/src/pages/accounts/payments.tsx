@@ -10,7 +10,13 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Pencil, Trash2, Eye } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+
+function isEdited(createdAt: string | null, updatedAt: string | null) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+}
 
 const PAGE_SIZE = 20;
 
@@ -61,6 +67,7 @@ export default function PaymentList() {
                   <p className="font-bold text-base">{p.partyName || "—"}</p>
                   <p className="text-xs text-muted-foreground font-mono">{p.voucherNumber} · {formatDate(p.date)}</p>
                   {p.narration && <p className="text-xs text-muted-foreground">{p.narration}</p>}
+                  {isEdited(p.createdAt, p.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 mt-0.5">Edited</Badge>}
                 </div>
                 <p className="font-bold text-base text-red-600">{formatCurrency(p.amount)}</p>
               </div>
@@ -104,7 +111,10 @@ export default function PaymentList() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No payments</TableCell></TableRow>
               ) : paginated.map((p: any) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-mono text-sm">{p.voucherNumber}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {p.voucherNumber}
+                    {isEdited(p.createdAt, p.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 ml-1">Edited</Badge>}
+                  </TableCell>
                   <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
                   <TableCell>{p.partyName || "-"}</TableCell>
                   <TableCell className="text-sm">{ledgerName(p.ledgerId)}</TableCell>
