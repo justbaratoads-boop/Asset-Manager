@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   BookOpen, TrendingUp, TrendingDown, BarChart2, Receipt, ShoppingCart,
-  DollarSign, Package, Layers, Users, BarChart, Truck, PackageCheck
+  DollarSign, Package, Layers, Users, BarChart, Truck, PackageCheck, Grid3x3
 } from "lucide-react";
 
 const reports = [
@@ -17,6 +17,7 @@ const reports = [
   { title: "All Transactions", href: "/reports/all-transactions", desc: "Complete transaction history", icon: Layers, color: "text-slate-600" },
   { title: "Party Statement", href: "/reports/party-statement", desc: "Party-wise account ledger", icon: Users, color: "text-pink-600" },
   { title: "Stock Summary", href: "/reports/stock-summary", desc: "Item-wise opening, purchase, sale & closing", icon: BarChart, color: "text-rose-600" },
+  { title: "Batch-wise Stock Summary", href: "/reports/stock-summary-batch", desc: "Opening, inward, outward & closing per batch · avg cost", icon: Grid3x3, color: "text-fuchsia-600" },
   { title: "Delivery Report", href: "/reports/delivery-report", desc: "Orders dispatched by vehicle & driver", icon: Truck, color: "text-teal-600" },
   { title: "Stock Availability", href: "/reports/stock-availability", desc: "Physical vs available stock with pending orders", icon: PackageCheck, color: "text-violet-600" },
 ];

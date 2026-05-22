@@ -4,7 +4,7 @@ import {
   saleInvoicesTable, saleInvoiceItemsTable, purchaseInvoicesTable, purchaseInvoiceItemsTable,
   saleInvoicePaymentsTable, purchaseInvoicePaymentsTable,
   paymentsTable, receiptsTable, journalEntriesTable, journalLinesTable,
-  ledgersTable, stockItemsTable, ordersTable,
+  ledgersTable, stockItemsTable, stockBatchesTable, ordersTable,
   creditNotesTable, debitNotesTable, creditNoteItemsTable, debitNoteItemsTable
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
@@ -877,6 +877,168 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
   });
 
   res.json({ summary, period: { from: from || null, to: to || null } });
+});
+
+// ── Batch-wise Stock Summary ──────────────────────────────────────────────────
+router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
+  const { from, to } = req.query;
+
+  const [items, batches] = await Promise.all([
+    db.select().from(stockItemsTable)
+      .where(eq(stockItemsTable.isDeleted, "false"))
+      .orderBy(stockItemsTable.name),
+    db.select().from(stockBatchesTable)
+      .orderBy(stockBatchesTable.name),
+  ]);
+
+  // Group batches by item
+  const batchesByItem: Record<number, typeof batches> = {};
+  for (const b of batches) {
+    if (b.stockItemId) {
+      if (!batchesByItem[b.stockItemId]) batchesByItem[b.stockItemId] = [];
+      batchesByItem[b.stockItemId].push(b);
+    }
+  }
+
+  const dateFilter = (dateCol: any) => and(
+    ...(from ? [gte(dateCol, from as string)] : []),
+    ...(to   ? [lte(dateCol, to   as string)] : []),
+  );
+
+  // Purchases (inward) grouped by itemId + batchId
+  const [purchRows, saleRows, creditRows, debitRows] = await Promise.all([
+    db.select({
+      stockItemId: purchaseInvoiceItemsTable.stockItemId,
+      batchId:     purchaseInvoiceItemsTable.batchId,
+      qty:   sql<string>`SUM(${purchaseInvoiceItemsTable.quantity})`,
+      value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
+    }).from(purchaseInvoiceItemsTable)
+      .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
+      .where(and(eq(purchaseInvoicesTable.isDeleted, "false"), dateFilter(purchaseInvoicesTable.date)))
+      .groupBy(purchaseInvoiceItemsTable.stockItemId, purchaseInvoiceItemsTable.batchId),
+
+    // Sales (outward) grouped by itemId + batchId
+    db.select({
+      stockItemId: saleInvoiceItemsTable.stockItemId,
+      batchId:     saleInvoiceItemsTable.batchId,
+      qty:   sql<string>`SUM(${saleInvoiceItemsTable.quantity})`,
+      value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
+    }).from(saleInvoiceItemsTable)
+      .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+      .where(and(eq(saleInvoicesTable.isDeleted, "false"), dateFilter(saleInvoicesTable.date)))
+      .groupBy(saleInvoiceItemsTable.stockItemId, saleInvoiceItemsTable.batchId),
+
+    // Credit notes (sale returns → inward, no batch) grouped by itemId
+    db.select({
+      stockItemId: creditNoteItemsTable.stockItemId,
+      qty:   sql<string>`SUM(${creditNoteItemsTable.quantity})`,
+      value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
+    }).from(creditNoteItemsTable)
+      .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+      .where(and(eq(creditNotesTable.isDeleted, "false"), dateFilter(creditNotesTable.date)))
+      .groupBy(creditNoteItemsTable.stockItemId),
+
+    // Debit notes (purchase returns → outward, no batch) grouped by itemId
+    db.select({
+      stockItemId: debitNoteItemsTable.stockItemId,
+      qty:   sql<string>`SUM(${debitNoteItemsTable.quantity})`,
+      value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
+    }).from(debitNoteItemsTable)
+      .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+      .where(and(eq(debitNotesTable.isDeleted, "false"), dateFilter(debitNotesTable.date)))
+      .groupBy(debitNoteItemsTable.stockItemId),
+  ]);
+
+  // Build lookup maps keyed by "itemId-batchId"
+  const purchMap: Record<string, { qty: number; value: number }> = {};
+  for (const r of purchRows) {
+    const k = `${r.stockItemId}-${r.batchId ?? "null"}`;
+    purchMap[k] = { qty: Number(r.qty), value: Number(r.value) };
+  }
+  const saleMap: Record<string, { qty: number; value: number }> = {};
+  for (const r of saleRows) {
+    const k = `${r.stockItemId}-${r.batchId ?? "null"}`;
+    saleMap[k] = { qty: Number(r.qty), value: Number(r.value) };
+  }
+  const creditMap: Record<number, { qty: number; value: number }> = {};
+  for (const r of creditRows) {
+    if (r.stockItemId) creditMap[r.stockItemId] = { qty: Number(r.qty), value: Number(r.value) };
+  }
+  const debitMap: Record<number, { qty: number; value: number }> = {};
+  for (const r of debitRows) {
+    if (r.stockItemId) debitMap[r.stockItemId] = { qty: Number(r.qty), value: Number(r.value) };
+  }
+
+  function buildRow(
+    itemId: number,
+    batchId: number | null,
+    closingQty: number,
+    baseRate: number,
+    inclCreditDebit: boolean,
+  ) {
+    const k = `${itemId}-${batchId ?? "null"}`;
+    const purch  = purchMap[k]  || { qty: 0, value: 0 };
+    const sale   = saleMap[k]   || { qty: 0, value: 0 };
+    // Credit/debit notes are item-level (no batch), only added to the null-batch row
+    const credit = inclCreditDebit ? (creditMap[itemId] || { qty: 0, value: 0 }) : { qty: 0, value: 0 };
+    const debit  = inclCreditDebit ? (debitMap[itemId]  || { qty: 0, value: 0 }) : { qty: 0, value: 0 };
+
+    const inwardQty   = purch.qty  + credit.qty;
+    const inwardValue = purch.value + credit.value;
+    const outwardQty  = sale.qty   + debit.qty;
+    const outwardValue = sale.value + debit.value;
+
+    // Derive opening from closing by reversing period movement
+    const openingQty   = closingQty - inwardQty + outwardQty;
+    const openingRate  = baseRate;
+    const openingValue = openingQty * openingRate;
+
+    const inwardRate  = inwardQty  > 0 ? inwardValue  / inwardQty  : 0;
+    const outwardRate = outwardQty > 0 ? outwardValue / outwardQty : 0;
+
+    // Weighted average cost for closing
+    const avgDenom    = openingQty + inwardQty;
+    const closingRate = avgDenom > 0 ? (openingValue + inwardValue) / avgDenom : baseRate;
+    const closingValue = Math.max(0, closingQty) * closingRate;
+
+    return {
+      batchId, batchName: null as string | null, expiryDate: null as string | null,
+      openingQty, openingRate, openingValue,
+      inwardQty, inwardRate, inwardValue,
+      outwardQty, outwardRate, outwardValue,
+      closingQty, closingRate, closingValue,
+    };
+  }
+
+  const result = items.map(item => {
+    const itemBatches = batchesByItem[item.id] || [];
+    const baseRate    = Number(item.purchaseRate) || 0;
+    const rows = [];
+
+    if (itemBatches.length === 0) {
+      // No batches — single main stock row
+      rows.push({ ...buildRow(item.id, null, Number(item.physicalStock) || 0, baseRate, true), batchName: null });
+    } else {
+      // Has batches: main (unbatched) row + each batch row
+      const mainRow = buildRow(item.id, null, Number(item.physicalStock) || 0, baseRate, true);
+      rows.push({ ...mainRow, batchName: null });
+
+      for (const b of itemBatches) {
+        const br = buildRow(item.id, b.id, Number(b.physicalStock) || 0, baseRate, false);
+        rows.push({ ...br, batchId: b.id, batchName: b.name, expiryDate: b.expiryDate ?? null });
+      }
+    }
+
+    return {
+      itemId:   item.id,
+      itemName: item.name,
+      unit:     item.unit,
+      hsnCode:  item.hsnCode,
+      rows,
+    };
+  });
+
+  res.json({ items: result, period: { from: from || null, to: to || null } });
 });
 
 router.get("/reports/delivery-report", authMiddleware, async (req, res) => {
