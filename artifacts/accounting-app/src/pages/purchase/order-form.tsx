@@ -301,18 +301,18 @@ export default function PurchaseOrderForm() {
           </div>
 
           {/* Desktop table layout */}
-          <div className="hidden md:block">
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Rate</TableHead>
-                  <TableHead>Disc%</TableHead>
+                  <TableHead className="min-w-[200px]">Item</TableHead>
+                  <TableHead className="w-24">Qty</TableHead>
+                  <TableHead className="w-20">Unit</TableHead>
+                  <TableHead className="w-28">Rate</TableHead>
+                  <TableHead className="w-20">Disc%</TableHead>
                   <TableHead className="w-32">GST Type / %</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="w-28 text-right">Total</TableHead>
+                  <TableHead className="w-8"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

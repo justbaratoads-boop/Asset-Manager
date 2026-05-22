@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useListPurchaseOrders, useDeletePurchaseOrder, getListPurchaseOrdersQueryKey, getListPurchaseInvoicesQueryKey, customFetch } from "@workspace/api-client-react";
+import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ const STATUSES = ["all", "open", "partially_received", "received", "cancelled"];
 function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: () => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
 
   useEffect(() => {
     if (!id) { setData(null); return; }
@@ -49,6 +51,12 @@ function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: (
   }, [id]);
 
   const items: any[] = data?.items || [];
+
+  const getBatchName = (batchId: number | null) => {
+    if (!batchId) return null;
+    const b = (batches as any[]).find((b: any) => b.id === batchId);
+    return b ? b.name : `Batch #${batchId}`;
+  };
 
   return (
     <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
@@ -106,17 +114,23 @@ function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: (
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {items.map((item: any, i: number) => (
-                      <tr key={i} className="hover:bg-muted/20">
-                        <td className="px-3 py-2.5">
-                          <p className="font-medium">{item.itemName}</p>
-                          {item.gstPct > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
-                        </td>
-                        <td className="px-3 py-2.5 text-right text-muted-foreground">{Number(item.quantity)} {item.unit}</td>
-                        <td className="px-3 py-2.5 text-right">{formatCurrency(Number(item.rate))}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold">{formatCurrency(Number(item.total))}</td>
-                      </tr>
-                    ))}
+                    {items.map((item: any, i: number) => {
+                      const batchName = getBatchName(item.batchId);
+                      const gstPct = Number(item.gstPct);
+                      const discPct = Number(item.discountPct);
+                      return (
+                        <tr key={i} className="hover:bg-muted/20">
+                          <td className="px-3 py-2.5">
+                            <p className="font-medium">{item.itemName}</p>
+                            {batchName && <p className="text-xs text-blue-600 font-medium">Batch: {batchName}</p>}
+                            {gstPct > 0 && <p className="text-xs text-muted-foreground">GST {gstPct}%{discPct > 0 ? ` · Disc ${discPct}%` : ""}</p>}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{Number(item.quantity)} {item.unit}</td>
+                          <td className="px-3 py-2.5 text-right">{formatCurrency(Number(item.rate))}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold">{formatCurrency(Number(item.total))}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="border-t bg-muted/30 font-bold">
