@@ -37,12 +37,6 @@ const statusStyles: Record<string, string> = {
 };
 
 const STATUSES = ["all", "confirmed", "partial", "paid", "cancelled"];
-const PAYMENT_MODES = [
-  { value: "cash", label: "Cash" },
-  { value: "bank_transfer", label: "Bank Transfer" },
-  { value: "upi", label: "UPI" },
-  { value: "cheque", label: "Cheque" },
-];
 
 function getBatchName(batchId: number | null | undefined, batches: any[]): string {
   if (!batchId) return "";
@@ -82,6 +76,13 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
   }, [id]);
 
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
+  const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
+      if (Array.isArray(data)) setBankAccounts(data.map((l: any) => ({ value: `bank_${l.id}`, label: l.name })));
+    }).catch(() => {});
+  }, []);
+  const allPaymentModes = [{ value: "cash", label: "Cash" }, ...bankAccounts];
   const items: any[] = data?.items || [];
   const payments: any[] = data?.payments || [];
 
@@ -212,7 +213,7 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
                   {payments.map((p: any, i: number) => (
                     <div key={i} className="flex justify-between items-center px-3 py-2 text-sm">
                       <div>
-                        <span className="font-medium capitalize">{p.mode?.replace("_", " ")}</span>
+                        <span className="font-medium capitalize">{allPaymentModes.find(m => m.value === p.mode)?.label ?? p.mode?.replace(/_/g, " ") ?? ""}</span>
                         {p.reference && <span className="text-xs text-muted-foreground ml-2">Ref: {p.reference}</span>}
                       </div>
                       <span className="font-semibold text-green-700">{formatCurrency(Number(p.amount))}</span>
@@ -260,6 +261,13 @@ function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { toast } = useToast();
+  const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
+      if (Array.isArray(data)) setBankAccounts(data.map((l: any) => ({ value: `bank_${l.id}`, label: l.name })));
+    }).catch(() => {});
+  }, []);
+  const allPaymentModes = [{ value: "cash", label: "Cash" }, ...bankAccounts];
 
   const handlePay = async () => {
     const amt = Number(amount);
@@ -320,7 +328,7 @@ function PayDialog({ invoice, onClose, onPaid }: PayDialogProps) {
             <Label>Payment Mode</Label>
             <Select value={mode} onValueChange={setMode}>
               <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+              <SelectContent>{allPaymentModes.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
