@@ -7,7 +7,7 @@ import {
   ledgersTable, stockItemsTable, stockBatchesTable, ordersTable,
   creditNotesTable, debitNotesTable, creditNoteItemsTable, debitNoteItemsTable
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, sql, inArray, isNull } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -1273,6 +1273,152 @@ router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
     openingQty,
     closingQty: balance,
     transactions,
+  });
+});
+
+// ── Batch / Unbatched-stock Ledger ───────────────────────────────────────────
+// GET /reports/stock-batch-ledger?itemId=X&batchId=Y|null&from=...&to=...
+router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
+  const itemId     = Number(req.query.itemId);
+  const batchIdRaw = req.query.batchId as string | undefined;
+  const batchId    = batchIdRaw === undefined || batchIdRaw === "null" ? null : Number(batchIdRaw);
+  const { from, to } = req.query;
+
+  if (!itemId) { res.status(400).json({ error: "itemId required" }); return; }
+
+  const [itemRows, batchRows] = await Promise.all([
+    db.select().from(stockItemsTable).where(eq(stockItemsTable.id, itemId)).limit(1),
+    batchId !== null
+      ? db.select().from(stockBatchesTable).where(eq(stockBatchesTable.id, batchId)).limit(1)
+      : Promise.resolve([] as typeof stockBatchesTable.$inferSelect[]),
+  ]);
+
+  if (!itemRows.length) { res.status(404).json({ error: "Item not found" }); return; }
+  const item  = itemRows[0];
+  const batch = batchRows[0] ?? null;
+
+  const addDate = (conds: any[], col: any) => {
+    if (from) conds.push(gte(col, from as string));
+    if (to)   conds.push(lte(col, to   as string));
+    return conds;
+  };
+
+  const batchFilter = (col: any) =>
+    batchId !== null ? eq(col, batchId) : isNull(col);
+
+  const [purchItems, saleItems, cnItems, dnItems] = await Promise.all([
+    // Purchases → inward, filtered by itemId + batchId
+    db.select({
+      date:     purchaseInvoicesTable.date,
+      number:   purchaseInvoicesTable.invoiceNumber,
+      sourceId: purchaseInvoicesTable.id,
+      party:    purchaseInvoicesTable.partyName,
+      qty:      purchaseInvoiceItemsTable.quantity,
+      rate:     purchaseInvoiceItemsTable.rate,
+      value:    purchaseInvoiceItemsTable.taxableAmount,
+    }).from(purchaseInvoiceItemsTable)
+      .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
+      .where(and(
+        eq(purchaseInvoiceItemsTable.stockItemId, itemId),
+        batchFilter(purchaseInvoiceItemsTable.batchId),
+        eq(purchaseInvoicesTable.isDeleted, "false"),
+        ...addDate([], purchaseInvoicesTable.date),
+      )),
+
+    // Sales → outward, filtered by itemId + batchId
+    db.select({
+      date:     saleInvoicesTable.date,
+      number:   saleInvoicesTable.invoiceNumber,
+      sourceId: saleInvoicesTable.id,
+      party:    saleInvoicesTable.partyName,
+      qty:      saleInvoiceItemsTable.quantity,
+      rate:     saleInvoiceItemsTable.rate,
+      value:    saleInvoiceItemsTable.taxableAmount,
+    }).from(saleInvoiceItemsTable)
+      .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+      .where(and(
+        eq(saleInvoiceItemsTable.stockItemId, itemId),
+        batchFilter(saleInvoiceItemsTable.batchId),
+        eq(saleInvoicesTable.isDeleted, "false"),
+        ...addDate([], saleInvoicesTable.date),
+      )),
+
+    // Credit notes (sale returns → inward) — item-level only, shown for unbatched row
+    batchId === null
+      ? db.select({
+          date:     creditNotesTable.date,
+          number:   creditNotesTable.noteNumber,
+          sourceId: creditNotesTable.id,
+          party:    creditNotesTable.partyName,
+          qty:      creditNoteItemsTable.quantity,
+          rate:     creditNoteItemsTable.rate,
+          value:    creditNoteItemsTable.taxableAmount,
+        }).from(creditNoteItemsTable)
+          .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+          .where(and(
+            eq(creditNoteItemsTable.stockItemId, itemId),
+            eq(creditNotesTable.isDeleted, "false"),
+            ...addDate([], creditNotesTable.date),
+          ))
+      : Promise.resolve([] as { date:string; number:string; sourceId:number; party:string; qty:string; rate:string; value:string }[]),
+
+    // Debit notes (purchase returns → outward) — item-level only
+    batchId === null
+      ? db.select({
+          date:     debitNotesTable.date,
+          number:   debitNotesTable.noteNumber,
+          sourceId: debitNotesTable.id,
+          party:    debitNotesTable.partyName,
+          qty:      debitNoteItemsTable.quantity,
+          rate:     debitNoteItemsTable.rate,
+          value:    debitNoteItemsTable.taxableAmount,
+        }).from(debitNoteItemsTable)
+          .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+          .where(and(
+            eq(debitNoteItemsTable.stockItemId, itemId),
+            eq(debitNotesTable.isDeleted, "false"),
+            ...addDate([], debitNotesTable.date),
+          ))
+      : Promise.resolve([] as { date:string; number:string; sourceId:number; party:string; qty:string; rate:string; value:string }[]),
+  ]);
+
+  // Merge and sort all transactions by date
+  const rows = [
+    ...purchItems.map(r => ({ date: r.date, type: "Purchase Invoice", number: r.number, sourceId: r.sourceId, party: r.party, inQty: Number(r.qty), outQty: 0,            rate: Number(r.rate), value: Number(r.value) })),
+    ...saleItems.map (r => ({ date: r.date, type: "Sale Invoice",     number: r.number, sourceId: r.sourceId, party: r.party, inQty: 0,            outQty: Number(r.qty), rate: Number(r.rate), value: Number(r.value) })),
+    ...cnItems.map   (r => ({ date: r.date, type: "Credit Note",      number: r.number, sourceId: r.sourceId, party: r.party, inQty: Number(r.qty), outQty: 0,            rate: Number(r.rate), value: Number(r.value) })),
+    ...dnItems.map   (r => ({ date: r.date, type: "Debit Note",       number: r.number, sourceId: r.sourceId, party: r.party, inQty: 0,            outQty: Number(r.qty), rate: Number(r.rate), value: Number(r.value) })),
+  ].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+
+  // Summary aggregates
+  const inwardQty   = rows.reduce((s, r) => s + r.inQty,  0);
+  const outwardQty  = rows.reduce((s, r) => s + r.outQty, 0);
+  const inwardValue = rows.filter(r => r.inQty  > 0).reduce((s, r) => s + r.value, 0);
+  const outwardValue= rows.filter(r => r.outQty > 0).reduce((s, r) => s + r.value, 0);
+
+  const closingQty   = batch ? Number(batch.physicalStock) : Number(item.physicalStock);
+  const openingQty   = closingQty - inwardQty + outwardQty;
+  const baseRate     = Number(item.purchaseRate) || 0;
+  const openingValue = openingQty * baseRate;
+  const inwardRate   = inwardQty  > 0 ? inwardValue  / inwardQty  : 0;
+  const outwardRate  = outwardQty > 0 ? outwardValue / outwardQty : 0;
+  const avgDenom     = openingQty + inwardQty;
+  const closingRate  = avgDenom > 0 ? (openingValue + inwardValue) / avgDenom : baseRate;
+  const closingValue = Math.max(0, closingQty) * closingRate;
+
+  // Build running balance
+  let balance = openingQty;
+  const transactions = rows.map(r => {
+    balance += r.inQty - r.outQty;
+    return { ...r, balance };
+  });
+
+  res.json({
+    item:  { id: item.id, name: item.name, unit: item.unit, purchaseRate: Number(item.purchaseRate), saleRate: Number(item.saleRate) },
+    batch: batch ? { id: batch.id, name: batch.name, expiryDate: batch.expiryDate, openingStock: Number(batch.openingStock), physicalStock: Number(batch.physicalStock) } : null,
+    summary: { openingQty, openingRate: baseRate, openingValue, inwardQty, inwardRate, inwardValue, outwardQty, outwardRate, outwardValue, closingQty, closingRate, closingValue },
+    transactions,
+    period: { from: from || null, to: to || null },
   });
 });
 
