@@ -64,6 +64,7 @@ export const stockItemGstHistoryTable = pgTable("stock_item_gst_history", {
   itemId: integer("item_id").notNull(),
   oldRate: numeric("old_rate", { precision: 5, scale: 2 }).notNull(),
   newRate: numeric("new_rate", { precision: 5, scale: 2 }).notNull(),
+  effectiveFrom: text("effective_from"),
   changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

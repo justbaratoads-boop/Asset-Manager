@@ -305,17 +305,47 @@ router.get("/stock-items/:id", authMiddleware, async (req, res) => {
   });
 });
 
+router.get("/stock-items/:id/gst-affected-bills", authMiddleware, async (req, res) => {
+  const id = Number(req.params.id);
+  const from = (req.query.from as string) || "";
+  if (!from) return res.json({ saleCount: 0, purchaseCount: 0 });
+
+  const [saleResult, purchaseResult] = await Promise.all([
+    db.execute<{ cnt: string }>(sql`
+      SELECT COUNT(DISTINCT sii.invoice_id)::text AS cnt
+      FROM sale_invoice_items sii
+      JOIN sale_invoices si ON si.id = sii.invoice_id
+      WHERE sii.stock_item_id = ${id}
+        AND si.date >= ${from}
+        AND si.is_deleted = 'false'
+    `),
+    db.execute<{ cnt: string }>(sql`
+      SELECT COUNT(DISTINCT pii.invoice_id)::text AS cnt
+      FROM purchase_invoice_items pii
+      JOIN purchase_invoices pi ON pi.id = pii.invoice_id
+      WHERE pii.stock_item_id = ${id}
+        AND pi.date >= ${from}
+        AND pi.is_deleted = 'false'
+    `),
+  ]);
+
+  res.json({
+    saleCount: Number(saleResult.rows[0]?.cnt ?? 0),
+    purchaseCount: Number(purchaseResult.rows[0]?.cnt ?? 0),
+  });
+});
+
 router.put("/stock-items/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   const d = req.body;
   const used = await isItemUsedInBills(id);
 
-  // Fetch current item to detect GST rate change
   const [current] = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, id)).limit(1);
   if (!current) return res.status(404).json({ error: "Not found" });
 
   const newGstRate = String(d.gstRate || 0);
   const gstChanged = Number(newGstRate) !== Number(current.gstRate);
+  const effectiveFrom: string | undefined = d.gstEffectiveFrom;
 
   const [item] = await db.update(stockItemsTable).set({
     name: d.name,
@@ -337,10 +367,123 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
       itemId: id,
       oldRate: String(Number(current.gstRate)),
       newRate: newGstRate,
+      effectiveFrom: effectiveFrom ?? null,
     });
   }
 
-  res.json({ ...item, usedInBills: used });
+  let retroUpdate: { saleCount: number; purchaseCount: number } | undefined;
+
+  if (gstChanged && effectiveFrom) {
+    const rate = Number(newGstRate);
+
+    // Retroactively update sale invoice line items
+    await db.execute(sql`
+      UPDATE sale_invoice_items sii
+      SET
+        gst_pct    = ${rate},
+        cgst       = CASE WHEN si.is_interstate THEN 0
+                          ELSE ROUND(sii.taxable_amount * ${rate} / 200, 2) END,
+        sgst       = CASE WHEN si.is_interstate THEN 0
+                          ELSE ROUND(sii.taxable_amount * ${rate} / 200, 2) END,
+        igst       = CASE WHEN si.is_interstate THEN ROUND(sii.taxable_amount * ${rate} / 100, 2)
+                          ELSE 0 END,
+        total      = ROUND(sii.taxable_amount * (1 + ${rate} / 100.0), 2)
+      FROM sale_invoices si
+      WHERE sii.invoice_id = si.id
+        AND sii.stock_item_id = ${id}
+        AND si.date >= ${effectiveFrom}
+        AND si.is_deleted = 'false'
+    `);
+
+    // Recalculate sale invoice header totals for affected invoices
+    const saleUpdated = await db.execute<{ cnt: string }>(sql`
+      WITH affected AS (
+        SELECT DISTINCT sii.invoice_id
+        FROM sale_invoice_items sii
+        JOIN sale_invoices si ON si.id = sii.invoice_id
+        WHERE sii.stock_item_id = ${id}
+          AND si.date >= ${effectiveFrom}
+          AND si.is_deleted = 'false'
+      ),
+      agg AS (
+        SELECT sii.invoice_id,
+          COALESCE(SUM(sii.cgst), 0)  AS tc,
+          COALESCE(SUM(sii.sgst), 0)  AS ts,
+          COALESCE(SUM(sii.igst), 0)  AS ti
+        FROM sale_invoice_items sii
+        WHERE sii.invoice_id IN (SELECT invoice_id FROM affected)
+        GROUP BY sii.invoice_id
+      )
+      UPDATE sale_invoices si
+      SET
+        total_cgst  = agg.tc,
+        total_sgst  = agg.ts,
+        total_igst  = agg.ti,
+        total_gst   = agg.tc + agg.ts + agg.ti,
+        grand_total = si.grand_total - si.total_gst + (agg.tc + agg.ts + agg.ti),
+        balance_due = si.balance_due - si.total_gst + (agg.tc + agg.ts + agg.ti)
+      FROM agg
+      WHERE si.id = agg.invoice_id
+      RETURNING si.id
+    `);
+
+    // Retroactively update purchase invoice line items
+    await db.execute(sql`
+      UPDATE purchase_invoice_items pii
+      SET
+        gst_pct    = ${rate},
+        cgst       = CASE WHEN pi.is_interstate THEN 0
+                          ELSE ROUND(pii.taxable_amount * ${rate} / 200, 2) END,
+        sgst       = CASE WHEN pi.is_interstate THEN 0
+                          ELSE ROUND(pii.taxable_amount * ${rate} / 200, 2) END,
+        igst       = CASE WHEN pi.is_interstate THEN ROUND(pii.taxable_amount * ${rate} / 100, 2)
+                          ELSE 0 END,
+        total      = ROUND(pii.taxable_amount * (1 + ${rate} / 100.0), 2)
+      FROM purchase_invoices pi
+      WHERE pii.invoice_id = pi.id
+        AND pii.stock_item_id = ${id}
+        AND pi.date >= ${effectiveFrom}
+        AND pi.is_deleted = 'false'
+    `);
+
+    // Recalculate purchase invoice header totals
+    const purchaseUpdated = await db.execute<{ cnt: string }>(sql`
+      WITH affected AS (
+        SELECT DISTINCT pii.invoice_id
+        FROM purchase_invoice_items pii
+        JOIN purchase_invoices pi ON pi.id = pii.invoice_id
+        WHERE pii.stock_item_id = ${id}
+          AND pi.date >= ${effectiveFrom}
+          AND pi.is_deleted = 'false'
+      ),
+      agg AS (
+        SELECT pii.invoice_id,
+          COALESCE(SUM(pii.cgst), 0)  AS tc,
+          COALESCE(SUM(pii.sgst), 0)  AS ts,
+          COALESCE(SUM(pii.igst), 0)  AS ti
+        FROM purchase_invoice_items pii
+        WHERE pii.invoice_id IN (SELECT invoice_id FROM affected)
+        GROUP BY pii.invoice_id
+      )
+      UPDATE purchase_invoices pi
+      SET
+        total_cgst  = agg.tc,
+        total_sgst  = agg.ts,
+        total_igst  = agg.ti,
+        grand_total = pi.grand_total - pi.total_cgst - pi.total_sgst - pi.total_igst + (agg.tc + agg.ts + agg.ti),
+        balance_due = pi.balance_due - pi.total_cgst - pi.total_sgst - pi.total_igst + (agg.tc + agg.ts + agg.ti)
+      FROM agg
+      WHERE pi.id = agg.invoice_id
+      RETURNING pi.id
+    `);
+
+    retroUpdate = {
+      saleCount: saleUpdated.rows.length,
+      purchaseCount: purchaseUpdated.rows.length,
+    };
+  }
+
+  res.json({ ...item, usedInBills: used, ...(retroUpdate ? { retroUpdate } : {}) });
 });
 
 router.delete("/stock-items/:id", authMiddleware, async (req, res) => {
