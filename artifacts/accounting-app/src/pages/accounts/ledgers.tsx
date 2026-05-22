@@ -208,7 +208,8 @@ export default function LedgerAccounts() {
     const e: Record<string, string> = {};
     if (!partyForm.name.trim()) e.name = "Name is required";
     if (!partyForm.accountGroup) e.accountGroup = "Account group is required";
-    if (!partyForm.state) e.state = "State is required";
+    const stateRequired = partyForm.accountGroup === "Sundry Debtors" || partyForm.accountGroup === "Sundry Creditors";
+    if (stateRequired && !partyForm.state) e.state = "State is required";
     if (partyForm.phone && !/^\d{10}$/.test(partyForm.phone)) e.phone = "Phone must be exactly 10 digits";
     if (partyForm.gstType !== "unregistered") {
       if (!partyForm.gstin) e.gstin = "GSTIN is required";
@@ -736,7 +737,7 @@ export default function LedgerAccounts() {
                     <Input value={partyForm.city} onChange={e => setParty("city", e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label>State *</Label>
+                    <Label>State {(partyForm.accountGroup === "Sundry Debtors" || partyForm.accountGroup === "Sundry Creditors") ? "*" : ""}</Label>
                     <Select value={partyForm.state} onValueChange={v => setParty("state", v)}>
                       <SelectTrigger className={partyErrors.state ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select state" />
