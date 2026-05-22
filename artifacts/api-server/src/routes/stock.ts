@@ -317,25 +317,6 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
   const newGstRate = String(d.gstRate || 0);
   const gstChanged = Number(newGstRate) !== Number(current.gstRate);
 
-  if (used) {
-    // Only allow GST fields to be updated
-    const [item] = await db.update(stockItemsTable).set({
-      gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
-      gstRate: newGstRate,
-    }).where(eq(stockItemsTable.id, id)).returning();
-
-    // Log GST history if rate changed
-    if (gstChanged) {
-      await db.insert(stockItemGstHistoryTable).values({
-        itemId: id,
-        oldRate: String(Number(current.gstRate)),
-        newRate: newGstRate,
-      });
-    }
-    return res.json({ ...item, usedInBills: true });
-  }
-
-  // Full update for items not used in bills
   const [item] = await db.update(stockItemsTable).set({
     name: d.name,
     categoryId: d.categoryId,
@@ -346,11 +327,11 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
     saleRate: String(d.saleRate || 0),
     minStockLevel: String(d.minStockLevel || 0),
     barcode: d.barcode,
+    physicalStock: d.physicalStock !== undefined ? String(Number(d.physicalStock) || 0) : current.physicalStock,
     gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
     gstRate: newGstRate,
   }).where(eq(stockItemsTable.id, id)).returning();
 
-  // Log GST history if rate changed
   if (gstChanged) {
     await db.insert(stockItemGstHistoryTable).values({
       itemId: id,
@@ -359,7 +340,7 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
     });
   }
 
-  res.json(item);
+  res.json({ ...item, usedInBills: used });
 });
 
 router.delete("/stock-items/:id", authMiddleware, async (req, res) => {

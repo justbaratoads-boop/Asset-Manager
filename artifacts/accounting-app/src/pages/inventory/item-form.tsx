@@ -94,9 +94,9 @@ export default function ItemForm() {
       </div>
 
       {usedInBills && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
           <Lock className="h-4 w-4 shrink-0" />
-          <span>This item is used in bills. Only GST settings can be edited.</span>
+          <span>This item is used in bills. Changes will apply to future transactions only.</span>
         </div>
       )}
 
@@ -105,22 +105,22 @@ export default function ItemForm() {
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1 sm:col-span-2">
             <Label>Name *</Label>
-            <Input required value={form.name} onChange={e => set("name", e.target.value)} disabled={usedInBills} />
+            <Input required value={form.name} onChange={e => set("name", e.target.value)} />
           </div>
           <div className="space-y-1">
             <Label>Category</Label>
-            <Select value={form.categoryId} onValueChange={v => set("categoryId", v)} disabled={usedInBills}>
+            <Select value={form.categoryId} onValueChange={v => set("categoryId", v)}>
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>{(categories as any[]).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <Label>HSN Code</Label>
-            <Input value={form.hsnCode} onChange={e => set("hsnCode", e.target.value)} placeholder="e.g. 8471" disabled={usedInBills} />
+            <Input value={form.hsnCode} onChange={e => set("hsnCode", e.target.value)} placeholder="e.g. 8471" />
           </div>
           <div className="space-y-1">
             <Label>Unit</Label>
-            <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" disabled={usedInBills} />
+            <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" />
           </div>
         </CardContent>
       </Card>
@@ -152,24 +152,24 @@ export default function ItemForm() {
         </CardContent>
       </Card>
 
-      <Card className={usedInBills ? "opacity-50" : ""}>
+      <Card>
         <CardHeader><CardTitle className="text-base">Pricing & Stock</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1">
             <Label>Purchase Rate</Label>
-            <Input type="number" inputMode="decimal" min="0" step="any" value={form.purchaseRate} onChange={e => set("purchaseRate", e.target.value)} disabled={usedInBills} placeholder="0.00" />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.purchaseRate} onChange={e => set("purchaseRate", e.target.value)} placeholder="0.00" />
           </div>
           <div className="space-y-1">
             <Label>Sale Rate</Label>
-            <Input type="number" inputMode="decimal" min="0" step="any" value={form.saleRate} onChange={e => set("saleRate", e.target.value)} disabled={usedInBills} placeholder="0.00" />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.saleRate} onChange={e => set("saleRate", e.target.value)} placeholder="0.00" />
           </div>
           <div className="space-y-1">
             <Label>Min Stock Level</Label>
-            <Input type="number" inputMode="decimal" min="0" step="any" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} disabled={usedInBills} placeholder="0" />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.minStockLevel} onChange={e => set("minStockLevel", e.target.value)} placeholder="0" />
           </div>
           <div className="space-y-1">
             <Label>{isEdit ? "Unbatched Physical Stock" : "Opening Stock (Unbatched)"}</Label>
-            <Input type="number" inputMode="decimal" min="0" step="any" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} disabled={usedInBills} placeholder="0" />
+            <Input type="number" inputMode="decimal" min="0" step="any" value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} placeholder="0" />
             <p className="text-xs text-muted-foreground">Stock not assigned to any batch. Total stock = this + sum of all batch stocks.</p>
           </div>
         </CardContent>
