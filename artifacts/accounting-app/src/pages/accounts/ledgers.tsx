@@ -133,6 +133,7 @@ export default function LedgerAccounts() {
   const [partyErrors, setPartyErrors] = useState<Record<string, string>>({});
 
   const [isSaving, setIsSaving] = useState(false);
+  const [ledgerNameError, setLedgerNameError] = useState("");
   const [page, setPage] = useState(1);
 
   const { data: ledgers = [], isLoading: ledgersLoading } = useListLedgers({});
@@ -182,6 +183,7 @@ export default function LedgerAccounts() {
     setLedgerForm({ ...BLANK_LEDGER, group: (accountGroups as any[])[0]?.name || "" });
     setPartyForm(BLANK_PARTY);
     setPartyErrors({});
+    setLedgerNameError("");
     setDialogOpen(true);
   };
 
@@ -189,6 +191,7 @@ export default function LedgerAccounts() {
     setEditItem({ ...l, kind: "ledger" });
     setDialogType("ledger");
     setLedgerForm({ name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance) });
+    setLedgerNameError("");
     setDialogOpen(true);
   };
 
@@ -212,8 +215,9 @@ export default function LedgerAccounts() {
 
   const handleSave = async () => {
     if (dialogType === "ledger") {
-      if (!ledgerForm.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
+      if (!ledgerForm.name.trim()) { setLedgerNameError("Name is required"); return; }
       if (!ledgerForm.group) { toast({ title: "Account group is required", variant: "destructive" }); return; }
+      setLedgerNameError("");
       setIsSaving(true);
       try {
         if (editItem) {
@@ -234,7 +238,13 @@ export default function LedgerAccounts() {
         queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
         setDialogOpen(false);
       } catch (err: any) {
-        toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
+        const code = err?.data?.code;
+        const msg = err?.data?.error || "Failed to save";
+        if (code === "DUPLICATE_NAME") {
+          setLedgerNameError(msg);
+        } else {
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        }
       } finally {
         setIsSaving(false);
       }
@@ -537,7 +547,16 @@ export default function LedgerAccounts() {
                       {ledgerForm.name}
                     </div>
                   ) : (
-                    <Input value={ledgerForm.name} onChange={e => setLedgerForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. HDFC Bank Account" autoFocus />
+                    <>
+                      <Input
+                        value={ledgerForm.name}
+                        onChange={e => { setLedgerForm(p => ({ ...p, name: e.target.value })); setLedgerNameError(""); }}
+                        placeholder="e.g. HDFC Bank Account"
+                        autoFocus
+                        className={ledgerNameError ? "border-destructive" : ""}
+                      />
+                      {ledgerNameError && <p className="text-xs text-destructive">{ledgerNameError}</p>}
+                    </>
                   )}
                 </div>
                 <div className="space-y-1">
