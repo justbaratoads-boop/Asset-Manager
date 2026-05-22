@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useListPurchaseInvoices, useDeletePurchaseInvoice, getListPurchaseInvoicesQueryKey, customFetch } from "@workspace/api-client-react";
+import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,12 @@ const PAYMENT_MODES = [
   { value: "cheque", label: "Cheque" },
 ];
 
+function getBatchName(batchId: number | null | undefined, batches: any[]): string {
+  if (!batchId) return "";
+  const b = (batches || []).find((b: any) => b.id === Number(batchId));
+  return b ? b.batchCode + (b.expiryDate ? ` · exp ${b.expiryDate}` : "") : `#${batchId}`;
+}
+
 function isEdited(createdAt: string | null, updatedAt: string | null) {
   if (!createdAt || !updatedAt) return false;
   return new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
@@ -63,7 +70,7 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
   const [lastId, setLastId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!id) { setData(null); return; }
+    if (!id) { setData(null); setLastId(null); return; }
     if (id === lastId) return;
     setLastId(id);
     setLoading(true);
@@ -74,6 +81,7 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const items: any[] = data?.items || [];
   const payments: any[] = data?.payments || [];
 
@@ -143,6 +151,7 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
                       <tr key={i} className="hover:bg-muted/20">
                         <td className="px-3 py-2.5">
                           <p className="font-medium">{item.itemName}</p>
+                          {item.batchId && <p className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</p>}
                           {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
                         </td>
                         <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>

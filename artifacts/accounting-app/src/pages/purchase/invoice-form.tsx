@@ -167,6 +167,13 @@ export default function PurchaseInvoiceForm() {
     }
   }, [existing]);
 
+  useEffect(() => {
+    if (!partyId) return;
+    const party = (parties as any[]).find((p: any) => p.id === partyId);
+    const interstate = party?.isOutOfState === "true" || party?.isOutOfState === true;
+    setItems(prev => prev.map(item => calc(item, interstate)));
+  }, [partyId]);
+
   const updateItem = (index: number, field: keyof Item, value: any) => {
     setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], [field]: value }, isInterstate); return u; });
   };
