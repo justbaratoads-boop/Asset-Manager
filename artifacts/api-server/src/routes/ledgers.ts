@@ -46,7 +46,13 @@ router.put("/ledgers/:id", authMiddleware, async (req, res) => {
   const [existing] = await db.select().from(ledgersTable).where(eq(ledgersTable.id, Number(id))).limit(1);
   if (!existing) return res.status(404).json({ error: "Ledger not found" });
   if (existing.isSystem === "true") {
-    return res.status(400).json({ error: `"${existing.name}" is a system ledger and cannot be renamed or modified` });
+    // System ledgers: allow only opening balance and nature (Dr/Cr) to be updated
+    const [ledger] = await db.update(ledgersTable).set({
+      openingBalance: String(Number(data.openingBalance) || 0),
+      nature: data.nature || existing.nature,
+    }).where(eq(ledgersTable.id, Number(id))).returning();
+    if (!ledger) return res.status(404).json({ error: "Ledger not found" });
+    return res.json({ ...ledger, openingBalance: Number(ledger.openingBalance) });
   }
   const [ledger] = await db.update(ledgersTable).set({
     name: data.name,
@@ -234,9 +240,9 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   //   Sale invoice → Cr (output tax collected)
   //   Purchase invoice → Dr (input tax credit)
   const gstField: "totalCgst" | "totalSgst" | "totalIgst" | null =
-    ledger.name === "CGST Payable" ? "totalCgst" :
-    ledger.name === "SGST Payable" ? "totalSgst" :
-    ledger.name === "IGST Payable" ? "totalIgst" : null;
+    (ledger.name === "CGST" || ledger.name === "CGST Payable") ? "totalCgst" :
+    (ledger.name === "SGST" || ledger.name === "SGST Payable") ? "totalSgst" :
+    (ledger.name === "IGST" || ledger.name === "IGST Payable") ? "totalIgst" : null;
 
   if (gstField) {
     const salGstConds: any[] = [eq(saleInvoicesTable.isDeleted, "false")];

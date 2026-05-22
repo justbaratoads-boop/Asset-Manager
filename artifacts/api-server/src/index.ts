@@ -5,11 +5,18 @@ import { ledgersTable, accountGroupsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
 const SYSTEM_LEDGERS = [
-  { name: "Cash",          group: "Cash-in-Hand",  nature: "dr" },
-  { name: "CGST Payable",  group: "Duties & Taxes", nature: "cr" },
-  { name: "SGST Payable",  group: "Duties & Taxes", nature: "cr" },
-  { name: "IGST Payable",  group: "Duties & Taxes", nature: "cr" },
+  { name: "Cash",  group: "Cash-in-Hand",   nature: "dr" },
+  { name: "CGST",  group: "Duties & Taxes", nature: "cr" },
+  { name: "SGST",  group: "Duties & Taxes", nature: "cr" },
+  { name: "IGST",  group: "Duties & Taxes", nature: "cr" },
 ] as const;
+
+// Old names that should be migrated to new names on startup
+const LEDGER_RENAMES: { from: string; to: string }[] = [
+  { from: "CGST Payable", to: "CGST" },
+  { from: "SGST Payable", to: "SGST" },
+  { from: "IGST Payable", to: "IGST" },
+];
 
 async function ensureSystemLedgers() {
   try {
@@ -21,6 +28,13 @@ async function ensureSystemLedgers() {
         name: "Duties & Taxes", nature: "Liability",
         statement: "Balance Sheet", parentGroup: "liabilities", isSystem: "true",
       });
+    }
+
+    // Migrate old ledger names to new names
+    for (const { from, to } of LEDGER_RENAMES) {
+      await db.update(ledgersTable)
+        .set({ name: to })
+        .where(and(eq(ledgersTable.name, from), eq(ledgersTable.isSystem, "true")));
     }
 
     for (const seed of SYSTEM_LEDGERS) {

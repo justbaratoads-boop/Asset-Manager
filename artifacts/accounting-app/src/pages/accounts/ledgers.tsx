@@ -186,10 +186,6 @@ export default function LedgerAccounts() {
   };
 
   const openEditLedger = (l: any) => {
-    if (l.isSystem === "true") {
-      toast({ title: "System account", description: `"${l.name}" is a system ledger and cannot be edited`, variant: "destructive" });
-      return;
-    }
     setEditItem({ ...l, kind: "ledger" });
     setDialogType("ledger");
     setLedgerForm({ name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance) });
@@ -382,7 +378,7 @@ export default function LedgerAccounts() {
                           <Lock className="h-3 w-3" />System
                         </span>
                       )}
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLedger(u.raw)} disabled={u.isSystem}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLedger(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => !u.isSystem && setDeleteId(u.id)} disabled={u.isSystem}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   )}
@@ -463,15 +459,14 @@ export default function LedgerAccounts() {
                             <Link href={`/accounts/ledgers/${u.id}`}>
                               <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" title="View Statement"><Eye className="h-3.5 w-3.5" /></Button>
                             </Link>
-                            {u.isSystem ? (
+                            {u.isSystem && (
                               <span title="System ledger" className="inline-flex items-center gap-0.5 text-xs text-amber-600 font-medium px-1.5">
                                 <Lock className="h-3 w-3" />System
                               </span>
-                            ) : (
-                              <>
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLedger(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                              </>
+                            )}
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLedger(u.raw)}><Pencil className="h-3.5 w-3.5" /></Button>
+                            {!u.isSystem && (
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                             )}
                           </>
                         ) : (
@@ -525,48 +520,81 @@ export default function LedgerAccounts() {
           )}
 
           {/* ---- LEDGER FORM ---- */}
-          {dialogType === "ledger" && (
-            <div className="space-y-4 py-1">
-              <div className="space-y-1">
-                <Label>Account Name *</Label>
-                <Input value={ledgerForm.name} onChange={e => setLedgerForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. HDFC Bank Account" autoFocus />
-              </div>
-              <div className="space-y-1">
-                <Label>Account Group *</Label>
-                <Select value={ledgerForm.group} onValueChange={v => {
-                  const grp = (accountGroups as any[]).find((g: any) => g.name === v);
-                  setLedgerForm(p => ({ ...p, group: v, nature: grp ? (grp.nature === "Asset" || grp.nature === "Expense" ? "dr" : "cr") : p.nature }));
-                }}>
-                  <SelectTrigger className={!ledgerForm.group ? "border-destructive" : ""}>
-                    <SelectValue placeholder="Select group..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(accountGroups as any[]).map((g: any) => (
-                      <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Nature</Label>
-                <Select value={ledgerForm.nature} onValueChange={v => setLedgerForm(p => ({ ...p, nature: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dr">Debit (Dr)</SelectItem>
-                    <SelectItem value="cr">Credit (Cr)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Auto-set from the group you choose</p>
-              </div>
-              <div className="space-y-1">
-                <Label>Opening Balance</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
-                  <Input className="pl-7" type="number" value={ledgerForm.openingBalance} onChange={e => setLedgerForm(p => ({ ...p, openingBalance: e.target.value }))} placeholder="0.00" />
+          {dialogType === "ledger" && (() => {
+            const isSystemEdit = editItem?.isSystem === "true";
+            return (
+              <div className="space-y-4 py-1">
+                {isSystemEdit && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                    <Lock className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>System ledger — name and group are locked. You can set the opening balance and its Dr/Cr type.</span>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label>Account Name {!isSystemEdit && "*"}</Label>
+                  {isSystemEdit ? (
+                    <div className="h-9 flex items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground">
+                      {ledgerForm.name}
+                    </div>
+                  ) : (
+                    <Input value={ledgerForm.name} onChange={e => setLedgerForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. HDFC Bank Account" autoFocus />
+                  )}
                 </div>
+                <div className="space-y-1">
+                  <Label>Account Group {!isSystemEdit && "*"}</Label>
+                  {isSystemEdit ? (
+                    <div className="h-9 flex items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground">
+                      {ledgerForm.group}
+                    </div>
+                  ) : (
+                    <Select value={ledgerForm.group} onValueChange={v => {
+                      const grp = (accountGroups as any[]).find((g: any) => g.name === v);
+                      setLedgerForm(p => ({ ...p, group: v, nature: grp ? (grp.nature === "Asset" || grp.nature === "Expense" ? "dr" : "cr") : p.nature }));
+                    }}>
+                      <SelectTrigger className={!ledgerForm.group ? "border-destructive" : ""}>
+                        <SelectValue placeholder="Select group..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(accountGroups as any[]).map((g: any) => (
+                          <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Opening Balance</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <Input className="pl-7" type="number" value={ledgerForm.openingBalance} onChange={e => setLedgerForm(p => ({ ...p, openingBalance: e.target.value }))} placeholder="0.00" autoFocus={isSystemEdit} />
+                    </div>
+                    <Select value={ledgerForm.nature} onValueChange={v => setLedgerForm(p => ({ ...p, nature: v }))}>
+                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dr">Dr (Debit)</SelectItem>
+                        <SelectItem value="cr">Cr (Credit)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!isSystemEdit && <p className="text-xs text-muted-foreground">Dr/Cr is auto-set from the account group</p>}
+                </div>
+                {!isSystemEdit && (
+                  <div className="space-y-1">
+                    <Label>Nature</Label>
+                    <Select value={ledgerForm.nature} onValueChange={v => setLedgerForm(p => ({ ...p, nature: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dr">Debit (Dr)</SelectItem>
+                        <SelectItem value="cr">Credit (Cr)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Auto-set from the group you choose</p>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ---- PARTY FORM ---- */}
           {dialogType === "party" && !editItem && (

@@ -124,9 +124,9 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     ap:          byName("Accounts Payable")    ?? 5,
     sales:       byName("Sales")               ?? 9,
     purchase:    byName("Purchase")            ?? 10,
-    cgstPayable: byName("CGST Payable")        ?? 20,
-    sgstPayable: byName("SGST Payable")        ?? 21,
-    igstPayable: byName("IGST Payable")        ?? 22,
+    cgstPayable: byName("CGST") ?? byName("CGST Payable") ?? 20,
+    sgstPayable: byName("SGST") ?? byName("SGST Payable") ?? 21,
+    igstPayable: byName("IGST") ?? byName("IGST Payable") ?? 22,
   };
 
   // Build ledger balance map: ledgerId -> { dr, cr }
@@ -416,9 +416,9 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     ap:          byName("Accounts Payable")    ?? 5,
     sales:       byName("Sales")               ?? 9,
     purchase:    byName("Purchase")            ?? 10,
-    cgstPayable: byName("CGST Payable")        ?? 20,
-    sgstPayable: byName("SGST Payable")        ?? 21,
-    igstPayable: byName("IGST Payable")        ?? 22,
+    cgstPayable: byName("CGST") ?? byName("CGST Payable") ?? 20,
+    sgstPayable: byName("SGST") ?? byName("SGST Payable") ?? 21,
+    igstPayable: byName("IGST") ?? byName("IGST Payable") ?? 22,
   };
 
   // Build Dr/Cr balance map from all transaction sources
