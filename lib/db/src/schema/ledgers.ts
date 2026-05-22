@@ -21,6 +21,11 @@ export const ledgersTable = pgTable("ledgers", {
   openingBalance: numeric("opening_balance", { precision: 15, scale: 2 }).notNull().default("0"),
   isSystem: text("is_system").notNull().default("false"),
   isDeleted: text("is_deleted").notNull().default("false"),
+  bankName: text("bank_name"),
+  bankBranch: text("bank_branch"),
+  accountNumber: text("account_number"),
+  ifscCode: text("ifsc_code"),
+  upiId: text("upi_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

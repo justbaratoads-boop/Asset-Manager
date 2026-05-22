@@ -55,6 +55,11 @@ router.post("/ledgers", authMiddleware, async (req, res) => {
     group: data.group,
     nature: data.nature || "dr",
     openingBalance: String(data.openingBalance || 0),
+    bankName: data.bankName || null,
+    bankBranch: data.bankBranch || null,
+    accountNumber: data.accountNumber || null,
+    ifscCode: data.ifscCode || null,
+    upiId: data.upiId || null,
   }).returning();
   res.status(201).json({ ...ledger, openingBalance: Number(ledger.openingBalance) });
 });
@@ -101,6 +106,11 @@ router.put("/ledgers/:id", authMiddleware, async (req, res) => {
     group: data.group,
     nature: data.nature,
     openingBalance: String(data.openingBalance || 0),
+    bankName: data.bankName ?? null,
+    bankBranch: data.bankBranch ?? null,
+    accountNumber: data.accountNumber ?? null,
+    ifscCode: data.ifscCode ?? null,
+    upiId: data.upiId ?? null,
   }).where(eq(ledgersTable.id, Number(id))).returning();
   if (!ledger) return res.status(404).json({ error: "Ledger not found" });
   res.json({ ...ledger, openingBalance: Number(ledger.openingBalance) });

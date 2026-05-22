@@ -19,7 +19,7 @@ import { customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 
 const PAGE_SIZE = 25;
-const BLANK_LEDGER = { name: "", group: "", nature: "dr", openingBalance: "" };
+const BLANK_LEDGER = { name: "", group: "", nature: "dr", openingBalance: "", bankName: "", bankBranch: "", accountNumber: "", ifscCode: "", upiId: "" };
 const BLANK_PARTY = {
   name: "", accountGroup: "Sundry Debtors",
   gstType: "unregistered",
@@ -190,7 +190,11 @@ export default function LedgerAccounts() {
   const openEditLedger = (l: any) => {
     setEditItem({ ...l, kind: "ledger" });
     setDialogType("ledger");
-    setLedgerForm({ name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance) });
+    setLedgerForm({
+      name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance),
+      bankName: l.bankName || "", bankBranch: l.bankBranch || "",
+      accountNumber: l.accountNumber || "", ifscCode: l.ifscCode || "", upiId: l.upiId || "",
+    });
     setLedgerNameError("");
     setDialogOpen(true);
   };
@@ -502,7 +506,7 @@ export default function LedgerAccounts() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className={dialogType === "party" && !editItem ? "max-w-2xl max-h-[90vh] overflow-y-auto" : "max-w-sm"}>
+        <DialogContent className={dialogType === "party" && !editItem ? "max-w-2xl max-h-[90vh] overflow-y-auto" : ledgerForm.group === "Bank Accounts" ? "max-w-md max-h-[90vh] overflow-y-auto" : "max-w-sm"}>
           <DialogHeader>
             <DialogTitle>{editItem ? "Edit Ledger Account" : "New Account"}</DialogTitle>
           </DialogHeader>
@@ -609,6 +613,56 @@ export default function LedgerAccounts() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">Auto-set from the group you choose</p>
+                  </div>
+                )}
+
+                {ledgerForm.group === "Bank Accounts" && (
+                  <div className="border-t pt-3 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bank Details</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label>Bank Name</Label>
+                        <Input
+                          value={(ledgerForm as any).bankName}
+                          onChange={e => setLedgerForm((p: any) => ({ ...p, bankName: e.target.value }))}
+                          placeholder="e.g. HDFC Bank"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Branch</Label>
+                        <Input
+                          value={(ledgerForm as any).bankBranch}
+                          onChange={e => setLedgerForm((p: any) => ({ ...p, bankBranch: e.target.value }))}
+                          placeholder="e.g. Connaught Place"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Account Number</Label>
+                      <Input
+                        value={(ledgerForm as any).accountNumber}
+                        onChange={e => setLedgerForm((p: any) => ({ ...p, accountNumber: e.target.value }))}
+                        placeholder="Enter account number"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label>IFSC Code</Label>
+                        <Input
+                          value={(ledgerForm as any).ifscCode}
+                          onChange={e => setLedgerForm((p: any) => ({ ...p, ifscCode: e.target.value.toUpperCase() }))}
+                          placeholder="e.g. HDFC0001234"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>UPI ID</Label>
+                        <Input
+                          value={(ledgerForm as any).upiId}
+                          onChange={e => setLedgerForm((p: any) => ({ ...p, upiId: e.target.value }))}
+                          placeholder="e.g. business@upi"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
