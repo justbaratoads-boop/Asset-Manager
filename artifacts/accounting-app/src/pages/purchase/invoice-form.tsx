@@ -86,7 +86,7 @@ export default function PurchaseInvoiceForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreatePurchaseInvoice();
-  const { data: parties = [] } = useListParties();
+  const { data: parties = [] } = useListParties({ type: "supplier" });
   const { data: stockItems = [] } = useListStockItems({});
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetPurchaseInvoice(editId!, { query: { enabled: isEdit } });

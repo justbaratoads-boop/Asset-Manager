@@ -75,7 +75,7 @@ export default function PurchaseOrderForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreatePurchaseOrder();
-  const { data: parties = [] } = useListParties();
+  const { data: parties = [] } = useListParties({ type: "supplier" });
   const { data: stockItems = [] } = useListStockItems({});
   const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
