@@ -350,18 +350,19 @@ export default function PurchaseInvoiceForm() {
                       <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1">
                         <p className="font-semibold text-amber-800 mb-1">GST Inclusive Breakdown</p>
                         <div className="flex justify-between text-amber-900"><span>Rate entered (incl. {item.gstPct}% GST)</span><span className="font-medium">{formatCurrency(item.rate)} × {item.quantity}</span></div>
+                        {item.discountAmount > 0 && <div className="flex justify-between text-red-700"><span>Discount ({item.discountPct}%)</span><span>− {formatCurrency(item.discountAmount)}</span></div>}
                         <div className="flex justify-between text-green-800 font-medium"><span>Cost Price (base)</span><span>{formatCurrency(item.taxableAmount)}</span></div>
                         <div className="flex justify-between text-blue-800 font-medium"><span>GST ({item.gstPct}%)</span><span>+ {formatCurrency(item.gstAmount)}</span></div>
-                        {item.discountAmount > 0 && <div className="flex justify-between text-red-700"><span>Discount ({item.discountPct}%)</span><span>− {formatCurrency(item.discountAmount)}</span></div>}
                         <div className="flex justify-between font-bold border-t border-amber-200 pt-1 mt-0.5 text-amber-900"><span>Item Total</span><span>{formatCurrency(item.total)}</span></div>
                       </div>
                     )}
                     {/* Standard breakdown for exclusive GST */}
                     {item.quantity > 0 && item.rate > 0 && (!item.gstInclusive || item.gstPct === 0) && (
                       <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-xs space-y-0.5">
-                        <div className="flex justify-between text-muted-foreground"><span>Base amount</span><span>{formatCurrency(item.taxableAmount)}</span></div>
-                        {item.gstPct > 0 && <div className="flex justify-between text-muted-foreground"><span>GST ({item.gstPct}%)</span><span>+ {formatCurrency(item.gstAmount)}</span></div>}
+                        {item.discountAmount > 0 && <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(item.quantity * item.rate)}</span></div>}
                         {item.discountAmount > 0 && <div className="flex justify-between text-red-600"><span>Discount ({item.discountPct}%)</span><span>− {formatCurrency(item.discountAmount)}</span></div>}
+                        <div className="flex justify-between text-muted-foreground"><span>{item.discountAmount > 0 ? "Taxable" : "Base amount"}</span><span>{formatCurrency(item.taxableAmount)}</span></div>
+                        {item.gstPct > 0 && <div className="flex justify-between text-muted-foreground"><span>GST ({item.gstPct}%)</span><span>+ {formatCurrency(item.gstAmount)}</span></div>}
                         <div className="flex justify-between font-bold border-t border-border/60 pt-1 mt-1"><span>Total</span><span>{formatCurrency(item.total)}</span></div>
                       </div>
                     )}
