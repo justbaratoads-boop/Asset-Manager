@@ -21,24 +21,40 @@ async function isItemUsedInBills(itemId: number): Promise<boolean> {
   return Number(result.rows[0].cnt) > 0;
 }
 
-// Check if a batch's assigned item is used in bills
-async function isBatchUsedInBills(batchId: number): Promise<boolean> {
-  const [batch] = await db.select({ stockItemId: stockBatchesTable.stockItemId })
-    .from(stockBatchesTable).where(eq(stockBatchesTable.id, batchId)).limit(1);
-  if (!batch?.stockItemId) return false;
-  return isItemUsedInBills(batch.stockItemId);
+// Check if THIS specific batch is directly referenced in any bill line item
+async function isBatchDirectlyUsedInBills(batchId: number): Promise<boolean> {
+  const result = await db.execute<{ cnt: string }>(sql`
+    SELECT (
+      (SELECT COUNT(*) FROM sale_invoice_items     WHERE batch_id = ${batchId}) +
+      (SELECT COUNT(*) FROM purchase_invoice_items WHERE batch_id = ${batchId}) +
+      (SELECT COUNT(*) FROM order_items            WHERE batch_id = ${batchId}) +
+      (SELECT COUNT(*) FROM purchase_order_items   WHERE batch_id = ${batchId})
+    ) AS cnt
+  `);
+  return Number(result.rows[0].cnt) > 0;
 }
 
 // ---- BATCHES ----
 router.get("/stock-batches", authMiddleware, async (req, res) => {
   const itemId = req.query.itemId ? Number(req.query.itemId) : undefined;
-  const batches = await db.select().from(stockBatchesTable)
-    .where(itemId ? eq(stockBatchesTable.stockItemId, itemId) : undefined)
-    .orderBy(stockBatchesTable.name);
-  const items = await db.select({
-    id: stockItemsTable.id,
-    name: stockItemsTable.name,
-  }).from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false"));
+  const [batches, items, usedResult] = await Promise.all([
+    db.select().from(stockBatchesTable)
+      .where(itemId ? eq(stockBatchesTable.stockItemId, itemId) : undefined)
+      .orderBy(stockBatchesTable.name),
+    db.select({ id: stockItemsTable.id, name: stockItemsTable.name })
+      .from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false")),
+    db.execute<{ batch_id: number }>(sql`
+      SELECT DISTINCT batch_id FROM sale_invoice_items     WHERE batch_id IS NOT NULL
+      UNION
+      SELECT DISTINCT batch_id FROM purchase_invoice_items WHERE batch_id IS NOT NULL
+      UNION
+      SELECT DISTINCT batch_id FROM order_items            WHERE batch_id IS NOT NULL
+      UNION
+      SELECT DISTINCT batch_id FROM purchase_order_items   WHERE batch_id IS NOT NULL
+    `),
+  ]);
+
+  const usedBatchIds = new Set(usedResult.rows.map(r => Number(r.batch_id)));
 
   const result = batches.map(b => ({
     ...b,
@@ -46,6 +62,7 @@ router.get("/stock-batches", authMiddleware, async (req, res) => {
     physicalStock: Number(b.physicalStock),
     reservedStock: Number(b.reservedStock),
     availableStock: Number(b.physicalStock) - Number(b.reservedStock),
+    usedInBills: usedBatchIds.has(b.id),
     items: b.stockItemId ? items.filter(i => i.id === b.stockItemId).map(i => ({ id: i.id, name: i.name })) : [],
   }));
   res.json(result);
@@ -81,21 +98,29 @@ router.post("/stock-batches", authMiddleware, async (req, res) => {
 router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   const { name, description, expiryDate, itemIds, openingStock } = req.body;
-  if (await isBatchUsedInBills(id)) {
-    return res.status(400).json({ error: "Cannot edit: the item assigned to this batch is used in bills" });
-  }
-  const itemId: number | null = Array.isArray(itemIds) && itemIds.length > 0 ? Number(itemIds[0]) : null;
 
-  // Adjust physical stock by the opening stock delta if opening changed
   const [existing] = await db.select({
     openingStock: stockBatchesTable.openingStock,
     physicalStock: stockBatchesTable.physicalStock,
     stockItemId: stockBatchesTable.stockItemId,
   }).from(stockBatchesTable).where(eq(stockBatchesTable.id, id)).limit(1);
+  if (!existing) return res.status(404).json({ error: "Not found" });
 
-  const newOpening = openingStock !== undefined ? Number(openingStock) : Number(existing?.openingStock || 0);
-  const delta = newOpening - Number(existing?.openingStock || 0);
-  const newPhysical = Math.max(0, Number(existing?.physicalStock || 0) + delta);
+  const directlyUsed = await isBatchDirectlyUsedInBills(id);
+  const incomingItemId: number | null = Array.isArray(itemIds) && itemIds.length > 0 ? Number(itemIds[0]) : null;
+
+  // If used in bills, block stock item reassignment but allow all other edits
+  if (directlyUsed && incomingItemId !== existing.stockItemId) {
+    return res.status(400).json({
+      error: "This batch is used in bills and cannot be reassigned to a different stock item.",
+      code: "BATCH_REASSIGN_LOCKED",
+    });
+  }
+
+  const itemId = directlyUsed ? existing.stockItemId : incomingItemId;
+  const newOpening = openingStock !== undefined ? Number(openingStock) : Number(existing.openingStock || 0);
+  const delta = newOpening - Number(existing.openingStock || 0);
+  const newPhysical = Math.max(0, Number(existing.physicalStock || 0) + delta);
 
   const [batch] = await db.update(stockBatchesTable).set({
     name, description, expiryDate,
@@ -106,12 +131,11 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
   if (!batch) return res.status(404).json({ error: "Not found" });
 
   // If old item had this as default batch and item changed, clear old item's default
-  const oldItemId = existing?.stockItemId;
+  const oldItemId = existing.stockItemId;
   if (oldItemId && oldItemId !== itemId) {
     const [oldItem] = await db.select({ batchId: stockItemsTable.batchId })
       .from(stockItemsTable).where(eq(stockItemsTable.id, oldItemId)).limit(1);
     if (oldItem?.batchId === id) {
-      // Find another batch for this item to use as default, or null
       const [anotherBatch] = await db.select({ id: stockBatchesTable.id })
         .from(stockBatchesTable)
         .where(and(eq(stockBatchesTable.stockItemId, oldItemId), sql`${stockBatchesTable.id} != ${id}`))
@@ -121,7 +145,6 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
         .where(eq(stockItemsTable.id, oldItemId));
     }
   }
-  // Set new item's default batch if it has none
   if (itemId) {
     const [newItem] = await db.select({ batchId: stockItemsTable.batchId })
       .from(stockItemsTable).where(eq(stockItemsTable.id, itemId)).limit(1);
@@ -130,13 +153,13 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
     }
   }
 
-  res.json(batch);
+  res.json({ ...batch, usedInBills: directlyUsed });
 });
 
 router.delete("/stock-batches/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
-  if (await isBatchUsedInBills(id)) {
-    return res.status(400).json({ error: "Cannot delete: the item assigned to this batch is used in bills" });
+  if (await isBatchDirectlyUsedInBills(id)) {
+    return res.status(400).json({ error: "Cannot delete: this batch is referenced in one or more bills" });
   }
   const [batch] = await db.select({ stockItemId: stockBatchesTable.stockItemId })
     .from(stockBatchesTable).where(eq(stockBatchesTable.id, id)).limit(1);

@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Package, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, AlertTriangle, Lock, Info } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
@@ -26,6 +26,7 @@ interface Batch {
   physicalStock: number;
   reservedStock: number;
   availableStock: number;
+  usedInBills?: boolean;
   items: BatchItem[];
 }
 interface StockItem { id: number; name: string; }
@@ -38,6 +39,7 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
   onClose: () => void;
 }) {
   const { toast } = useToast();
+  const usedInBills = !!(batch?.usedInBills);
   const [form, setForm] = useState({
     name: batch?.name || "",
     description: batch?.description || "",
@@ -86,6 +88,13 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {usedInBills && (
+        <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-800">
+          <Lock className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>This batch is used in bills. Name, description, opening stock and expiry date can still be edited, but the assigned stock item is locked.</span>
+        </div>
+      )}
+
       <div className="space-y-1">
         <Label>Batch Name *</Label>
         <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Batch-2024-A" autoFocus />
@@ -106,17 +115,22 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
       </div>
 
       <div className="space-y-1">
-        <Label>Assign Stock Item</Label>
-        {stockItems.length === 0 ? (
+        <Label className="flex items-center gap-1.5">
+          Assign Stock Item
+          {usedInBills && <Lock className="h-3 w-3 text-muted-foreground" />}
+        </Label>
+        {usedInBills ? (
+          <div className="h-9 flex items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground">
+            {batch?.items?.[0]?.name ?? "Not assigned"}
+          </div>
+        ) : stockItems.length === 0 ? (
           <p className="text-xs text-muted-foreground py-2">No stock items found. Add items first.</p>
         ) : (
           <Select
             value={selectedItem ? String(selectedItem) : "none"}
             onValueChange={v => setSelectedItem(v === "none" ? null : Number(v))}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a stock item (optional)" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Select a stock item (optional)" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">— None —</SelectItem>
               {availableItems.map(item => (
@@ -125,7 +139,11 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
             </SelectContent>
           </Select>
         )}
-        <p className="text-xs text-muted-foreground">One batch belongs to one item. One item can have multiple batches.</p>
+        <p className="text-xs text-muted-foreground">
+          {usedInBills
+            ? "Cannot be changed — this batch is referenced in existing bills."
+            : "One batch belongs to one item. One item can have multiple batches."}
+        </p>
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
@@ -212,7 +230,14 @@ export default function Batches() {
                     const isLow = avail <= 0;
                     return (
                       <TableRow key={batch.id}>
-                        <TableCell className="font-medium">{batch.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-1.5">
+                            {batch.name}
+                            {batch.usedInBills && (
+                              <Info className="h-3 w-3 text-blue-500 shrink-0" title="Used in bills" />
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-muted-foreground text-sm">{batch.description || "—"}</TableCell>
                         <TableCell className="text-sm">{batch.expiryDate || "—"}</TableCell>
                         <TableCell>
@@ -254,7 +279,14 @@ export default function Batches() {
                                 )}
                               </DialogContent>
                             </Dialog>
-                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteBatch(batch.id)}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive disabled:opacity-30 disabled:cursor-not-allowed"
+                              onClick={() => deleteBatch(batch.id)}
+                              disabled={!!batch.usedInBills}
+                              title={batch.usedInBills ? "Cannot delete: batch is used in bills" : "Delete batch"}
+                            >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
