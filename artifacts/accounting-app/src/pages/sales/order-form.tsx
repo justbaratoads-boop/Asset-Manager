@@ -272,6 +272,18 @@ export default function OrderForm() {
                     {` ${item.unit}`}
                   </p>
                 )}
+                {item.stockItemId && item.quantity > 0 && (() => {
+                  const selBatch = item.batchId ? (batches as any[]).find((b: any) => b.id === item.batchId) : null;
+                  const effAvail = selBatch
+                    ? Number(selBatch.physicalStock) - Number(selBatch.reservedStock)
+                    : (stockAvail[item.stockItemId!]?.availableStock ?? null);
+                  return effAvail != null && item.quantity > effAvail ? (
+                    <p className="text-xs text-amber-700 flex items-center gap-1 px-1 mt-0.5">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      Only {effAvail} {item.unit} available — order can still be saved
+                    </p>
+                  ) : null;
+                })()}
                 {item.stockItemId && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
@@ -379,6 +391,18 @@ export default function OrderForm() {
                           {` ${item.unit}`}
                         </p>
                       )}
+                      {item.stockItemId && item.quantity > 0 && (() => {
+                        const selBatch = item.batchId ? (batches as any[]).find((b: any) => b.id === item.batchId) : null;
+                        const effAvail = selBatch
+                          ? Number(selBatch.physicalStock) - Number(selBatch.reservedStock)
+                          : (stockAvail[item.stockItemId!]?.availableStock ?? null);
+                        return effAvail != null && item.quantity > effAvail ? (
+                          <p className="text-xs text-amber-700 flex items-center gap-1 px-1 mt-0.5">
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            Only {effAvail} {item.unit} available — order can still be saved
+                          </p>
+                        ) : null;
+                      })()}
                       {item.stockItemId && (
                         <div className="flex items-center gap-1 mt-0.5">
                           <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
@@ -431,6 +455,25 @@ export default function OrderForm() {
         </CardContent>
       </Card>
 
+      {(() => {
+        const overItems = items.filter(item => {
+          if (!item.stockItemId || !item.quantity) return false;
+          const selBatch = item.batchId ? (batches as any[]).find((b: any) => b.id === item.batchId) : null;
+          const effAvail = selBatch
+            ? Number(selBatch.physicalStock) - Number(selBatch.reservedStock)
+            : (stockAvail[item.stockItemId]?.availableStock ?? null);
+          return effAvail != null && item.quantity > effAvail;
+        });
+        return overItems.length > 0 ? (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+            <span>
+              <strong>Stock warning:</strong> {overItems.map(i => i.itemName || "item").join(", ")} {overItems.length === 1 ? "exceeds" : "exceed"} available stock.
+              The order can still be saved — stock will go negative.
+            </span>
+          </div>
+        ) : null;
+      })()}
       <Card>
         <CardHeader><CardTitle className="text-base">Dispatch Details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
