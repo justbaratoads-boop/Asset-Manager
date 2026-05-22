@@ -116,6 +116,14 @@ export default function PartiesList() {
                   {party.gstin && <span className="font-mono">{party.gstin}</span>}
                 </div>
               )}
+              {party.creditLimitEnabled === "true" && (
+                <div className="flex items-center justify-between text-xs border rounded px-2 py-1 bg-amber-50 border-amber-200">
+                  <span className="text-amber-700 font-medium">Credit Limit</span>
+                  <span className="font-semibold text-amber-800">
+                    {party.creditLimit ? formatCurrency(Number(party.creditLimit)) : "Unlimited"}
+                  </span>
+                </div>
+              )}
               <div className="flex gap-2 border-t pt-3">
                 <Link href={`/accounts/parties/${party.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
@@ -146,15 +154,16 @@ export default function PartiesList() {
                 <TableHead>GST Status</TableHead>
                 <TableHead>State</TableHead>
                 <TableHead>Phone</TableHead>
+                <TableHead>Credit Limit</TableHead>
                 <TableHead className="text-right">Bal.</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No parties found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No parties found</TableCell></TableRow>
               ) : paginated.map((party: any) => (
                 <TableRow key={party.id}>
                   <TableCell>
@@ -170,6 +179,13 @@ export default function PartiesList() {
                   </TableCell>
                   <TableCell className="text-sm">{party.state || "—"}</TableCell>
                   <TableCell className="text-sm">{party.phone || "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    {party.creditLimitEnabled === "true" ? (
+                      <span className="text-amber-700 font-medium">
+                        {party.creditLimit ? formatCurrency(Number(party.creditLimit)) : "Unlimited"}
+                      </span>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="text-right text-sm whitespace-nowrap">
                     {formatCurrency(party.openingBalance)}
                     <span className="text-muted-foreground uppercase text-xs ml-1">{party.balanceType}</span>
