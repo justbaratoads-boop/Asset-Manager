@@ -55,6 +55,7 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { toast({ title: "Batch name is required", variant: "destructive" }); return; }
+    if (form.openingStock === "" || form.openingStock === null) { toast({ title: "Opening stock value is required", variant: "destructive" }); return; }
     setLoading(true);
     try {
       const payload = {
@@ -99,8 +100,8 @@ function BatchDialog({ batch, stockItems, batches, onSaved, onClose }: {
           <Input type="date" value={form.expiryDate} onChange={e => set("expiryDate", e.target.value)} />
         </div>
         <div className="space-y-1">
-          <Label>Opening Stock</Label>
-          <Input type="number" min="0" step="any" value={form.openingStock} onChange={e => set("openingStock", e.target.value)} placeholder="0" />
+          <Label>Opening Stock *</Label>
+          <Input type="number" min="0" step="any" required value={form.openingStock} onChange={e => set("openingStock", e.target.value)} placeholder="Enter quantity" />
         </div>
       </div>
 
