@@ -457,7 +457,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
         <div className="mt-4 pt-4 border-t">
           <p className="text-sm font-semibold mb-2">Payment Details</p>
           {invoice.payments.map((p: any, i: number) => {
-            const modeLabel = allPaymentModes.find(m => m.value === p.mode)?.label
+            const modeLabel = BASE_PAYMENT_MODES.find(m => m.value === p.mode)?.label
               ?? (p.mode === "receipt_voucher" ? "Receipt Voucher" : p.mode?.replace(/_/g, " ") ?? "");
             return (
               <p key={i} className="text-sm text-gray-500 capitalize">
