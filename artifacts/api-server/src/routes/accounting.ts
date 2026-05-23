@@ -131,6 +131,7 @@ router.post("/payments", authMiddleware, async (req, res) => {
     amount: String(data.amount),
     narration: data.narration,
     reference: data.reference,
+    ledgerAllocations: data.ledgerAllocations ? JSON.stringify(data.ledgerAllocations) : null,
   }).returning();
 
   // Bill-wise: apply each entry as a payment against the respective purchase invoice
@@ -164,7 +165,7 @@ router.post("/payments", authMiddleware, async (req, res) => {
 router.get("/payments/:id", authMiddleware, async (req, res) => {
   const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.id, Number(req.params.id))).limit(1);
   if (!payment) return res.status(404).json({ error: "Not found" });
-  res.json({ ...payment, amount: Number(payment.amount) });
+  res.json({ ...payment, amount: Number(payment.amount), ledgerAllocations: payment.ledgerAllocations ? JSON.parse(payment.ledgerAllocations) : null });
 });
 
 router.put("/payments/:id", authMiddleware, async (req, res) => {
@@ -178,8 +179,9 @@ router.put("/payments/:id", authMiddleware, async (req, res) => {
     amount: String(data.amount),
     narration: data.narration,
     reference: data.reference,
+    ledgerAllocations: data.ledgerAllocations ? JSON.stringify(data.ledgerAllocations) : null,
   }).where(eq(paymentsTable.id, Number(req.params.id))).returning();
-  res.json({ ...payment, amount: Number(payment.amount) });
+  res.json({ ...payment, amount: Number(payment.amount), ledgerAllocations: payment.ledgerAllocations ? JSON.parse(payment.ledgerAllocations) : null });
 });
 
 router.delete("/payments/:id", authMiddleware, async (req, res) => {
@@ -209,6 +211,7 @@ router.post("/receipts", authMiddleware, async (req, res) => {
     amount: String(data.amount),
     narration: data.narration,
     reference: data.reference,
+    ledgerAllocations: data.ledgerAllocations ? JSON.stringify(data.ledgerAllocations) : null,
   }).returning();
 
   // Bill-wise: apply each entry as a payment against the respective sale invoice
@@ -242,7 +245,7 @@ router.post("/receipts", authMiddleware, async (req, res) => {
 router.get("/receipts/:id", authMiddleware, async (req, res) => {
   const [receipt] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, Number(req.params.id))).limit(1);
   if (!receipt) return res.status(404).json({ error: "Not found" });
-  res.json({ ...receipt, amount: Number(receipt.amount) });
+  res.json({ ...receipt, amount: Number(receipt.amount), ledgerAllocations: receipt.ledgerAllocations ? JSON.parse(receipt.ledgerAllocations) : null });
 });
 
 router.put("/receipts/:id", authMiddleware, async (req, res) => {
@@ -256,8 +259,9 @@ router.put("/receipts/:id", authMiddleware, async (req, res) => {
     amount: String(data.amount),
     narration: data.narration,
     reference: data.reference,
+    ledgerAllocations: data.ledgerAllocations ? JSON.stringify(data.ledgerAllocations) : null,
   }).where(eq(receiptsTable.id, Number(req.params.id))).returning();
-  res.json({ ...receipt, amount: Number(receipt.amount) });
+  res.json({ ...receipt, amount: Number(receipt.amount), ledgerAllocations: receipt.ledgerAllocations ? JSON.parse(receipt.ledgerAllocations) : null });
 });
 
 router.delete("/receipts/:id", authMiddleware, async (req, res) => {

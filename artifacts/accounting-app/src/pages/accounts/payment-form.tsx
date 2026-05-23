@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { PartySelect } from "@/components/party-select";
 import { today, formatCurrency, formatDate } from "@/lib/format";
-import { ArrowLeft, ListChecks, CheckSquare, Square } from "lucide-react";
+import { ArrowLeft, ListChecks, CheckSquare, Square, Plus, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BillEntry {
@@ -22,6 +22,14 @@ interface BillEntry {
   balanceDue: number;
   amount: number;
 }
+
+interface LedgerRow {
+  key: number;
+  ledgerId: string;
+  amount: string;
+}
+
+let rowKeyCounter = 1;
 
 export default function PaymentForm() {
   const [, setLocation] = useLocation();
@@ -47,6 +55,11 @@ export default function PaymentForm() {
   const [form, setForm] = useState({ date: today(), ledgerId: "", amount: "", narration: "" });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
+  // Primary ledger amount (for the Payment Ledger selected above)
+  const [primaryAmount, setPrimaryAmount] = useState("");
+  // Extra ledger rows
+  const [extraRows, setExtraRows] = useState<LedgerRow[]>([]);
+
   // Bill-wise state
   const [billWiseOpen, setBillWiseOpen] = useState(false);
   const [billWiseEntries, setBillWiseEntries] = useState<BillEntry[]>([]);
@@ -59,6 +72,14 @@ export default function PaymentForm() {
     const e = existing as any;
     setPartyId(e.partyId || undefined);
     setForm({ date: e.date || today(), ledgerId: e.ledgerId ? String(e.ledgerId) : "", amount: String(e.amount || ""), narration: e.narration || "" });
+    // Restore ledger allocations if any
+    if (e.ledgerAllocations?.length) {
+      const allocs = e.ledgerAllocations as { ledgerId: number; amount: number }[];
+      if (allocs.length > 0) {
+        setPrimaryAmount(String(allocs[0].amount || ""));
+        setExtraRows(allocs.slice(1).map(a => ({ key: rowKeyCounter++, ledgerId: String(a.ledgerId), amount: String(a.amount) })));
+      }
+    }
   }, [existing]);
 
   const handlePartyChange = useCallback((id: number) => {
@@ -112,9 +133,38 @@ export default function PaymentForm() {
 
   const billWiseTotal = Object.values(billAmounts).reduce((s, v) => s + (Number(v) || 0), 0);
 
+  // Ledger allocation helpers
+  const addRow = () => {
+    setExtraRows(prev => [...prev, { key: rowKeyCounter++, ledgerId: "", amount: "" }]);
+  };
+  const removeRow = (key: number) => {
+    setExtraRows(prev => prev.filter(r => r.key !== key));
+  };
+  const updateRow = (key: number, field: "ledgerId" | "amount", value: string) => {
+    setExtraRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r));
+  };
+
+  // Allocation totals & validation
+  const hasAllocation = primaryAmount !== "" || extraRows.length > 0;
+  const totalAllocated = (Number(primaryAmount) || 0) + extraRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const totalRequired = Number(form.amount) || 0;
+  const totalMatches = hasAllocation ? Math.abs(totalAllocated - totalRequired) < 0.01 : true;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!totalMatches) {
+      toast({ title: "Amount mismatch", description: "Ledger allocation total must equal the payment amount.", variant: "destructive" });
+      return;
+    }
     const party = parties.find((p: any) => p.id === partyId);
+    // Build ledger allocations array
+    let ledgerAllocations: { ledgerId: number; amount: number }[] | undefined;
+    if (hasAllocation && form.ledgerId) {
+      ledgerAllocations = [
+        { ledgerId: Number(form.ledgerId), amount: Number(primaryAmount) || 0 },
+        ...extraRows.filter(r => r.ledgerId && r.amount).map(r => ({ ledgerId: Number(r.ledgerId), amount: Number(r.amount) })),
+      ];
+    }
     const payload: any = {
       date: form.date,
       partyId: partyId || undefined,
@@ -122,6 +172,7 @@ export default function PaymentForm() {
       ledgerId: Number(form.ledgerId),
       amount: Number(form.amount),
       narration: form.narration,
+      ledgerAllocations,
     };
     if (billWiseEntries.length > 0) {
       payload.billWiseEntries = billWiseEntries.map(e => ({ invoiceId: e.invoiceId, amount: e.amount }));
@@ -141,6 +192,8 @@ export default function PaymentForm() {
     }
   };
 
+  const primaryLedgerName = cashBankLedgers.find((l: any) => l.id === Number(form.ledgerId))?.name;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
       <div className="flex items-center gap-3">
@@ -154,7 +207,7 @@ export default function PaymentForm() {
             <Label>Amount *</Label>
             <Input
               type="number" required inputMode="decimal" min="0" step="any"
-              value={form.amount} onChange={e => { set("amount", e.target.value); setBillWiseEntries([]); }}
+              value={form.amount} onChange={e => { set("amount", e.target.value); setBillWiseEntries([]); setPrimaryAmount(""); setExtraRows([]); }}
               placeholder="0.00"
               readOnly={billWiseEntries.length > 0}
               className={billWiseEntries.length > 0 ? "bg-muted cursor-not-allowed" : ""}
@@ -198,19 +251,89 @@ export default function PaymentForm() {
             </div>
           )}
 
+          {/* Payment Ledger */}
           <div className="space-y-1 sm:col-span-2">
             <Label>Payment Ledger *</Label>
-            <Select value={form.ledgerId} onValueChange={v => set("ledgerId", v)} required>
+            <Select value={form.ledgerId} onValueChange={v => { set("ledgerId", v); setPrimaryAmount(""); setExtraRows([]); }} required>
               <SelectTrigger><SelectValue placeholder="Select cash / bank account" /></SelectTrigger>
               <SelectContent>{cashBankLedgers.map((l: any) => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+
+          {/* Ledger Allocation Section */}
+          {form.ledgerId && (
+            <div className="sm:col-span-2 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">
+                <span>Ledger Allocation</span>
+                <div className="flex-1 border-t" />
+              </div>
+
+              {/* Primary row (locked to selected Payment Ledger) */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium text-foreground truncate">
+                  {primaryLedgerName || "—"}
+                </div>
+                <Input
+                  type="number" inputMode="decimal" min="0" step="any"
+                  value={primaryAmount}
+                  onChange={e => setPrimaryAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-32 text-right shrink-0"
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addRow} className="shrink-0 gap-1">
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </Button>
+              </div>
+
+              {/* Extra rows */}
+              {extraRows.map(row => (
+                <div key={row.key} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Select value={row.ledgerId} onValueChange={v => updateRow(row.key, "ledgerId", v)}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select ledger" /></SelectTrigger>
+                      <SelectContent>{cashBankLedgers.map((l: any) => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <Input
+                    type="number" inputMode="decimal" min="0" step="any"
+                    value={row.amount}
+                    onChange={e => updateRow(row.key, "amount", e.target.value)}
+                    placeholder="0.00"
+                    className="w-32 text-right shrink-0"
+                  />
+                  <Button type="button" size="icon" variant="ghost" onClick={() => removeRow(row.key)} className="shrink-0 h-9 w-9 text-muted-foreground hover:text-destructive">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
+              {/* Total row */}
+              {hasAllocation && (
+                <div className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-semibold border ${totalMatches ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+                  <span className="flex items-center gap-1.5">
+                    {totalMatches
+                      ? <CheckCircle2 className="h-4 w-4" />
+                      : <AlertCircle className="h-4 w-4" />}
+                    Allocated
+                  </span>
+                  <span>
+                    {formatCurrency(totalAllocated)}
+                    {!totalMatches && <span className="font-normal text-xs ml-1">/ {formatCurrency(totalRequired)} required</span>}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1 sm:col-span-2"><Label>Narration</Label><Input value={form.narration} onChange={e => set("narration", e.target.value)} /></div>
         </CardContent>
       </Card>
-      <Button type="submit" disabled={createMutation.isPending || !form.ledgerId}>
+      <Button type="submit" disabled={createMutation.isPending || !form.ledgerId || !totalMatches}>
         {createMutation.isPending ? "Saving..." : isEdit ? "Update Payment" : "Save Payment"}
       </Button>
+      {hasAllocation && !totalMatches && (
+        <p className="text-xs text-red-600">Ledger allocation total ({formatCurrency(totalAllocated)}) must equal payment amount ({formatCurrency(totalRequired)}) to save.</p>
+      )}
 
       {/* Bill-wise Dialog */}
       <Dialog open={billWiseOpen} onOpenChange={setBillWiseOpen}>
@@ -230,7 +353,6 @@ export default function PaymentForm() {
                   const hasAmount = entered > 0;
                   return (
                     <div key={bill.id} className={`px-4 py-3 ${hasAmount ? "bg-green-50" : ""}`}>
-                      {/* Top row: checkbox + invoice# + date */}
                       <div className="flex items-center gap-2 mb-2">
                         <button
                           type="button"
@@ -245,7 +367,6 @@ export default function PaymentForm() {
                         <span className="font-mono text-xs font-semibold flex-1">{bill.invoiceNumber}</span>
                         <span className="text-xs text-muted-foreground">{formatDate(bill.date)}</span>
                       </div>
-                      {/* Bottom row: totals + amount input */}
                       <div className="flex items-center gap-2 pl-6">
                         <div className="flex-1 text-xs text-muted-foreground">
                           Total: <span className="font-medium text-foreground">{formatCurrency(bill.grandTotal)}</span>
