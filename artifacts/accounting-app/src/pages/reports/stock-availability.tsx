@@ -10,6 +10,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { cn } from "@/lib/utils";
+import { formatQty } from "@/lib/format";
 import { StockLedgerDialog } from "@/components/stock-ledger-dialog";
 
 const PAGE_SIZE = 20;
@@ -118,16 +119,16 @@ export default function StockAvailabilityReport() {
                   {vis.has("idx") && <TableCell className="text-xs text-muted-foreground">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>}
                   {vis.has("name") && <TableCell className="font-medium">{item.name}</TableCell>}
                   {vis.has("unit") && <TableCell className="text-sm">{item.unit}</TableCell>}
-                  {vis.has("physicalStock") && <TableCell className="text-right font-medium">{Number(item.physicalStock).toLocaleString()}</TableCell>}
+                  {vis.has("physicalStock") && <TableCell className="text-right font-medium">{formatQty(item.physicalStock, item.unit)}</TableCell>}
                   {vis.has("reservedQty") && (
                     <TableCell className="text-right">
-                      {item.reservedQty > 0 ? <span className="text-amber-700 font-medium">{Number(item.reservedQty).toLocaleString()}</span> : <span className="text-muted-foreground">—</span>}
+                      {item.reservedQty > 0 ? <span className="text-amber-700 font-medium">{formatQty(item.reservedQty, item.unit)}</span> : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   )}
                   {vis.has("availableStock") && (
                     <TableCell className="text-right font-bold">
                       <span className={cn(item.availableStock < 0 ? "text-red-600" : item.availableStock === 0 ? "text-amber-600" : "text-green-700")}>
-                        {Number(item.availableStock).toLocaleString()}
+                        {formatQty(item.availableStock, item.unit)}
                       </span>
                     </TableCell>
                   )}
@@ -145,7 +146,7 @@ export default function StockAvailabilityReport() {
                     const avail = Number(batch.physicalStock) - Number(batch.reservedStock);
                     return (
                       <TableCell className="text-right font-medium">
-                        <span className={cn(avail <= 0 ? "text-amber-600" : "text-green-700")}>{avail.toLocaleString()}</span>
+                        <span className={cn(avail <= 0 ? "text-amber-600" : "text-green-700")}>{formatQty(avail, item.unit)}</span>
                       </TableCell>
                     );
                   })()}

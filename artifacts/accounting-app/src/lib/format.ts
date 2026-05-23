@@ -23,6 +23,13 @@ export function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function formatQty(qty: number | string | undefined, unit?: string): string {
+  const n = Number(qty || 0);
+  const formatted = n % 1 === 0 ? String(n) : n.toFixed(2);
+  if (!unit || unit.toLowerCase() === "n/a") return formatted;
+  return `${formatted} ${unit}`;
+}
+
 export const GST_RATES = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 7.5, 12, 18, 28];
 
 export const INDIAN_STATES = [

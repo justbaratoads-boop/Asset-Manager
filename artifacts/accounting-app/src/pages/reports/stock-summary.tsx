@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatQty } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -103,20 +103,20 @@ export default function StockSummary() {
                       {vis.has("name") && <TableCell className="font-medium max-w-[160px] truncate">{item.name}</TableCell>}
                       {vis.has("unit") && <TableCell className="text-xs">{item.unit}</TableCell>}
                       {vis.has("hsnCode") && <TableCell className="text-xs text-muted-foreground">{item.hsnCode || "-"}</TableCell>}
-                      {vis.has("openingQty") && <TableCell className="text-right text-sm">{Number(item.openingQty).toFixed(2)}</TableCell>}
+                      {vis.has("openingQty") && <TableCell className="text-right text-sm">{formatQty(item.openingQty, item.unit)}</TableCell>}
                       {vis.has("openingValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.openingValue))}</TableCell>}
-                      {vis.has("purchasedQty") && <TableCell className="text-right text-sm text-blue-600">{Number(item.purchasedQty).toFixed(2)}</TableCell>}
+                      {vis.has("purchasedQty") && <TableCell className="text-right text-sm text-blue-600">{formatQty(item.purchasedQty, item.unit)}</TableCell>}
                       {vis.has("purchasedValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.purchasedValue))}</TableCell>}
-                      {vis.has("saleReturnQty") && <TableCell className="text-right text-sm text-orange-600">{Number(item.saleReturnQty).toFixed(2)}</TableCell>}
+                      {vis.has("saleReturnQty") && <TableCell className="text-right text-sm text-orange-600">{formatQty(item.saleReturnQty, item.unit)}</TableCell>}
                       {vis.has("saleReturnValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.saleReturnValue))}</TableCell>}
-                      {vis.has("soldQty") && <TableCell className="text-right text-sm text-green-600">{Number(item.soldQty).toFixed(2)}</TableCell>}
+                      {vis.has("soldQty") && <TableCell className="text-right text-sm text-green-600">{formatQty(item.soldQty, item.unit)}</TableCell>}
                       {vis.has("soldValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.soldValue))}</TableCell>}
-                      {vis.has("purchaseReturnQty") && <TableCell className="text-right text-sm text-pink-600">{Number(item.purchaseReturnQty).toFixed(2)}</TableCell>}
+                      {vis.has("purchaseReturnQty") && <TableCell className="text-right text-sm text-pink-600">{formatQty(item.purchaseReturnQty, item.unit)}</TableCell>}
                       {vis.has("purchaseReturnValue") && <TableCell className="text-right text-sm">{formatCurrency(Number(item.purchaseReturnValue))}</TableCell>}
                       {vis.has("closingQty") && (
                         <TableCell className="text-right font-semibold">
                           <div className="flex items-center justify-end gap-1">
-                            {Number(item.closingQty).toFixed(2)}
+                            {formatQty(item.closingQty, item.unit)}
                             {Number(item.closingQty) <= 0 && <Badge variant="outline" className="text-xs text-red-600 border-red-300">Out</Badge>}
                           </div>
                         </TableCell>

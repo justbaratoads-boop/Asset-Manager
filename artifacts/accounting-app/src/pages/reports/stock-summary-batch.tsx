@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatQty } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
 import { useFY } from "@/lib/financial-year";
 import { useFetch } from "@/hooks/use-fetch";
@@ -217,7 +217,7 @@ function BatchLedgerSheet({
                         <TableCell />
                         <TableCell className="text-right">{fmtRate(s!.openingRate)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(s!.openingValue)}</TableCell>
-                        <TableCell className="text-right font-bold text-slate-700">{fmt2(s!.openingQty)}</TableCell>
+                        <TableCell className="text-right font-bold text-slate-700">{formatQty(s!.openingQty, data.item.unit)}</TableCell>
                       </TableRow>
 
                       {txns.map((t, i) => {
@@ -233,10 +233,10 @@ function BatchLedgerSheet({
                             <TableCell className="font-mono text-xs">{t.number}</TableCell>
                             <TableCell className="text-xs max-w-[130px] truncate">{t.party}</TableCell>
                             <TableCell className="text-right text-blue-700 font-medium">
-                              {t.inQty > 0 ? fmt2(t.inQty) : ""}
+                              {t.inQty > 0 ? formatQty(t.inQty, data.item.unit) : ""}
                             </TableCell>
                             <TableCell className="text-right text-green-700 font-medium">
-                              {t.outQty > 0 ? fmt2(t.outQty) : ""}
+                              {t.outQty > 0 ? formatQty(t.outQty, data.item.unit) : ""}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">{fmtRate(t.rate)}</TableCell>
                             <TableCell className={`text-right font-medium ${meta.color}`}>
@@ -244,7 +244,7 @@ function BatchLedgerSheet({
                             </TableCell>
                             <TableCell className="text-right font-bold">
                               <span className={t.balance < 0 ? "text-red-600" : ""}>
-                                {fmt2(t.balance)}
+                                {formatQty(t.balance, data.item.unit)}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -258,7 +258,7 @@ function BatchLedgerSheet({
                         <TableCell />
                         <TableCell className="text-right">{fmtRate(s!.closingRate)}</TableCell>
                         <TableCell className="text-right text-primary">{formatCurrency(s!.closingValue)}</TableCell>
-                        <TableCell className="text-right text-primary font-bold">{fmt2(s!.closingQty)}</TableCell>
+                        <TableCell className="text-right text-primary font-bold">{formatQty(s!.closingQty, data.item.unit)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -449,24 +449,24 @@ export default function StockSummaryBatch() {
                         </TableCell>
 
                         {/* Opening */}
-                        <TableCell className="text-right text-sm">{fmt2(row.openingQty)}</TableCell>
+                        <TableCell className="text-right text-sm">{formatQty(row.openingQty, item.unit)}</TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground">{fmtRate(row.openingRate)}</TableCell>
                         <TableCell className="text-right text-sm">{formatCurrency(row.openingValue)}</TableCell>
 
                         {/* Inward */}
-                        <TableCell className="text-right text-sm text-blue-700">{row.inwardQty > 0 ? fmt2(row.inwardQty) : "—"}</TableCell>
+                        <TableCell className="text-right text-sm text-blue-700">{row.inwardQty > 0 ? formatQty(row.inwardQty, item.unit) : "—"}</TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground">{fmtRate(row.inwardRate)}</TableCell>
                         <TableCell className="text-right text-sm text-blue-700">{row.inwardValue > 0 ? formatCurrency(row.inwardValue) : "—"}</TableCell>
 
                         {/* Outward */}
-                        <TableCell className="text-right text-sm text-green-700">{row.outwardQty > 0 ? fmt2(row.outwardQty) : "—"}</TableCell>
+                        <TableCell className="text-right text-sm text-green-700">{row.outwardQty > 0 ? formatQty(row.outwardQty, item.unit) : "—"}</TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground">{fmtRate(row.outwardRate)}</TableCell>
                         <TableCell className="text-right text-sm text-green-700">{row.outwardValue > 0 ? formatCurrency(row.outwardValue) : "—"}</TableCell>
 
                         {/* Closing */}
                         <TableCell className="text-right font-semibold">
                           <div className="flex items-center justify-end gap-1">
-                            {fmt2(row.closingQty)}
+                            {formatQty(row.closingQty, item.unit)}
                             {row.closingQty <= 0 && (
                               <Badge variant="outline" className="text-[10px] px-1 py-0 border-red-300 text-red-600">Out</Badge>
                             )}
