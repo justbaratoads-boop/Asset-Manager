@@ -26,27 +26,20 @@ router.post("/ledgers", authMiddleware, async (req, res) => {
   const data = req.body;
   const trimmedName = (data.name || "").trim();
 
-  // Check for existing ledger with same name (including soft-deleted)
-  const [existing] = await db.select()
+  // Revive a soft-deleted ledger only if the name matches exactly and is deleted
+  const [softDeleted] = await db.select()
     .from(ledgersTable)
-    .where(ilike(ledgersTable.name, trimmedName))
+    .where(and(ilike(ledgersTable.name, trimmedName), eq(ledgersTable.isDeleted, "true")))
     .limit(1);
 
-  if (existing) {
-    if (existing.isDeleted === "false") {
-      return res.status(400).json({
-        error: `A ledger named "${existing.name}" already exists.`,
-        code: "DUPLICATE_NAME",
-      });
-    }
-    // Soft-deleted ledger with the same name — revive it with new values
+  if (softDeleted) {
     const [revived] = await db.update(ledgersTable).set({
       name: trimmedName,
       group: data.group,
       nature: data.nature || "dr",
       openingBalance: String(data.openingBalance || 0),
       isDeleted: "false",
-    }).where(eq(ledgersTable.id, existing.id)).returning();
+    }).where(eq(ledgersTable.id, softDeleted.id)).returning();
     return res.status(201).json({ ...revived, openingBalance: Number(revived.openingBalance) });
   }
 
@@ -84,21 +77,6 @@ router.put("/ledgers/:id", authMiddleware, async (req, res) => {
     }).where(eq(ledgersTable.id, Number(id))).returning();
     if (!ledger) return res.status(404).json({ error: "Ledger not found" });
     return res.json({ ...ledger, openingBalance: Number(ledger.openingBalance) });
-  }
-
-  // Check for duplicate name on a different non-deleted ledger
-  if (data.name) {
-    const trimmedName = (data.name || "").trim();
-    const [dupe] = await db.select({ id: ledgersTable.id })
-      .from(ledgersTable)
-      .where(and(ilike(ledgersTable.name, trimmedName), eq(ledgersTable.isDeleted, "false"), ne(ledgersTable.id, Number(id))))
-      .limit(1);
-    if (dupe) {
-      return res.status(400).json({
-        error: `A ledger named "${trimmedName}" already exists.`,
-        code: "DUPLICATE_NAME",
-      });
-    }
   }
 
   const [ledger] = await db.update(ledgersTable).set({

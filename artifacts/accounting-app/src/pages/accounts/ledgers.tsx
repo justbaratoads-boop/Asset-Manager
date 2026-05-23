@@ -243,13 +243,7 @@ export default function LedgerAccounts() {
         queryClient.invalidateQueries({ queryKey: getListLedgersQueryKey() });
         setDialogOpen(false);
       } catch (err: any) {
-        const code = err?.data?.code;
-        const msg = err?.data?.error || "Failed to save";
-        if (code === "DUPLICATE_NAME") {
-          setLedgerNameError(msg);
-        } else {
-          toast({ title: "Error", description: msg, variant: "destructive" });
-        }
+        toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
       } finally {
         setIsSaving(false);
       }
@@ -275,13 +269,7 @@ export default function LedgerAccounts() {
         queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
         setDialogOpen(false);
       } catch (err: any) {
-        const code = err?.data?.code;
-        const msg = err?.data?.error || "Failed to save";
-        if (code === "DUPLICATE_NAME") {
-          setPartyErrors(prev => ({ ...prev, name: msg }));
-        } else {
-          toast({ title: "Error", description: msg, variant: "destructive" });
-        }
+        toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
       } finally {
         setIsSaving(false);
       }
