@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,7 @@ export default function PurchaseInvoiceForm() {
   const createMutation = useCreatePurchaseInvoice();
   const { data: parties = [] } = useListParties({ type: "supplier" });
   const { data: stockItems = [] } = useListStockItems({});
+  const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetPurchaseInvoice(editId!, { query: { enabled: isEdit } });
 
@@ -307,13 +309,23 @@ export default function PurchaseInvoiceForm() {
                       placeholder="Search item…"
                       inputClassName="h-10"
                     />
+                    {item.stockItemId && stockAvail[item.stockItemId] && (
+                      <p className="text-xs px-1 -mt-1">
+                        <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>
+                        {" · "}
+                        <span className={stockAvail[item.stockItemId].availableStock < 0 ? "text-red-600 font-medium" : stockAvail[item.stockItemId].availableStock === 0 ? "text-amber-600 font-medium" : "text-green-600 font-medium"}>
+                          Avail: {stockAvail[item.stockItemId].availableStock}
+                        </span>
+                        {` ${item.unit}`}
+                      </p>
+                    )}
                     {item.stockItemId && (
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
                         <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
                           <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">— none —</SelectItem>
+                            <SelectItem value="none">— none —{item.stockItemId && stockAvail[item.stockItemId] ? ` · avail: ${stockAvail[item.stockItemId].unbatchedAvailable}` : ""}</SelectItem>
                             {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
                               const avail = Number(b.physicalStock) - Number(b.reservedStock);
                               const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
@@ -401,13 +413,23 @@ export default function PurchaseInvoiceForm() {
                             onQuickAdd={() => { setQuickAddForIndex(i); setQuickAddOpen(true); }}
                             placeholder="Search item…"
                           />
+                          {item.stockItemId && stockAvail[item.stockItemId] && (
+                            <p className="text-xs mt-0.5 px-1">
+                              <span className="text-muted-foreground">Phys: {stockAvail[item.stockItemId].physicalStock}</span>
+                              {" · "}
+                              <span className={stockAvail[item.stockItemId].availableStock < 0 ? "text-red-600 font-medium" : stockAvail[item.stockItemId].availableStock === 0 ? "text-amber-600 font-medium" : "text-green-600 font-medium"}>
+                                Avail: {stockAvail[item.stockItemId].availableStock}
+                              </span>
+                              {` ${item.unit}`}
+                            </p>
+                          )}
                           {item.stockItemId && (
                             <div className="flex items-center gap-1 mt-0.5">
                               <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
                               <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
                                 <SelectTrigger className="h-6 text-xs py-0 flex-1 min-w-0"><SelectValue placeholder="— none —" /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="none">— none —</SelectItem>
+                                  <SelectItem value="none">— none —{item.stockItemId && stockAvail[item.stockItemId] ? ` · avail: ${stockAvail[item.stockItemId].unbatchedAvailable}` : ""}</SelectItem>
                                   {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
                                     const avail = Number(b.physicalStock) - Number(b.reservedStock);
                                     const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
