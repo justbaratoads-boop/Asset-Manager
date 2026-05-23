@@ -9,7 +9,6 @@ import { UnitSelect } from "@/components/unit-select";
 import { useCreateStockItem, useListStockCategories, getListStockItemsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { GST_RATES } from "@/lib/format";
 
 interface QuickAddItemDialogProps {
   open: boolean;
@@ -20,7 +19,7 @@ interface QuickAddItemDialogProps {
 const BLANK = {
   name: "", categoryId: "", hsnCode: "", unit: "pcs",
   purchaseRate: "", saleRate: "",
-  minStockLevel: "", openingStock: "",
+  minStockLevel: "", physicalStock: "",
   barcode: "",
   gstApplicable: true, gstRate: "18",
 };
@@ -54,13 +53,13 @@ export function QuickAddItemDialog({ open, onClose, onAdded }: QuickAddItemDialo
           categoryId: form.categoryId ? Number(form.categoryId) : undefined,
           hsnCode: form.hsnCode || undefined,
           unit: form.unit,
-          purchaseRate: form.purchaseRate || "0",
-          saleRate: form.saleRate || "0",
-          minStockLevel: form.minStockLevel || "0",
-          openingStock: form.openingStock || "0",
+          purchaseRate: Number(form.purchaseRate) || 0,
+          saleRate: Number(form.saleRate) || 0,
+          minStockLevel: Number(form.minStockLevel) || 0,
+          physicalStock: Number(form.physicalStock) || 0,
           barcode: form.barcode || undefined,
           gstApplicable: String(form.gstApplicable),
-          gstRate: form.gstRate,
+          gstRate: Number(form.gstRate) || 0,
         } as any,
       });
       queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey() });
@@ -129,12 +128,20 @@ export function QuickAddItemDialog({ open, onClose, onAdded }: QuickAddItemDialo
 
             <div className="space-y-1">
               <Label>GST Rate</Label>
-              <Select value={form.gstRate} onValueChange={v => set("gstRate", v)} disabled={!form.gstApplicable}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.gstRate}
+                  onChange={e => set("gstRate", e.target.value)}
+                  disabled={!form.gstApplicable}
+                  className="pr-7"
+                  placeholder="0"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+              </div>
             </div>
           </div>
 
@@ -161,7 +168,7 @@ export function QuickAddItemDialog({ open, onClose, onAdded }: QuickAddItemDialo
               <div className="space-y-1">
                 <Label>Opening Stock</Label>
                 <Input type="number" inputMode="decimal" min="0" step="any"
-                  value={form.openingStock} onChange={e => set("openingStock", e.target.value)} placeholder="0" />
+                  value={form.physicalStock} onChange={e => set("physicalStock", e.target.value)} placeholder="0" />
               </div>
             </div>
 

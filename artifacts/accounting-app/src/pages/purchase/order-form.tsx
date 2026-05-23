@@ -427,8 +427,8 @@ export default function PurchaseOrderForm() {
       />
       <QuickAddItemDialog
         open={quickAddOpen}
-        onOpenChange={setQuickAddOpen}
-        onCreated={handleQuickAdded}
+        onClose={() => setQuickAddOpen(false)}
+        onAdded={handleQuickAdded}
       />
     </form>
   );
