@@ -163,14 +163,16 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
       {charges.map((charge, i) => {
         const isDeduct = (charge.type ?? "add") === "deduct";
         return (
-          <div key={i} className="flex gap-2 items-center">
+          <div key={i} className="flex flex-wrap gap-2 items-center">
 
-            {/* Ledger selector (indirect expense / income) */}
-            <LedgerSelect
-              value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
-              onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
-              ledgers={ledgers}
-            />
+            {/* Ledger selector — takes all available space, min 220px so text is always readable */}
+            <div className="flex-1 min-w-[220px]">
+              <LedgerSelect
+                value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
+                onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
+                ledgers={ledgers}
+              />
+            </div>
 
             {/* +Add / −Deduct toggle */}
             <button
