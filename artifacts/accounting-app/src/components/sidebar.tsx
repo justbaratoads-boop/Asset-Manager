@@ -1,8 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, Receipt, ShoppingCart, BookOpen, Package,
-  FileText, Percent, Truck, Settings, LogOut, ChevronDown,
+  LayoutDashboard, BookOpen, Package, BarChart2, TrendingUp,
+  Truck, Percent, Building2, Layers, Wrench, UserCog, Printer,
+  Lock, CreditCard, HelpCircle, Settings, LogOut, ChevronDown,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "./ui/button";
@@ -11,86 +13,161 @@ import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
 type NavSubItem = { name: string; href: string; perm?: string };
-type NavItem = { name: string; href?: string; icon: any; items?: NavSubItem[]; perm?: string };
+type NavGroup  = { kind: "group"; name: string; icon: any; items: NavSubItem[]; perm?: string };
+type NavLink   = { kind: "link";  name: string; href: string; icon: any; perm?: string };
+type NavSep    = { kind: "sep";   label?: string };
+type NavItem   = NavGroup | NavLink | NavSep;
 
 const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, perm: "dashboard" },
+  // ── Dashboard ──────────────────────────────────────────────
+  { kind: "link", name: "Dashboard", href: "/", icon: LayoutDashboard, perm: "dashboard" },
+
+  // ── Vouchers ───────────────────────────────────────────────
   {
-    name: "Sales", icon: Receipt,
+    kind: "group", name: "Vouchers", icon: ClipboardList,
     items: [
-      { name: "Sale Invoices", href: "/sales/invoices", perm: "sales_invoices" },
-      { name: "Order Booking", href: "/sales/orders", perm: "sales_orders" },
+      { name: "Sale Order",     href: "/sales/orders",           perm: "sales_orders" },
+      { name: "Sale",           href: "/sales/invoices",          perm: "sales_invoices" },
+      { name: "Purchase Order", href: "/purchase/orders",         perm: "purchase_orders" },
+      { name: "Purchase",       href: "/purchase/invoices",       perm: "purchase_invoices" },
+      { name: "Payment",        href: "/accounts/payments",       perm: "accounts_payments" },
+      { name: "Receipt",        href: "/accounts/receipts",       perm: "accounts_receipts" },
+      { name: "Contra",         href: "/accounts/contra",         perm: "accounts_journal" },
+      { name: "Journal",        href: "/accounts/journal",        perm: "accounts_journal" },
+      { name: "Debit Note",     href: "/accounts/debit-notes",   perm: "accounts_debit_notes" },
+      { name: "Credit Note",    href: "/accounts/credit-notes",  perm: "accounts_credit_notes" },
     ],
   },
+
+  // ── Accounts ───────────────────────────────────────────────
   {
-    name: "Purchase", icon: ShoppingCart,
-    items: [
-      { name: "Purchase Invoices", href: "/purchase/invoices", perm: "purchase_invoices" },
-      { name: "Purchase Orders", href: "/purchase/orders", perm: "purchase_orders" },
-    ],
-  },
-  {
-    name: "Accounts", icon: BookOpen,
+    kind: "group", name: "Accounts", icon: BookOpen,
     items: [
       { name: "Chart of Accounts", href: "/accounts/chart-of-accounts", perm: "accounts_parties" },
-      { name: "Journal Entries", href: "/accounts/journal", perm: "accounts_journal" },
-      { name: "Payments", href: "/accounts/payments", perm: "accounts_payments" },
-      { name: "Receipts", href: "/accounts/receipts", perm: "accounts_receipts" },
-      { name: "Ledger Accounts", href: "/accounts/ledgers", perm: "accounts_parties" },
-      { name: "Credit Notes", href: "/accounts/credit-notes", perm: "accounts_credit_notes" },
-      { name: "Debit Notes", href: "/accounts/debit-notes", perm: "accounts_debit_notes" },
+      { name: "Ledger",            href: "/accounts/ledgers",            perm: "accounts_parties" },
     ],
   },
+
+  // ── Stock ──────────────────────────────────────────────────
   {
-    name: "Inventory", icon: Package,
+    kind: "group", name: "Stock", icon: Package,
     items: [
-      { name: "Stock Items", href: "/inventory/items", perm: "inventory_items" },
-      { name: "Categories", href: "/inventory/categories", perm: "inventory_categories" },
-      { name: "Current Stock", href: "/inventory/current-stock", perm: "inventory_stock" },
-      { name: "Batches", href: "/inventory/batches", perm: "inventory_batches" },
+      { name: "Stock Summary",            href: "/reports/stock-summary",      perm: "reports" },
+      { name: "Current Stock Report",     href: "/reports/stock-availability",  perm: "reports" },
+      { name: "Stock Report Batch Wise",  href: "/reports/stock-batch",         perm: "reports" },
+      { name: "Stock Report Item Wise",   href: "/reports/stock-item-wise",     perm: "reports" },
+      { name: "Stock Category",           href: "/inventory/categories",        perm: "inventory_categories" },
+      { name: "Stock Items",              href: "/inventory/items",             perm: "inventory_items" },
+      { name: "Stock Items Batch",        href: "/inventory/batches",           perm: "inventory_batches" },
     ],
   },
+
+  // ── Report ─────────────────────────────────────────────────
   {
-    name: "Reports", icon: FileText,
+    kind: "group", name: "Report", icon: BarChart2,
     items: [
-      { name: "All Reports", href: "/reports", perm: "reports" },
-      { name: "Day Book", href: "/reports/day-book", perm: "reports" },
-      { name: "Trial Balance", href: "/reports/trial-balance", perm: "reports" },
-      { name: "Profit & Loss", href: "/reports/profit-loss", perm: "reports" },
-      { name: "Balance Sheet", href: "/reports/balance-sheet", perm: "reports" },
-      { name: "Sale Register", href: "/reports/sale-register", perm: "reports" },
-      { name: "Purchase Register", href: "/reports/purchase-register", perm: "reports" },
-      { name: "Cash Book", href: "/reports/cash-book", perm: "reports" },
-      { name: "All Transactions", href: "/reports/all-transactions", perm: "reports" },
-      { name: "Party Statement", href: "/reports/party-statement", perm: "reports" },
-      { name: "Stock Summary", href: "/reports/stock-summary", perm: "reports" },
-      { name: "Stock Availability", href: "/reports/stock-availability", perm: "reports" },
-      { name: "Delivery Report", href: "/reports/delivery-report", perm: "reports" },
+      { name: "Ledger Report",     href: "/reports/party-statement",    perm: "reports" },
+      { name: "Day Book",          href: "/reports/day-book",           perm: "reports" },
+      { name: "Cash Book",         href: "/reports/cash-book",          perm: "reports" },
+      { name: "Bank Book",         href: "/reports/bank-book",          perm: "reports" },
+      { name: "Sale Register",     href: "/reports/sale-register",      perm: "reports" },
+      { name: "Purchase Register", href: "/reports/purchase-register",  perm: "reports" },
+      { name: "All Transactions",  href: "/reports/all-transactions",   perm: "reports" },
     ],
   },
+
+  // ── Financial Report ───────────────────────────────────────
   {
-    name: "GST Reports", icon: Percent,
+    kind: "group", name: "Financial Report", icon: TrendingUp,
     items: [
-      { name: "GSTR-3B", href: "/gst/gstr3b", perm: "gst_reports" },
-      { name: "GSTR-2B", href: "/gst/gstr2b", perm: "gst_reports" },
-      { name: "HSN Summary", href: "/gst/hsn-summary", perm: "gst_reports" },
+      { name: "Trial Balance",  href: "/reports/trial-balance", perm: "reports" },
+      { name: "Profit & Loss",  href: "/reports/profit-loss",   perm: "reports" },
+      { name: "Balance Sheet",  href: "/reports/balance-sheet", perm: "reports" },
     ],
   },
-  { name: "Delivery", icon: Truck, href: "/delivery", perm: "delivery" },
+
+  // ── Delivery & Logistics ───────────────────────────────────
   {
-    name: "Settings", icon: Settings,
+    kind: "group", name: "Delivery & Logistics", icon: Truck,
     items: [
-      { name: "Company Settings", href: "/settings", perm: "settings_company" },
-      { name: "Print Settings", href: "/settings/print", perm: "settings_print" },
+      { name: "Delivery Assign",  href: "/delivery",                perm: "delivery" },
+      { name: "Delivery Report",  href: "/reports/delivery-report", perm: "delivery" },
+      { name: "Driver & Vehicle", href: "/delivery/drivers",        perm: "delivery" },
+    ],
+  },
+
+  // ── GST Report ─────────────────────────────────────────────
+  {
+    kind: "group", name: "GST Report", icon: Percent,
+    items: [
+      { name: "GSTR-3B",    href: "/gst/gstr3b",      perm: "gst_reports" },
+      { name: "GSTR-2B",    href: "/gst/gstr2b",      perm: "gst_reports" },
+      { name: "GSTR-1",     href: "/gst/gstr1",       perm: "gst_reports" },
+      { name: "HSN Report", href: "/gst/hsn-summary", perm: "gst_reports" },
+    ],
+  },
+
+  // ── Business Profile ───────────────────────────────────────
+  { kind: "link", name: "Business Profile", href: "/settings", icon: Building2, perm: "settings_company" },
+
+  // ── Manage Company ─────────────────────────────────────────
+  {
+    kind: "group", name: "Manage Company", icon: Layers,
+    items: [
+      { name: "Add Company",    href: "/company/add",    perm: "settings_company" },
+      { name: "Switch Company", href: "/company/switch", perm: "settings_company" },
+    ],
+  },
+
+  // ── separator ──────────────────────────────────────────────
+  { kind: "sep", label: "Settings" },
+
+  // ── Utility ────────────────────────────────────────────────
+  {
+    kind: "group", name: "Utility", icon: Wrench,
+    items: [
+      { name: "Export Data (Excel)", href: "/utility/export",   perm: "settings_company" },
+      { name: "Import Data (Excel)", href: "/utility/import",   perm: "settings_company" },
+      { name: "Backup",              href: "/utility/backup",   perm: "settings_company" },
+      { name: "Recycle Bin",         href: "/settings/recycle-bin", perm: "settings_company" },
+    ],
+  },
+
+  // ── User Role ──────────────────────────────────────────────
+  {
+    kind: "group", name: "User Role", icon: UserCog,
+    items: [
       { name: "Users & Roles", href: "/settings/users", perm: "settings_users" },
-      { name: "Recycle Bin", href: "/settings/recycle-bin", perm: "settings_company" },
     ],
   },
+
+  // ── Invoice Print Setting ──────────────────────────────────
+  { kind: "link", name: "Invoice Print Setting", href: "/settings/print", icon: Printer, perm: "settings_print" },
+
+  // ── Password / Fingerprint ─────────────────────────────────
+  { kind: "link", name: "Password / Fingerprint", href: "/settings/security", icon: Lock, perm: "settings_company" },
+
+  // ── Plan & Pricing ─────────────────────────────────────────
+  { kind: "link", name: "Plan & Pricing", href: "/plan-pricing", icon: CreditCard },
+
+  // ── Help & Support ─────────────────────────────────────────
+  { kind: "link", name: "Help & Support", href: "/help-support", icon: HelpCircle },
 ];
 
 const ROLE_DEFAULT_PERMS: Record<string, string[]> = {
-  admin: ["dashboard","sales_invoices","sales_orders","purchase_invoices","purchase_orders","accounts_parties","accounts_journal","accounts_payments","accounts_receipts","accounts_credit_notes","accounts_debit_notes","inventory_items","inventory_categories","inventory_stock","inventory_batches","reports","gst_reports","delivery","settings_company","settings_print","settings_users"],
-  accountant: ["dashboard","sales_invoices","sales_orders","purchase_invoices","purchase_orders","accounts_parties","accounts_journal","accounts_payments","accounts_receipts","accounts_credit_notes","accounts_debit_notes","inventory_items","inventory_categories","inventory_stock","inventory_batches","reports","gst_reports","settings_company","settings_print"],
+  admin: [
+    "dashboard","sales_invoices","sales_orders","purchase_invoices","purchase_orders",
+    "accounts_parties","accounts_journal","accounts_payments","accounts_receipts",
+    "accounts_credit_notes","accounts_debit_notes","inventory_items","inventory_categories",
+    "inventory_stock","inventory_batches","reports","gst_reports","delivery",
+    "settings_company","settings_print","settings_users",
+  ],
+  accountant: [
+    "dashboard","sales_invoices","sales_orders","purchase_invoices","purchase_orders",
+    "accounts_parties","accounts_journal","accounts_payments","accounts_receipts",
+    "accounts_credit_notes","accounts_debit_notes","inventory_items","inventory_categories",
+    "inventory_stock","inventory_batches","reports","gst_reports","settings_company","settings_print",
+  ],
   sales_staff: ["dashboard","sales_invoices","sales_orders","accounts_parties","inventory_items","inventory_stock"],
   view_only: ["dashboard","reports","gst_reports"],
 };
@@ -114,10 +191,12 @@ function canView(user: any, perm: string | undefined): boolean {
   return perms.includes(perm);
 }
 
-function NavLink({ item, isActive, onNavigate }: { item: NavItem; isActive: boolean; onNavigate?: () => void }) {
+function SidebarLink({ item, onNavigate }: { item: NavLink; onNavigate?: () => void }) {
+  const [location] = useLocation();
+  const isActive = item.href === "/" ? location === "/" : location === item.href || location.startsWith(item.href + "/");
   return (
     <Link
-      href={item.href!}
+      href={item.href}
       onClick={onNavigate}
       className={cn(
         "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
@@ -132,9 +211,9 @@ function NavLink({ item, isActive, onNavigate }: { item: NavItem; isActive: bool
   );
 }
 
-function NavGroup({ item, user, onNavigate }: { item: NavItem; user: any; onNavigate?: () => void }) {
+function SidebarGroup({ item, user, onNavigate }: { item: NavGroup; user: any; onNavigate?: () => void }) {
   const [location] = useLocation();
-  const visibleItems = (item.items || []).filter((sub) => canView(user, sub.perm));
+  const visibleItems = item.items.filter((sub) => canView(user, sub.perm));
   const isActiveGroup = visibleItems.some(
     (sub) => location === sub.href || location.startsWith(sub.href + "/")
   );
@@ -164,7 +243,7 @@ function NavGroup({ item, user, onNavigate }: { item: NavItem; user: any; onNavi
         {visibleItems.map((subItem) => {
           const isActive =
             location === subItem.href ||
-            (location.startsWith(subItem.href + "/") && subItem.href !== "/");
+            (subItem.href !== "/" && location.startsWith(subItem.href + "/"));
           return (
             <Link
               key={subItem.name}
@@ -186,8 +265,16 @@ function NavGroup({ item, user, onNavigate }: { item: NavItem; user: any; onNavi
   );
 }
 
+function SidebarSep({ label }: { label?: string }) {
+  return (
+    <div className="pt-3 pb-1 px-3 flex items-center gap-2">
+      {label && <span className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">{label}</span>}
+      <div className="flex-1 h-px bg-sidebar-border" />
+    </div>
+  );
+}
+
 export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
-  const [location] = useLocation();
   const { logout, user } = useAuth();
 
   return (
@@ -203,19 +290,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
 
       <ScrollArea className="flex-1 py-4 px-3">
         <div className="space-y-1">
-          {navigation.map((item) => {
-            if (item.items) {
-              return <NavGroup key={item.name} item={item} user={user} onNavigate={onNavigate} />;
+          {navigation.map((item, idx) => {
+            if (item.kind === "sep") {
+              return <SidebarSep key={idx} label={item.label} />;
+            }
+            if (item.kind === "group") {
+              return <SidebarGroup key={item.name} item={item} user={user} onNavigate={onNavigate} />;
             }
             if (!canView(user, item.perm)) return null;
-            return (
-              <NavLink
-                key={item.name}
-                item={item}
-                isActive={item.href ? location === item.href : false}
-                onNavigate={onNavigate}
-              />
-            );
+            return <SidebarLink key={item.name} item={item} onNavigate={onNavigate} />;
           })}
         </div>
       </ScrollArea>
