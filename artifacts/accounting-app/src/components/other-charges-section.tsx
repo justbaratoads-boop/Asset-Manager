@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/format";
@@ -20,15 +21,38 @@ function LedgerSelect({ value, onChange, ledgers }: {
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  const triggerRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setDropdownStyle({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 240) });
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+        const portal = document.getElementById("ledger-select-portal");
+        if (portal && portal.contains(e.target as Node)) return;
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, updatePosition]);
 
   const selected = ledgers.find(l => l.id === value.ledgerId);
   const filtered = ledgers.filter(l =>
@@ -38,19 +62,23 @@ function LedgerSelect({ value, onChange, ledgers }: {
   );
 
   return (
-    <div className="relative flex-1" ref={ref}>
+    <div className="relative flex-1 min-w-0" ref={triggerRef}>
       <button
         type="button"
-        onClick={() => { setOpen(o => !o); setSearch(""); }}
-        className="w-full h-9 flex items-center justify-between rounded border border-input bg-background px-3 text-sm text-left hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-ring"
+        onClick={() => { setOpen(o => !o); setSearch(""); updatePosition(); }}
+        className="w-full h-9 flex items-center justify-between rounded border border-input bg-background px-3 text-sm text-left hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-ring min-w-0"
       >
-        <span className={selected ? "" : "text-muted-foreground"}>
+        <span className={`truncate flex-1 ${selected ? "" : "text-muted-foreground"}`}>
           {selected ? selected.name : "Select account..."}
         </span>
         <Search className="h-3.5 w-3.5 text-muted-foreground ml-1 shrink-0" />
       </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-72 rounded-md border bg-popover shadow-lg">
+      {open && createPortal(
+        <div
+          id="ledger-select-portal"
+          className="fixed z-[9999] rounded-md border bg-popover shadow-lg"
+          style={{ top: dropdownStyle.top, left: dropdownStyle.left, width: dropdownStyle.width }}
+        >
           <div className="p-1.5 border-b">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
@@ -72,14 +100,15 @@ function LedgerSelect({ value, onChange, ledgers }: {
                 type="button"
                 className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground flex items-center justify-between gap-2
                   ${value.ledgerId === l.id ? "bg-accent font-medium" : ""}`}
-                onClick={() => { onChange(l.id, l.name); setOpen(false); }}
+                onMouseDown={e => { e.preventDefault(); onChange(l.id, l.name); setOpen(false); }}
               >
                 <span className="truncate">{l.name}</span>
                 <span className="text-[10px] text-muted-foreground shrink-0">{l.group}</span>
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

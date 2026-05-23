@@ -144,14 +144,14 @@ export default function SaleInvoiceForm() {
     customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
       if (Array.isArray(data)) setBankAccounts(data.map((l: any) => ({ value: `bank_${l.id}`, label: l.name })));
     }).catch(() => {});
-    Promise.all([
-      customFetch<any>("/api/ledgers?group=Indirect%20Expenses"),
-      customFetch<any>("/api/ledgers?group=Indirect%20Incomes"),
-    ]).then(([exp, inc]) => {
-      setIndirectLedgers([
-        ...(Array.isArray(exp) ? exp : []),
-        ...(Array.isArray(inc) ? inc : []),
-      ].sort((a: any, b: any) => a.name.localeCompare(b.name)));
+    customFetch<any>("/api/ledgers").then((data: any) => {
+      if (Array.isArray(data)) {
+        const filtered = data.filter((l: any) => {
+          const g = (l.group || "").toLowerCase();
+          return g.includes("expense") || g.includes("income");
+        });
+        setIndirectLedgers(filtered.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      }
     }).catch(() => {});
   }, []);
 

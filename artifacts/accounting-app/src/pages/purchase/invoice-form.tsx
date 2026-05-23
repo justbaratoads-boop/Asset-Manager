@@ -110,14 +110,14 @@ export default function PurchaseInvoiceForm() {
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    Promise.all([
-      customFetch<any>("/api/ledgers?group=Indirect%20Expenses"),
-      customFetch<any>("/api/ledgers?group=Indirect%20Incomes"),
-    ]).then(([exp, inc]) => {
-      setIndirectLedgers([
-        ...(Array.isArray(exp) ? exp : []),
-        ...(Array.isArray(inc) ? inc : []),
-      ].sort((a: any, b: any) => a.name.localeCompare(b.name)));
+    customFetch<any>("/api/ledgers").then((data: any) => {
+      if (Array.isArray(data)) {
+        const filtered = data.filter((l: any) => {
+          const g = (l.group || "").toLowerCase();
+          return g.includes("expense") || g.includes("income");
+        });
+        setIndirectLedgers(filtered.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      }
     }).catch(() => {});
   }, []);
 

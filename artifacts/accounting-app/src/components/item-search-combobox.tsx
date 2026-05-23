@@ -52,7 +52,7 @@ export function ItemSearchCombobox({
   const updateDropdownPosition = useCallback(() => {
     if (wrapRef.current) {
       const rect = wrapRef.current.getBoundingClientRect();
-      setDropdownStyle({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: rect.width });
+      setDropdownStyle({ top: rect.bottom + 4, left: rect.left, width: rect.width });
     }
   }, []);
 
@@ -107,9 +107,7 @@ export function ItemSearchCombobox({
         <Input
           value={query}
           onChange={e => {
-            const v = e.target.value;
-            setQuery(v);
-            onNameChange(v);
+            setQuery(e.target.value);
             setOpen(true);
           }}
           onFocus={() => { setOpen(true); updateDropdownPosition(); }}
