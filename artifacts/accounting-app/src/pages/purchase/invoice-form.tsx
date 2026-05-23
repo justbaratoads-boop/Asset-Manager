@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
@@ -107,6 +107,7 @@ export default function PurchaseInvoiceForm() {
   const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
   const [indirectLedgers, setIndirectLedgers] = useState<{ id: number; name: string; group: string }[]>([]);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     Promise.all([
@@ -144,7 +145,8 @@ export default function PurchaseInvoiceForm() {
   };
 
   useEffect(() => {
-    if (!existing || !isEdit) return;
+    if (!existing || !isEdit || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     const inv = existing as any;
     if (inv.otherCharges) {
       try { setCharges(JSON.parse(inv.otherCharges)); } catch { setCharges([]); }

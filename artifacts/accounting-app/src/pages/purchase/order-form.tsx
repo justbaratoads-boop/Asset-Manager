@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCreatePurchaseOrder, useGetPurchaseOrder, useListParties, useListStockItems, getListPurchaseOrdersQueryKey, customFetch } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
@@ -94,9 +94,11 @@ export default function PurchaseOrderForm() {
   const [showAddParty, setShowAddParty] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddForIndex, setQuickAddForIndex] = useState<number | null>(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!existing || !isEdit) return;
+    if (!existing || !isEdit || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     const o = existing as any;
     if (o.partyId) setPartyId(o.partyId);
     setPartyName(o.partyName || "");

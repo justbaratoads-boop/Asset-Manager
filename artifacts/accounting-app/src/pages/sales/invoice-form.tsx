@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
@@ -138,6 +138,7 @@ export default function SaleInvoiceForm() {
   const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
   const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
   const [indirectLedgers, setIndirectLedgers] = useState<{ id: number; name: string; group: string }[]>([]);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
@@ -197,7 +198,8 @@ export default function SaleInvoiceForm() {
   }, [partyId]);
 
   useEffect(() => {
-    if (!existing || !isEdit) return;
+    if (!existing || !isEdit || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     const inv = existing as any;
     if (inv.partyId) { setPartyId(inv.partyId); setBillType("credit"); }
     else { setBillType("cash"); }
