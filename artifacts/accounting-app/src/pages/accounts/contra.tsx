@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { customFetch, getListJournalsQueryKey } from "@workspace/api-client-react";
+import { customFetch } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ function isEdited(createdAt: string | null, updatedAt: string | null) {
 
 function useContraList() {
   return useQuery<any[]>({
-    queryKey: [...getListJournalsQueryKey(), "contra"],
+    queryKey: ["contra-vouchers"],
     queryFn: () => customFetch("/api/journals?voucherType=contra"),
   });
 }
@@ -42,7 +42,7 @@ export default function ContraList() {
   const handleDelete = async () => {
     if (!deleteId) return;
     await customFetch(`/api/journals/${deleteId}`, { method: "DELETE" });
-    queryClient.invalidateQueries({ queryKey: [...getListJournalsQueryKey(), "contra"] });
+    queryClient.invalidateQueries({ queryKey: ["contra-vouchers"] });
     setDeleteId(null);
     toast({ title: "Contra voucher deleted" });
   };

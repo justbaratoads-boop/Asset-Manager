@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListJournals, useDeleteJournal, useGetJournal, getListJournalsQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useDeleteJournal, useGetJournal, getListJournalsQueryKey, customFetch } from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,10 @@ export default function JournalList() {
   const [viewId, setViewId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
-  const { data: journals = [], isLoading } = useListJournals({});
+  const { data: journals = [], isLoading } = useQuery<any[]>({
+    queryKey: ["journal-vouchers"],
+    queryFn: () => customFetch("/api/journals?voucherType=journal"),
+  });
   const deleteMutation = useDeleteJournal();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -33,7 +36,7 @@ export default function JournalList() {
   const handleDelete = async () => {
     if (!deleteId) return;
     await deleteMutation.mutateAsync({ id: deleteId });
-    queryClient.invalidateQueries({ queryKey: getListJournalsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ["journal-vouchers"] });
     setDeleteId(null);
     toast({ title: "Journal entry deleted" });
   };

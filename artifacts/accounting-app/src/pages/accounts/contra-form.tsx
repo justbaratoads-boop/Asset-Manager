@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
-import { customFetch, useListLedgers, getListJournalsQueryKey } from "@workspace/api-client-react";
+import { customFetch, useListLedgers } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -168,7 +168,7 @@ export default function ContraForm() {
         });
         toast({ title: "Contra voucher saved" });
       }
-      queryClient.invalidateQueries({ queryKey: [...getListJournalsQueryKey(), "contra"] });
+      queryClient.invalidateQueries({ queryKey: ["contra-vouchers"] });
       setLocation("/accounts/contra");
     } catch (err: any) {
       toast({ title: "Error", description: err?.data?.error || "Failed to save", variant: "destructive" });
