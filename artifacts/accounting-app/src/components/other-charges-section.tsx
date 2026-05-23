@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/format";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, ChevronDown } from "lucide-react";
 
 export interface OtherCharge {
   name?: string;
@@ -24,11 +24,12 @@ function LedgerSelect({ value, onChange, ledgers }: {
   const [search, setSearch] = useState("");
   const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const updatePosition = useCallback(() => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setDropdownStyle({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 240) });
+      setDropdownStyle({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 260) });
     }
   }, []);
 
@@ -38,6 +39,7 @@ function LedgerSelect({ value, onChange, ledgers }: {
         const portal = document.getElementById("ledger-select-portal");
         if (portal && portal.contains(e.target as Node)) return;
         setOpen(false);
+        setSearch("");
       }
     };
     document.addEventListener("mousedown", handler);
@@ -47,6 +49,7 @@ function LedgerSelect({ value, onChange, ledgers }: {
   useEffect(() => {
     if (!open) return;
     updatePosition();
+    setTimeout(() => searchRef.current?.focus(), 0);
     window.addEventListener("scroll", updatePosition, true);
     window.addEventListener("resize", updatePosition);
     return () => {
@@ -63,48 +66,51 @@ function LedgerSelect({ value, onChange, ledgers }: {
   );
 
   return (
-    <div className="relative w-full" ref={triggerRef}>
+    <div className="relative flex-1 min-w-0" ref={triggerRef}>
       <button
         type="button"
-        onClick={() => { setOpen(o => !o); setSearch(""); updatePosition(); }}
-        className="w-full h-9 flex items-center justify-between rounded border border-input bg-background px-3 text-sm text-left hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-ring"
+        onClick={() => { setOpen(o => !o); if (!open) setSearch(""); updatePosition(); }}
+        className="w-full h-9 flex items-center gap-2 rounded border border-input bg-background px-3 text-sm text-left hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-ring"
       >
-        <span className={`truncate flex-1 min-w-0 ${selected ? "text-foreground" : "text-muted-foreground"}`}>
-          {selected ? selected.name : "Select account..."}
+        <span className={`flex-1 min-w-0 truncate ${selected ? "text-foreground" : "text-muted-foreground"}`}>
+          {selected ? selected.name : "Select ledger..."}
         </span>
-        <Search className="h-3.5 w-3.5 text-muted-foreground ml-2 shrink-0" />
+        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       </button>
+
       {open && createPortal(
         <div
           id="ledger-select-portal"
-          className="fixed z-[9999] rounded-md border bg-popover shadow-lg"
+          className="fixed z-[9999] rounded-md border bg-popover shadow-lg overflow-hidden"
           style={{ top: dropdownStyle.top, left: dropdownStyle.left, width: dropdownStyle.width }}
         >
           <div className="p-1.5 border-b">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-              <input
-                autoFocus
-                className="w-full h-7 pl-6 pr-2 text-xs rounded border border-input bg-background outline-none"
-                placeholder="Search account..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
+            <input
+              ref={searchRef}
+              className="w-full h-8 px-3 text-sm rounded border border-input bg-background outline-none placeholder:text-muted-foreground"
+              placeholder="Type to search ledger..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
-          <div className="max-h-48 overflow-y-auto py-1">
+          <div className="max-h-52 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <div className="text-center py-3 text-xs text-muted-foreground">No accounts found</div>
+              <div className="text-center py-4 text-sm text-muted-foreground">No ledgers found</div>
             ) : filtered.map(l => (
               <button
                 key={l.id}
                 type="button"
-                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground flex items-center justify-between gap-2
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground flex items-center justify-between gap-3
                   ${value.ledgerId === l.id ? "bg-accent font-medium" : ""}`}
-                onMouseDown={e => { e.preventDefault(); onChange(l.id, l.name); setOpen(false); }}
+                onMouseDown={e => {
+                  e.preventDefault();
+                  onChange(l.id, l.name);
+                  setOpen(false);
+                  setSearch("");
+                }}
               >
                 <span className="truncate">{l.name}</span>
-                <span className="text-[10px] text-muted-foreground shrink-0">{l.group}</span>
+                <span className="text-xs text-muted-foreground shrink-0 capitalize">{l.group}</span>
               </button>
             ))}
           </div>
@@ -122,7 +128,7 @@ interface Props {
 }
 
 export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) {
-  const add = () => onChange([...charges, { name: "", ledgerId: 0, ledgerName: "", amount: 0, type: "add" }]);
+  const add = () => onChange([...charges, { ledgerId: 0, ledgerName: "", amount: 0, type: "add" }]);
   const remove = (i: number) => onChange(charges.filter((_, j) => j !== i));
   const update = (i: number, partial: Partial<OtherCharge>) => {
     const updated = [...charges];
@@ -156,36 +162,15 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
 
       {charges.map((charge, i) => {
         const isDeduct = (charge.type ?? "add") === "deduct";
-        const displayLabel = charge.name || charge.ledgerName;
         return (
           <div key={i} className="flex gap-2 items-center">
 
-            {/* Name / label input — always visible */}
-            <div className="w-32 shrink-0">
-              <Input
-                placeholder="Label"
-                value={charge.name ?? ""}
-                onChange={e => update(i, { name: e.target.value })}
-                className="h-9 text-sm w-full"
-              />
-            </div>
-
-            {/* Ledger account selector — shown when accounts are available */}
-            {ledgers.length > 0 && (
-              <div className="flex-1 min-w-0">
-                <LedgerSelect
-                  value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
-                  onChange={(ledgerId, ledgerName) => {
-                    update(i, {
-                      ledgerId,
-                      ledgerName,
-                      name: charge.name || ledgerName,
-                    });
-                  }}
-                  ledgers={ledgers}
-                />
-              </div>
-            )}
+            {/* Ledger selector (indirect expense / income) */}
+            <LedgerSelect
+              value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
+              onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
+              ledgers={ledgers}
+            />
 
             {/* +Add / −Deduct toggle */}
             <button
@@ -237,7 +222,7 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
             const isDeduct = (c.type ?? "add") === "deduct";
             const amt = Number(c.amount) || 0;
             if (amt === 0) return null;
-            const label = c.name || c.ledgerName || `Field ${i + 1}`;
+            const label = c.ledgerName || `Field ${i + 1}`;
             return (
               <div key={i} className="flex justify-between text-xs text-muted-foreground">
                 <span>{label}</span>
