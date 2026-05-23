@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/format";
 import { Plus, Trash2, Search } from "lucide-react";
 
 export interface OtherCharge {
+  name?: string;
   ledgerId: number;
   ledgerName: string;
   amount: number;
@@ -62,16 +63,16 @@ function LedgerSelect({ value, onChange, ledgers }: {
   );
 
   return (
-    <div className="relative flex-1 min-w-0" ref={triggerRef}>
+    <div className="relative w-full" ref={triggerRef}>
       <button
         type="button"
         onClick={() => { setOpen(o => !o); setSearch(""); updatePosition(); }}
-        className="w-full h-9 flex items-center justify-between rounded border border-input bg-background px-3 text-sm text-left hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-ring min-w-0"
+        className="w-full h-9 flex items-center justify-between rounded border border-input bg-background px-3 text-sm text-left hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-ring"
       >
-        <span className={`truncate flex-1 ${selected ? "" : "text-muted-foreground"}`}>
+        <span className={`truncate flex-1 min-w-0 ${selected ? "text-foreground" : "text-muted-foreground"}`}>
           {selected ? selected.name : "Select account..."}
         </span>
-        <Search className="h-3.5 w-3.5 text-muted-foreground ml-1 shrink-0" />
+        <Search className="h-3.5 w-3.5 text-muted-foreground ml-2 shrink-0" />
       </button>
       {open && createPortal(
         <div
@@ -121,7 +122,7 @@ interface Props {
 }
 
 export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) {
-  const add = () => onChange([...charges, { ledgerId: 0, ledgerName: "", amount: 0, type: "add" }]);
+  const add = () => onChange([...charges, { name: "", ledgerId: 0, ledgerName: "", amount: 0, type: "add" }]);
   const remove = (i: number) => onChange(charges.filter((_, j) => j !== i));
   const update = (i: number, partial: Partial<OtherCharge>) => {
     const updated = [...charges];
@@ -155,24 +156,38 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
 
       {charges.map((charge, i) => {
         const isDeduct = (charge.type ?? "add") === "deduct";
+        const displayLabel = charge.name || charge.ledgerName;
         return (
           <div key={i} className="flex gap-2 items-center">
-            {ledgers.length > 0 && (
-              <LedgerSelect
-                value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
-                onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
-                ledgers={ledgers}
-              />
-            )}
-            {ledgers.length === 0 && (
+
+            {/* Name / label input — always visible */}
+            <div className="w-32 shrink-0">
               <Input
-                placeholder="Label (e.g. Freight)"
-                value={charge.ledgerName}
-                onChange={e => update(i, { ledgerName: e.target.value })}
-                className="flex-1 h-9 text-sm"
+                placeholder="Label"
+                value={charge.name ?? ""}
+                onChange={e => update(i, { name: e.target.value })}
+                className="h-9 text-sm w-full"
               />
+            </div>
+
+            {/* Ledger account selector — shown when accounts are available */}
+            {ledgers.length > 0 && (
+              <div className="flex-1 min-w-0">
+                <LedgerSelect
+                  value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
+                  onChange={(ledgerId, ledgerName) => {
+                    update(i, {
+                      ledgerId,
+                      ledgerName,
+                      name: charge.name || ledgerName,
+                    });
+                  }}
+                  ledgers={ledgers}
+                />
+              </div>
             )}
 
+            {/* +Add / −Deduct toggle */}
             <button
               type="button"
               onClick={() => toggleType(i)}
@@ -186,6 +201,7 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
               {isDeduct ? "− Deduct" : "+ Add"}
             </button>
 
+            {/* Amount */}
             <div className="relative w-28 shrink-0">
               <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm pointer-events-none font-medium
                 ${isDeduct ? "text-red-500" : "text-muted-foreground"}`}>₹</span>
@@ -201,6 +217,7 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
               />
             </div>
 
+            {/* Delete */}
             <Button
               type="button"
               size="icon"
@@ -220,7 +237,7 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
             const isDeduct = (c.type ?? "add") === "deduct";
             const amt = Number(c.amount) || 0;
             if (amt === 0) return null;
-            const label = c.ledgerName || `Field ${i + 1}`;
+            const label = c.name || c.ledgerName || `Field ${i + 1}`;
             return (
               <div key={i} className="flex justify-between text-xs text-muted-foreground">
                 <span>{label}</span>
