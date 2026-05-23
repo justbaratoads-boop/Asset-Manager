@@ -15,10 +15,11 @@ const router = Router();
 
 // --- JOURNAL ENTRIES ---
 router.get("/journals", authMiddleware, async (req, res) => {
-  const { from, to } = req.query;
+  const { from, to, voucherType } = req.query;
   const conditions: any[] = [eq(journalEntriesTable.isDeleted, "false")];
   if (from) conditions.push(gte(journalEntriesTable.date, from as string));
   if (to) conditions.push(lte(journalEntriesTable.date, to as string));
+  if (voucherType) conditions.push(eq(journalEntriesTable.voucherType, voucherType as string));
 
   const entries = await db.select().from(journalEntriesTable)
     .where(and(...conditions))
@@ -29,7 +30,8 @@ router.get("/journals", authMiddleware, async (req, res) => {
 
 router.post("/journals", authMiddleware, async (req, res) => {
   const data = req.body;
-  const voucherNumber = await makeVoucherNumber("JV");
+  const prefix = data.voucherType === "contra" ? "CV" : "JV";
+  const voucherNumber = await makeVoucherNumber(prefix);
 
   const [entry] = await db.insert(journalEntriesTable).values({
     date: data.date,

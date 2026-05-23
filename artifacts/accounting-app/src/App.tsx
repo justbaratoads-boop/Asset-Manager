@@ -46,6 +46,8 @@ import CreditNoteView from "@/pages/accounts/credit-note-view";
 import DebitNotesList from "@/pages/accounts/debit-notes";
 import DebitNoteForm from "@/pages/accounts/debit-note-form";
 import DebitNoteView from "@/pages/accounts/debit-note-view";
+import ContraList from "@/pages/accounts/contra";
+import ContraForm from "@/pages/accounts/contra-form";
 
 // Inventory
 import StockItemList from "@/pages/inventory/items";
@@ -167,6 +169,9 @@ function Router() {
       <PR path="/accounts/debit-notes/new" component={DebitNoteForm} />
       <PR path="/accounts/debit-notes/:id/edit" component={DebitNoteForm} />
       <PR path="/accounts/debit-notes/:id" component={DebitNoteView} />
+      <PR path="/accounts/contra" component={ContraList} />
+      <PR path="/accounts/contra/new" component={ContraForm} />
+      <PR path="/accounts/contra/:id/edit" component={ContraForm} />
 
       {/* Inventory */}
       <PR path="/inventory/items" component={StockItemList} />
