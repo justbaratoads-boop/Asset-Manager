@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCreateDebitNote, useGetDebitNote, useListParties, useListStockItems, getListDebitNotesQueryKey, customFetch } from "@workspace/api-client-react";
+import { useCreateDebitNote, useGetDebitNote, useListParties, useListStockItems, getListDebitNotesQueryKey, customFetch, useListLedgers } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
@@ -71,6 +71,7 @@ export default function DebitNoteForm() {
   const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetDebitNote(editId!, { query: { enabled: isEdit } });
+  const { data: ledgers = [] } = useListLedgers();
 
   const [partyId, setPartyId] = useState<number | undefined>();
   const [date, setDate] = useState(today());
@@ -143,7 +144,6 @@ export default function DebitNoteForm() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!partyId) e.party = "Supplier is required";
-    if (!reason.trim()) e.reason = "Reason is required";
     if (items.length === 0) e.items = "Add at least one item";
     if (items.some(i => !i.itemName)) e.items = "All items must have a name";
     return e;
@@ -216,7 +216,7 @@ export default function DebitNoteForm() {
                 <PartySelect
                   value={partyId}
                   onChange={v => { setPartyId(v); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}
-                  parties={(parties as any[]).filter((p: any) => p.type === "supplier")}
+                  parties={parties as any[]}
                   placeholder="Select supplier"
                   hasError={!!errors.party}
                 />
@@ -227,7 +227,7 @@ export default function DebitNoteForm() {
                 <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <Label>Reason *</Label>
+                <Label>Reason</Label>
                 <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Goods returned to supplier, quality issue..." rows={2} className={errors.reason ? "border-destructive" : ""} />
                 {errors.reason && <p className="text-xs text-destructive">{errors.reason}</p>}
               </div>
@@ -281,7 +281,7 @@ export default function DebitNoteForm() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Unit</Label>
-                      <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" />
+                      <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" disabled={true} />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Rate</Label>
@@ -355,7 +355,7 @@ export default function DebitNoteForm() {
                         })()}
                       </TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                      <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" /></TableCell>
+                      <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" disabled={true} /></TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -377,7 +377,7 @@ export default function DebitNoteForm() {
 
             {/* Other Charges */}
             <div className="border rounded-lg p-3 bg-muted/20">
-              <OtherChargesSection charges={charges} onChange={setCharges} />
+              <OtherChargesSection charges={charges} onChange={setCharges} ledgers={ledgers as any[]} />
             </div>
           </CardContent>
         </Card>
@@ -389,7 +389,20 @@ export default function DebitNoteForm() {
             {totals.cgst > 0 && <><div className="flex justify-between"><span className="text-muted-foreground">CGST</span><span>{formatCurrency(totals.cgst)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>{formatCurrency(totals.sgst)}</span></div></>}
             {totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>{formatCurrency(totals.igst)}</span></div>}
             {chargesTotal !== 0 && <div className="flex justify-between"><span className="text-muted-foreground">Other Charges</span><span className={chargesTotal < 0 ? "text-red-600" : ""}>{chargesTotal < 0 ? "− " : "+ "}{formatCurrency(Math.abs(chargesTotal))}</span></div>}
-            <div className="flex justify-between font-bold text-base border-t pt-2"><span>Debit Amount</span><span className="text-red-600">{formatCurrency(grandTotal)}</span></div>
+            <div className="flex justify-between items-center font-bold text-base border-t pt-2">
+              <span>Debit Amount</span>
+              <div className="flex items-center gap-2">
+                {grandTotal % 1 !== 0 && grandTotal > 0 && (
+                  <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0" onClick={() => {
+                    const diff = Math.ceil(grandTotal) - grandTotal;
+                    if (diff > 0) {
+                      setCharges(prev => [...prev, { name: "Round Off", amount: String(diff.toFixed(2)), type: "add" }]);
+                    }
+                  }}>↑ Round Up</Button>
+                )}
+                <span className="text-red-600">{formatCurrency(grandTotal)}</span>
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground pt-1">Items will be removed from inventory on save.</p>
           </CardContent>
         </Card>

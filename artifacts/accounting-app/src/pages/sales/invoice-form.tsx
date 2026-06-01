@@ -385,7 +385,7 @@ export default function SaleInvoiceForm() {
                   <PartySelect
                     value={partyId}
                     onChange={v => { setPartyId(v); setErrors(p => { const n = { ...p }; delete n.party; return n; }); }}
-                    parties={(parties as any[]).filter((p: any) => p.type === "customer")}
+                    parties={parties as any[]}
                     placeholder="Select party"
                     hasError={!!errors.party}
                   />
@@ -740,7 +740,20 @@ export default function SaleInvoiceForm() {
               {isInterstate && totals.igst > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST</span><span>+ {formatCurrency(totals.igst)}</span></div>}
               {totals.gst === 0 && <div className="flex justify-between text-muted-foreground/60 text-xs"><span>GST</span><span>Nil</span></div>}
               {chargesTotal !== 0 && <div className="flex justify-between text-muted-foreground"><span>Additional Fields</span><span className={chargesTotal < 0 ? "text-red-600" : ""}>{chargesTotal < 0 ? "− " : "+ "}{formatCurrency(Math.abs(chargesTotal))}</span></div>}
-              <div className="flex justify-between font-bold text-base border-t pt-2"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
+              <div className="flex justify-between items-center font-bold text-base border-t pt-2">
+                <span>Grand Total</span>
+                <div className="flex items-center gap-2">
+                  {grandTotal % 1 !== 0 && grandTotal > 0 && (
+                    <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0" onClick={() => {
+                      const diff = Math.ceil(grandTotal) - grandTotal;
+                      if (diff > 0) {
+                        setCharges(prev => [...prev, { name: "Round Off", amount: String(diff.toFixed(2)), type: "add" }]);
+                      }
+                    }}>↑ Round Up</Button>
+                  )}
+                  <span>{formatCurrency(grandTotal)}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

@@ -47,9 +47,7 @@ export default function ReceiptForm() {
   const cashBankLedgers = (allLedgers as any[]).filter(
     (l: any) => l.group === "Bank Accounts" || l.name === "Cash"
   );
-  const parties = (allParties as any[]).filter(
-    (p: any) => p.accountGroup === "Sundry Debtors" || p.type === "customer" || p.type === "both"
-  );
+  const parties = allParties as any[];
 
   const [partyId, setPartyId] = useState<number | undefined>();
   const [form, setForm] = useState({ date: today(), ledgerId: "", amount: "", narration: "" });
@@ -204,7 +202,12 @@ export default function ReceiptForm() {
         <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.date} onChange={e => set("date", e.target.value)} /></div>
           <div className="space-y-1">
-            <Label>Amount *</Label>
+            <div className="flex items-center justify-between">
+              <Label>Amount *</Label>
+              {Number(form.amount) % 1 !== 0 && Number(form.amount) > 0 && billWiseEntries.length === 0 && (
+                <button type="button" onClick={() => set("amount", String(Math.ceil(Number(form.amount))))} className="text-[10px] text-primary hover:underline font-medium">↑ Round Up</button>
+              )}
+            </div>
             <Input
               type="number" required inputMode="decimal" min="0" step="any"
               value={form.amount} onChange={e => { set("amount", e.target.value); setBillWiseEntries([]); setPrimaryAmount(""); setExtraRows([]); }}

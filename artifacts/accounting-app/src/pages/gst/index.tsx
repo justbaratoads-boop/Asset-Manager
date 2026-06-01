@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/format";
-import { useLocation } from "wouter";
+import { useLocation } from "wouter";`nimport { useFY } from "@/lib/financial-year";
 
 function GSTR3B({ from, to }: { from: string; to: string }) {
   const { data, isLoading } = useGetGstr3b({ from: from || undefined, to: to || undefined });
@@ -107,16 +107,16 @@ function HSNSummary({ from, to }: { from: string; to: string }) {
 }
 
 export default function GSTDashboard() {
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  
+  
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">GST Compliance</h1>
         <div className="flex gap-3">
-          <div className="flex items-center gap-2"><Label>From</Label><Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-36" /></div>
-          <div className="flex items-center gap-2"><Label>To</Label><Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" /></div>
+          
+          
         </div>
       </div>
       <Tabs defaultValue="gstr3b">
@@ -128,3 +128,5 @@ export default function GSTDashboard() {
     </div>
   );
 }
+
+

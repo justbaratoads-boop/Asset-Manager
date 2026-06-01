@@ -37,8 +37,8 @@ export default function LedgerStatement() {
   const [, params] = useRoute("/accounts/ledgers/:id");
   const id = Number(params?.id);
 
-  const [from, setFrom] = useState(fyStart);
-  const [to, setTo] = useState(today);
+  
+  
 
   const { data: ledger } = useGetLedger(id, { query: { enabled: !!id } });
 
@@ -180,3 +180,4 @@ export default function LedgerStatement() {
     </div>
   );
 }
+

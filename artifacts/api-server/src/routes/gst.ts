@@ -81,20 +81,71 @@ router.get("/gst/gstr2b", authMiddleware, async (req, res) => {
   });
 });
 
+router.get("/gst/gstr1", authMiddleware, async (req, res) => {
+  const { month, year } = req.query;
+  const y = Number(year) || new Date().getFullYear();
+  const m = Number(month) || new Date().getMonth() + 1;
+  const from = `${y}-${String(m).padStart(2, "0")}-01`;
+  const toDate = new Date(y, m, 0).toISOString().slice(0, 10);
+
+  const invoices = await db.select().from(saleInvoicesTable)
+    .where(and(gte(saleInvoicesTable.date, from), lte(saleInvoicesTable.date, toDate), eq(saleInvoicesTable.isDeleted, "false")));
+
+  // B2B: Has Party GSTIN. B2C: No GSTIN.
+  // B2C Large: Interstate and Taxable > 2,50,000. B2C Small: Otherwise.
+  const categorized = invoices.map(i => {
+    let type = "B2C Small";
+    if (i.partyGstin) {
+      type = "B2B";
+    } else if (i.isInterstate && Number(i.totalTaxable) > 250000) {
+      type = "B2C Large";
+    }
+    
+    return {
+      type,
+      customerName: i.partyName,
+      gstin: i.partyGstin || "",
+      invoiceNumber: i.invoiceNumber,
+      date: i.date,
+      taxableAmount: Number(i.totalTaxable),
+      cgst: Number(i.totalCgst),
+      sgst: Number(i.totalSgst),
+      igst: Number(i.totalIgst),
+      total: Number(i.grandTotal),
+    };
+  });
+
+  res.json({
+    period: { month: m, year: y },
+    invoices: categorized,
+    summary: {
+      b2b: categorized.filter(i => i.type === "B2B").reduce((s, i) => s + i.taxableAmount, 0),
+      b2cLarge: categorized.filter(i => i.type === "B2C Large").reduce((s, i) => s + i.taxableAmount, 0),
+      b2cSmall: categorized.filter(i => i.type === "B2C Small").reduce((s, i) => s + i.taxableAmount, 0),
+      totalTaxable: categorized.reduce((s, i) => s + i.taxableAmount, 0),
+      totalGst: categorized.reduce((s, i) => s + i.cgst + i.sgst + i.igst, 0),
+    }
+  });
+});
+
 router.get("/gst/hsn-summary", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
-  const conditions: any[] = [eq(saleInvoiceItemsTable.hsnCode, saleInvoiceItemsTable.hsnCode)];
+  const conditions: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
+  if (from) conditions.push(gte(saleInvoicesTable.date, from as string));
+  if (to) conditions.push(lte(saleInvoicesTable.date, to as string));
 
   const rows = await db
     .select({
       hsnCode: saleInvoiceItemsTable.hsnCode,
-      quantity: sql<string>`SUM(quantity::numeric)`,
-      taxable: sql<string>`SUM(taxable_amount::numeric)`,
-      cgst: sql<string>`SUM(cgst::numeric)`,
-      sgst: sql<string>`SUM(sgst::numeric)`,
-      igst: sql<string>`SUM(igst::numeric)`,
+      quantity: sql<string>`SUM(${saleInvoiceItemsTable.quantity}::numeric)`,
+      taxable: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount}::numeric)`,
+      cgst: sql<string>`SUM(${saleInvoiceItemsTable.cgst}::numeric)`,
+      sgst: sql<string>`SUM(${saleInvoiceItemsTable.sgst}::numeric)`,
+      igst: sql<string>`SUM(${saleInvoiceItemsTable.igst}::numeric)`,
     })
     .from(saleInvoiceItemsTable)
+    .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+    .where(and(...conditions))
     .groupBy(saleInvoiceItemsTable.hsnCode)
     .orderBy(saleInvoiceItemsTable.hsnCode);
 

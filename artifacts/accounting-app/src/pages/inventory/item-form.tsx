@@ -39,11 +39,11 @@ export default function ItemForm() {
   const [form, setForm] = useState({
     name: "", categoryId: "", hsnCode: "", unit: "pcs",
     purchaseRate: "", saleRate: "", minStockLevel: "", physicalStock: "", barcode: "",
-    gstApplicable: false, gstRate: "18",
+    gstApplicable: false, gstRate: "",
   });
   const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
-  const originalGstRate = useRef<string>("18");
+  const originalGstRate = useRef<string>("");
   const originalGstApplicable = useRef<boolean>(false);
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -56,7 +56,7 @@ export default function ItemForm() {
   useEffect(() => {
     if (!existing) return;
     const e = existing as any;
-    const gstRate = String(e.gstRate || "18");
+    const gstRate = String(e.gstRate || "");
     const gstApplicable = e.gstApplicable === "true" || e.gstApplicable === true;
     originalGstRate.current = gstRate;
     originalGstApplicable.current = gstApplicable;

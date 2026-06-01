@@ -51,9 +51,9 @@ function navPath(type: string, id: number): string | null {
 }
 
 export default function AllTransactions() {
-  const { fy } = useFY();
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
+  const { fy, globalFrom: from, globalTo: to } = useFY();
+  
+  
   const [typeFilter, setTypeFilter] = useState("all");
   const [, setLocation] = useLocation();
   const { data, isLoading } = useGetAllTransactions({ from: from || undefined, to: to || undefined });
@@ -77,8 +77,8 @@ export default function AllTransactions() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2"><Label>From</Label><Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-36" /></div>
-        <div className="flex items-center gap-2"><Label>To</Label><Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" /></div>
+        
+        
         <div className="flex items-center gap-2">
           <Label>Type</Label>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -142,3 +142,4 @@ export default function AllTransactions() {
     </div>
   );
 }
+

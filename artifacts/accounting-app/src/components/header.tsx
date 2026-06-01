@@ -10,7 +10,7 @@ import { Badge } from "./ui/badge";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { fy } = useFY();
+  const { fy, globalFrom, globalTo, setGlobalFrom, setGlobalTo } = useFY();
 
   return (
     <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-10">
@@ -36,10 +36,25 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="hidden sm:flex text-xs font-medium text-muted-foreground border-dashed">
+        <div className="hidden sm:flex items-center gap-2 mr-2">
+          <Input 
+            type="date" 
+            value={globalFrom} 
+            onChange={(e) => setGlobalFrom(e.target.value)} 
+            className="w-36 h-8 text-xs" 
+          />
+          <span className="text-muted-foreground text-xs">to</span>
+          <Input 
+            type="date" 
+            value={globalTo} 
+            onChange={(e) => setGlobalTo(e.target.value)} 
+            className="w-36 h-8 text-xs" 
+          />
+        </div>
+        <Badge variant="outline" className="hidden lg:flex text-xs font-medium text-muted-foreground border-dashed">
           FY {fy.label}
         </Badge>
-        <div className="hidden lg:flex items-center gap-2 mr-2 text-xs font-medium text-muted-foreground">
+        <div className="hidden xl:flex items-center gap-2 mr-2 text-xs font-medium text-muted-foreground">
           <kbd className="px-1.5 py-0.5 bg-muted rounded border shadow-sm">F2</kbd> Sale
           <kbd className="px-1.5 py-0.5 bg-muted rounded border shadow-sm ml-2">F3</kbd> Receipt
         </div>

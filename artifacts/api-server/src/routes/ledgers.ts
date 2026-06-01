@@ -17,7 +17,7 @@ router.get("/ledgers", authMiddleware, async (req, res) => {
 
   const ledgers = await db.select().from(ledgersTable)
     .where(and(...conditions))
-    .orderBy(ledgersTable.group, ledgersTable.name);
+    .orderBy(ledgersTable.name);
 
   res.json(ledgers.map(l => ({ ...l, openingBalance: Number(l.openingBalance) })));
 });
@@ -39,6 +39,9 @@ router.post("/ledgers", authMiddleware, async (req, res) => {
       nature: data.nature || "dr",
       openingBalance: String(data.openingBalance || 0),
       isDeleted: "false",
+      isGstApplicable: data.isGstApplicable || false,
+      gstRate: data.gstRate || null,
+      hsnSac: data.hsnSac || null,
     }).where(eq(ledgersTable.id, softDeleted.id)).returning();
     return res.status(201).json({ ...revived, openingBalance: Number(revived.openingBalance) });
   }
@@ -53,6 +56,9 @@ router.post("/ledgers", authMiddleware, async (req, res) => {
     accountNumber: data.accountNumber || null,
     ifscCode: data.ifscCode || null,
     upiId: data.upiId || null,
+    isGstApplicable: data.isGstApplicable || false,
+    gstRate: data.gstRate || null,
+    hsnSac: data.hsnSac || null,
   }).returning();
   res.status(201).json({ ...ledger, openingBalance: Number(ledger.openingBalance) });
 });
@@ -89,6 +95,9 @@ router.put("/ledgers/:id", authMiddleware, async (req, res) => {
     accountNumber: data.accountNumber ?? null,
     ifscCode: data.ifscCode ?? null,
     upiId: data.upiId ?? null,
+    isGstApplicable: data.isGstApplicable ?? false,
+    gstRate: data.gstRate ?? null,
+    hsnSac: data.hsnSac ?? null,
   }).where(eq(ledgersTable.id, Number(id))).returning();
   if (!ledger) return res.status(404).json({ error: "Ledger not found" });
   res.json({ ...ledger, openingBalance: Number(ledger.openingBalance) });

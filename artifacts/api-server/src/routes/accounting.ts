@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable,
+  journalEntriesTable, journalLinesTable, partiesTable, paymentsTable, receiptsTable,
   creditNotesTable, creditNoteItemsTable, debitNotesTable, debitNoteItemsTable,
   ledgersTable, saleInvoicesTable, saleInvoicePaymentsTable,
   purchaseInvoicesTable, purchaseInvoicePaymentsTable,
@@ -66,10 +66,12 @@ router.get("/journals/:id", authMiddleware, async (req, res) => {
     ledgerId: journalLinesTable.ledgerId,
     ledgerName: ledgersTable.name,
     partyId: journalLinesTable.partyId,
+    partyName: partiesTable.name,
     type: journalLinesTable.type,
     amount: journalLinesTable.amount,
   }).from(journalLinesTable)
     .leftJoin(ledgersTable, eq(journalLinesTable.ledgerId, ledgersTable.id))
+    .leftJoin(partiesTable, eq(journalLinesTable.partyId, partiesTable.id))
     .where(eq(journalLinesTable.entryId, Number(req.params.id)));
   res.json({ ...entry, totalDebit: Number(entry.totalDebit), totalCredit: Number(entry.totalCredit), lines });
 });

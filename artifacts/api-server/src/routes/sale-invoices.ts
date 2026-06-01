@@ -4,7 +4,7 @@ import {
   saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockTransactionsTable,
   ordersTable,
 } from "@workspace/db/schema";
-import { adjustStock } from "../lib/batch-stock";
+import { adjustStock, adjustReservedStock } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
 import { eq, and, ilike, gte, lte, sql, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -126,6 +126,9 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
       });
 
       if (item.stockItemId) {
+        if (data.fromOrderId) {
+          await adjustReservedStock(item.batchId || null, -Number(item.quantity));
+        }
         const newBalance = await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
         await db.insert(stockTransactionsTable).values({
           itemId: item.stockItemId,
@@ -255,6 +258,9 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
       });
 
       if (item.stockItemId) {
+        if (data.fromOrderId) {
+          await adjustReservedStock(item.batchId || null, -Number(item.quantity));
+        }
         const newBalance = await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
         await db.insert(stockTransactionsTable).values({
           itemId: item.stockItemId,

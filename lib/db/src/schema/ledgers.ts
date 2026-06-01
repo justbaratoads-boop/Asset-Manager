@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -26,6 +26,9 @@ export const ledgersTable = pgTable("ledgers", {
   accountNumber: text("account_number"),
   ifscCode: text("ifsc_code"),
   upiId: text("upi_id"),
+  isGstApplicable: boolean("is_gst_applicable").notNull().default(false),
+  gstRate: numeric("gst_rate", { precision: 5, scale: 2 }),
+  hsnSac: text("hsn_sac"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

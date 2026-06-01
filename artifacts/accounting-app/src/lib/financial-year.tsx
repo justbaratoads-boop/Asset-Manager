@@ -25,6 +25,10 @@ type FYContextType = {
   setFYStart: (year: number) => void;
   availableFYs: FYInfo[];
   startMonth: number;
+  globalFrom: string;
+  globalTo: string;
+  setGlobalFrom: (date: string) => void;
+  setGlobalTo: (date: string) => void;
 };
 
 const FYContext = createContext<FYContextType | undefined>(undefined);
@@ -32,6 +36,17 @@ const FYContext = createContext<FYContextType | undefined>(undefined);
 export function FYProvider({ children, startMonth = 4 }: { children: ReactNode; startMonth?: number }) {
   const current = getCurrentFYStart(startMonth);
   const [fyStartYear, setFYStart] = useState(current);
+
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const defaultFrom = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-${pad(firstDay.getDate())}`;
+  const defaultTo = `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`;
+
+  const [globalFrom, setGlobalFrom] = useState(defaultFrom);
+  const [globalTo, setGlobalTo] = useState(defaultTo);
 
   const fy = useMemo(() => buildFY(fyStartYear, startMonth), [fyStartYear, startMonth]);
 
@@ -44,7 +59,7 @@ export function FYProvider({ children, startMonth = 4 }: { children: ReactNode; 
   }, [current, startMonth]);
 
   return (
-    <FYContext.Provider value={{ fy, setFYStart, availableFYs, startMonth }}>
+    <FYContext.Provider value={{ fy, setFYStart, availableFYs, startMonth, globalFrom, globalTo, setGlobalFrom, setGlobalTo }}>
       {children}
     </FYContext.Provider>
   );

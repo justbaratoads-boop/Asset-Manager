@@ -757,13 +757,6 @@ export default function SaleInvoiceView() {
           </span>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
-          {balanceDue > 0 && (
-            <Button size="sm" variant="default" onClick={openPayDialog} className="gap-1.5 bg-green-600 hover:bg-green-700">
-              <IndianRupee className="h-4 w-4" />
-              <span className="hidden sm:inline">Record Payment</span>
-              <span className="sm:hidden">Pay</span>
-            </Button>
-          )}
           <Link href={`/sales/invoices/${id}/edit`}>
             <Button variant="outline" size="sm" className="gap-1.5">
               <Edit className="h-4 w-4" /><span className="hidden sm:inline">Edit</span>
@@ -793,9 +786,6 @@ export default function SaleInvoiceView() {
               <span className="font-bold">{formatCurrency(balanceDue)} still due</span>
             </p>
           </div>
-          <Button size="sm" onClick={openPayDialog} className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shrink-0">
-            <IndianRupee className="h-3.5 w-3.5" />Collect Now
-          </Button>
         </div>
       )}
 

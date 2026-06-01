@@ -243,8 +243,13 @@ export default function ContraForm() {
           </div>
 
           {/* Amount */}
-          <div className="space-y-1.5">
-            <Label>Amount (₹)</Label>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <Label>Amount *</Label>
+              {Number(amount) % 1 !== 0 && Number(amount) > 0 && (
+                <button type="button" onClick={() => setAmount(Number(Math.ceil(Number(amount))))} className="text-[10px] text-primary hover:underline font-medium">↑ Round Up</button>
+              )}
+            </div>
             <div className="relative w-48">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
               <Input

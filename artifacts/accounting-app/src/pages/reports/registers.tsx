@@ -48,11 +48,11 @@ const PURCHASE_COLUMNS = [
 const AMOUNT_KEYS = new Set(["totalTaxable", "totalCgst", "totalSgst", "totalIgst", "grandTotal"]);
 
 function SaleRegister() {
-  const { fy } = useFY();
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
+  const { fy, globalFrom: from, globalTo: to } = useFY();
+  
+  
   const [, setLocation] = useLocation();
-  const { data, isLoading } = useGetSaleRegister({ from: from || undefined, to: to || undefined });
+  const { data, isLoading } = useGetSaleRegister({ from, to });
   const invoices: any[] = (data as any)?.invoices || [];
   const totals = (data as any)?.totals || {};
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("sale-register", SALE_COLUMNS);
@@ -63,7 +63,7 @@ function SaleRegister() {
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <DateFilters from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        
         <div className="flex items-center gap-2">
           <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
           <ExportButtons data={invoices} columns={visibleColumns} filename={`sale-register-${from}-${to}`} title="Sale Register" />
@@ -119,11 +119,11 @@ function SaleRegister() {
 }
 
 function PurchaseRegister() {
-  const { fy } = useFY();
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
+  const { fy, globalFrom: from, globalTo: to } = useFY();
+  
+  
   const [, setLocation] = useLocation();
-  const { data, isLoading } = useGetPurchaseRegister({ from: from || undefined, to: to || undefined });
+  const { data, isLoading } = useGetPurchaseRegister({ from, to });
   const invoices: any[] = (data as any)?.invoices || [];
   const totals = (data as any)?.totals || {};
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("purchase-register", PURCHASE_COLUMNS);
@@ -134,7 +134,7 @@ function PurchaseRegister() {
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <DateFilters from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        
         <div className="flex items-center gap-2">
           <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
           <ExportButtons data={invoices} columns={visibleColumns} filename={`purchase-register-${from}-${to}`} title="Purchase Register" />
@@ -203,3 +203,5 @@ export default function Registers() {
     </div>
   );
 }
+
+

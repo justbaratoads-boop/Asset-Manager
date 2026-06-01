@@ -13,6 +13,10 @@ import { FYProvider } from "./lib/financial-year";
 import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
 import NotFound from "@/pages/not-found";
+import HsnSummary from "@/pages/gst/hsn-summary";
+import GSTR1 from "@/pages/gst/gstr1";
+import GSTR2B from "@/pages/gst/gstr2b";
+import GSTR3B from "@/pages/gst/gstr3b";
 
 // Sales
 import SaleInvoiceList from "@/pages/sales/invoice-list";
@@ -65,24 +69,36 @@ import ProfitLoss from "@/pages/reports/profit-loss";
 import BalanceSheet from "@/pages/reports/balance-sheet";
 import Registers from "@/pages/reports/registers";
 import CashBook from "@/pages/reports/cash-book";
+import BankBook from "@/pages/reports/bank-book";
+import StockItemWise from "@/pages/reports/stock-item-wise";
 import AllTransactions from "@/pages/reports/all-transactions";
 import PartyStatement from "@/pages/reports/party-statement";
 import StockSummary from "@/pages/reports/stock-summary";
 import StockSummaryBatch from "@/pages/reports/stock-summary-batch";
 import StockAvailability from "@/pages/reports/stock-availability";
 import DeliveryReport from "@/pages/reports/delivery-report";
+import DriversAndVehicles from "@/pages/delivery/drivers";
 
 // GST
 import GSTDashboard from "@/pages/gst/index";
 
 // Delivery
 import DeliveryPage from "@/pages/delivery/index";
+import DeliveryForm from "@/pages/delivery/form";
 
 // Settings
 import CompanySettings from "@/pages/settings/company";
 import UsersSettings from "@/pages/settings/users";
 import PrintSettings from "@/pages/settings/print";
 import RecycleBin from "@/pages/settings/recycle-bin";
+import SecuritySettings from "@/pages/settings/security";
+
+// Utility
+import Utilities from "@/pages/utility/index";
+
+// Static Pages
+import PlanPricing from "@/pages/plan-pricing";
+import HelpSupport from "@/pages/help-support";
 
 setupApi();
 
@@ -191,21 +207,27 @@ function Router() {
       <PR path="/reports/sale-register" component={Registers} />
       <PR path="/reports/purchase-register" component={Registers} />
       <PR path="/reports/cash-book" component={CashBook} />
+      <PR path="/reports/bank-book" component={BankBook} />
       <PR path="/reports/all-transactions" component={AllTransactions} />
       <PR path="/reports/party-statement" component={PartyStatement} />
       <PR path="/reports/stock-summary" component={StockSummary} />
+      <PR path="/reports/stock-item-wise" component={StockItemWise} />
       <PR path="/reports/stock-summary-batch" component={StockSummaryBatch} />
       <PR path="/reports/stock-availability" component={StockAvailability} />
       <PR path="/reports/delivery-report" component={DeliveryReport} />
 
+      {/* GST Reports */}
+      <PR path="/gst/hsn-summary" component={HsnSummary} />
+      <PR path="/gst/gstr1" component={GSTR1} />
+      <PR path="/gst/gstr2b" component={GSTR2B} />
+      <PR path="/gst/gstr3b" component={GSTR3B} />
+
       {/* GST */}
       <PR path="/gst" component={GSTDashboard} />
-      <PR path="/gst/gstr3b" component={GSTDashboard} />
-      <PR path="/gst/gstr2b" component={GSTDashboard} />
-      <PR path="/gst/hsn-summary" component={GSTDashboard} />
 
       {/* Delivery */}
       <PR path="/delivery" component={DeliveryPage} />
+      <PR path="/delivery/drivers" component={DriversAndVehicles} />
 
       {/* Settings */}
       <PR path="/settings" component={CompanySettings} />
@@ -213,6 +235,16 @@ function Router() {
       <PR path="/settings/print" component={PrintSettings} />
       <PR path="/settings/users" component={UsersSettings} />
       <PR path="/settings/recycle-bin" component={RecycleBin} />
+      <PR path="/settings/security" component={SecuritySettings} />
+
+      {/* Utility */}
+      <PR path="/utility/export" component={Utilities} />
+      <PR path="/utility/import" component={Utilities} />
+      <PR path="/utility/backup" component={Utilities} />
+
+      {/* Static Pages */}
+      <PR path="/plan-pricing" component={PlanPricing} />
+      <PR path="/help-support" component={HelpSupport} />
 
       <Route component={NotFound} />
     </Switch>

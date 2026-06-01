@@ -33,11 +33,11 @@ const ALL_COLUMNS = [
 const DEFAULT_VISIBLE = ["name","unit","hsnCode","openingQty","openingValue","purchasedQty","purchasedValue","soldQty","soldValue","closingQty","closingValue"];
 
 export default function StockSummary() {
-  const { fy } = useFY();
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
+  const { fy, globalFrom: from, globalTo: to } = useFY();
+  
+  
   const [ledgerItem, setLedgerItem] = useState<{ id: number; name: string } | null>(null);
-  const { data, isLoading } = useGetStockSummary({ from: from || undefined, to: to || undefined });
+  const { data, isLoading } = useGetStockSummary({ from, to });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-summary", ALL_COLUMNS, DEFAULT_VISIBLE);
   const vis = visibleKeys;
 
@@ -57,8 +57,8 @@ export default function StockSummary() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2"><Label>From</Label><Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-36" /></div>
-        <div className="flex items-center gap-2"><Label>To</Label><Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" /></div>
+        
+        
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -140,3 +140,5 @@ export default function StockSummary() {
     </div>
   );
 }
+
+

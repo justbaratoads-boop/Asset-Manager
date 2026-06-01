@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListParties, useGetPartyStatement } from "@workspace/api-client-react";
+import { useListParties, useGetPartyStatement, useListLedgers } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -41,51 +41,58 @@ function navPath(type: string, id: number): string | null {
 }
 
 export default function PartyStatement() {
-  const { fy } = useFY();
+  const { fy, globalFrom: from, globalTo: to } = useFY();
   const [partyId, setPartyId] = useState<string>("");
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
+  
+  
   const [, setLocation] = useLocation();
-  const { data: parties = [] } = useListParties();
-  const { data, isLoading } = useGetPartyStatement({ partyId: partyId || undefined, from: from || undefined, to: to || undefined });
+  const { data: rawParties = [] } = useListParties();
+  const { data: rawLedgers = [] } = useListLedgers({});
+  const { data, isLoading } = useGetPartyStatement({ partyId: partyId || undefined, from, to });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("party-statement", ALL_COLUMNS);
   const vis = visibleKeys;
 
   const transactions: any[] = (data as any)?.transactions || [];
   const closingBalance = (data as any)?.closingBalance || 0;
-  const selectedParty = (parties as any[]).find((p: any) => p.id === Number(partyId));
+  
+  const allAccounts = [
+    ...(rawLedgers as any[]).map(l => ({ id: `ledger_${l.id}`, name: l.name, group: l.group, kind: "Ledger", phone: null, gstin: null })),
+    ...(rawParties as any[]).map(p => ({ id: `party_${p.id}`, name: p.name, group: "Parties", kind: "Party", phone: p.phone, gstin: p.gstin })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+
+  const selectedAccount = allAccounts.find(a => a.id === partyId);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-xl font-bold">Party Statement</h1>
+        <h1 className="text-xl font-bold">Ledger Statement</h1>
         <div className="flex items-center gap-2">
           <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
           {transactions.length > 0 && (
-            <ExportButtons data={transactions} columns={visibleColumns} filename={`party-statement-${selectedParty?.name || ""}`} title={`Party Statement — ${selectedParty?.name || ""}`} />
+            <ExportButtons data={transactions} columns={visibleColumns} filename={`ledger-statement-${selectedAccount?.name || ""}`} title={`Ledger Statement — ${selectedAccount?.name || ""}`} />
           )}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Label>Party</Label>
+          <Label>Account</Label>
           <Select value={partyId} onValueChange={setPartyId}>
-            <SelectTrigger className="w-52"><SelectValue placeholder="Select party" /></SelectTrigger>
-            <SelectContent>
-              {(parties as any[]).map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+            <SelectTrigger className="w-[300px]"><SelectValue placeholder="Select account" /></SelectTrigger>
+            <SelectContent className="max-h-[400px]">
+              {allAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} <span className="text-xs text-muted-foreground ml-2">({a.group})</span></SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2"><Label>From</Label><Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-36" /></div>
-        <div className="flex items-center gap-2"><Label>To</Label><Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" /></div>
+        
+        
       </div>
 
-      {selectedParty && (
+      {selectedAccount && (
         <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg text-sm">
-          <div><span className="text-muted-foreground">Party: </span><span className="font-semibold">{selectedParty.name}</span></div>
-          {selectedParty.gstin && <div><span className="text-muted-foreground">GSTIN: </span><span>{selectedParty.gstin}</span></div>}
-          {selectedParty.phone && <div><span className="text-muted-foreground">Ph: </span><span>{selectedParty.phone}</span></div>}
+          <div><span className="text-muted-foreground">Account: </span><span className="font-semibold">{selectedAccount.name}</span> <Badge variant="secondary" className="ml-2 text-[10px]">{selectedAccount.group}</Badge></div>
+          {selectedAccount.gstin && <div><span className="text-muted-foreground ml-4">GSTIN: </span><span>{selectedAccount.gstin}</span></div>}
+          {selectedAccount.phone && <div><span className="text-muted-foreground ml-4">Ph: </span><span>{selectedAccount.phone}</span></div>}
           <div className="ml-auto">
             <span className="text-muted-foreground mr-2">Closing Balance:</span>
             <span className={`font-bold text-base ${closingBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
@@ -96,7 +103,7 @@ export default function PartyStatement() {
       )}
 
       {!partyId ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">Select a party to view their statement</CardContent></Card>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">Select an account to view its statement</CardContent></Card>
       ) : (
         <Card>
           <CardContent className="p-0">
@@ -116,7 +123,7 @@ export default function PartyStatement() {
                 {isLoading
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                   : !transactions.length
-                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for this party in selected period</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions found in selected period</TableCell></TableRow>
                     : transactions.map((t: any, i: number) => {
                       const path = t.id ? navPath(t.type, t.id) : null;
                       return (
@@ -156,3 +163,5 @@ export default function PartyStatement() {
     </div>
   );
 }
+
+

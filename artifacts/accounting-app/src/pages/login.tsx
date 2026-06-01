@@ -9,8 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
 export default function Login() {
-  const [email, setEmail] = useState("admin@example.com");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const { login } = useAuth();
   const loginMutation = useLogin();
   const { toast } = useToast();

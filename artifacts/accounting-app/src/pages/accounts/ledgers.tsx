@@ -19,7 +19,7 @@ import { customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 
 const PAGE_SIZE = 25;
-const BLANK_LEDGER = { name: "", group: "", nature: "dr", openingBalance: "", bankName: "", bankBranch: "", accountNumber: "", ifscCode: "", upiId: "" };
+const BLANK_LEDGER = { name: "", group: "", nature: "dr", openingBalance: "", bankName: "", bankBranch: "", accountNumber: "", ifscCode: "", upiId: "", isGstApplicable: false, gstRate: "", hsnSac: "" };
 const BLANK_PARTY = {
   name: "", accountGroup: "Sundry Debtors",
   gstType: "unregistered",
@@ -194,6 +194,7 @@ export default function LedgerAccounts() {
       name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance),
       bankName: l.bankName || "", bankBranch: l.bankBranch || "",
       accountNumber: l.accountNumber || "", ifscCode: l.ifscCode || "", upiId: l.upiId || "",
+      isGstApplicable: l.isGstApplicable || false, gstRate: l.gstRate || "", hsnSac: l.hsnSac || "",
     });
     setLedgerNameError("");
     setDialogOpen(true);
@@ -602,6 +603,40 @@ export default function LedgerAccounts() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">Auto-set from the group you choose</p>
+                  </div>
+                )}
+
+                {["Indirect Expenses", "Indirect Incomes", "Direct Expenses", "Direct Incomes", "Fixed Assets", "Purchase Accounts", "Sales Accounts"].includes(ledgerForm.group) && (
+                  <div className="border-t pt-3 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">GST Settings</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Switch
+                        checked={(ledgerForm as any).isGstApplicable}
+                        onCheckedChange={c => setLedgerForm(p => ({ ...p, isGstApplicable: c }))}
+                      />
+                      <Label>Is GST Applicable?</Label>
+                    </div>
+                    {(ledgerForm as any).isGstApplicable && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label>GST Rate (%)</Label>
+                          <Input
+                            type="number"
+                            value={(ledgerForm as any).gstRate}
+                            onChange={e => setLedgerForm((p: any) => ({ ...p, gstRate: e.target.value }))}
+                            placeholder="e.g. 18"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>HSN / SAC</Label>
+                          <Input
+                            value={(ledgerForm as any).hsnSac}
+                            onChange={e => setLedgerForm((p: any) => ({ ...p, hsnSac: e.target.value }))}
+                            placeholder="e.g. 9983"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -166,6 +166,10 @@ export default function JournalForm() {
       return;
     }
     // Flatten each line into individual Dr / Cr journal lines
+    if (!narration.trim()) {
+      toast({ title: "Validation Error", description: "Narration is mandatory", variant: "destructive" });
+      return;
+    }
     const flatLines: { ledgerId: number; partyId: number | null; type: "dr" | "cr"; amount: number }[] = [];
     for (const l of lines) {
       const hasAccount = l.ledgerId > 0 || l.partyId != null;
@@ -242,32 +246,42 @@ export default function JournalForm() {
                     }}
                     accounts={allAccounts}
                   />
-                  <Input
-                    className="h-8 text-xs text-right"
-                    type="number"
-                    min="0"
-                    step="any"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={line.drAmount || ""}
-                    onChange={e => {
-                      updateLine(i, "drAmount", Number(e.target.value));
-                      if (Number(e.target.value) > 0) updateLine(i, "crAmount", 0);
-                    }}
-                  />
-                  <Input
-                    className="h-8 text-xs text-right"
-                    type="number"
-                    min="0"
-                    step="any"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={line.crAmount || ""}
-                    onChange={e => {
-                      updateLine(i, "crAmount", Number(e.target.value));
-                      if (Number(e.target.value) > 0) updateLine(i, "drAmount", 0);
-                    }}
-                  />
+                  <div className="flex flex-col gap-0.5">
+                    <Input
+                      className="h-8 text-xs text-right"
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={line.drAmount || ""}
+                      onChange={e => {
+                        updateLine(i, "drAmount", Number(e.target.value));
+                        if (Number(e.target.value) > 0) updateLine(i, "crAmount", 0);
+                      }}
+                    />
+                    {line.drAmount % 1 !== 0 && line.drAmount > 0 && (
+                      <button type="button" onClick={() => updateLine(i, "drAmount", Math.ceil(line.drAmount))} className="text-[9px] text-primary text-right font-medium hover:underline">↑ Round Up</button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <Input
+                      className="h-8 text-xs text-right"
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={line.crAmount || ""}
+                      onChange={e => {
+                        updateLine(i, "crAmount", Number(e.target.value));
+                        if (Number(e.target.value) > 0) updateLine(i, "drAmount", 0);
+                      }}
+                    />
+                    {line.crAmount % 1 !== 0 && line.crAmount > 0 && (
+                      <button type="button" onClick={() => updateLine(i, "crAmount", Math.ceil(line.crAmount))} className="text-[9px] text-primary text-right font-medium hover:underline">↑ Round Up</button>
+                    )}
+                  </div>
                   <button
                     type="button"
                     className="h-8 w-8 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"

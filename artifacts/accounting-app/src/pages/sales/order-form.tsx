@@ -131,12 +131,20 @@ export default function OrderForm() {
     setVehicleNo(o.vehicleNo || "");
     setDispatchNotes(o.dispatchNotes || "");
     if (o.items?.length) {
-      setItems(o.items.map((i: any) => calcItem({
+      setItems(o.items.map((i: any) => {
+        const qty = Number(i.quantity) || 0;
+        const rate = Number(i.rate) || 0;
+        const discPct = Number(i.discountPct) || 0;
+        const grossAmount = (qty * rate) * (1 - discPct / 100);
+        const taxable = Number(i.taxableAmount) || 0;
+        const wasInclusive = taxable < grossAmount - 0.01 && Number(i.gstPct) > 0;
+        return calcItem({
         stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: false,
-      })));
+        gstLocked: !!i.stockItemId, gstInclusive: wasInclusive,
+        });
+      }));
     }
   }, [existing]);
 
@@ -228,7 +236,7 @@ export default function OrderForm() {
             <PartySelect
               value={partyId}
               onChange={v => selectParty(String(v))}
-              parties={(parties as any[]).filter((p: any) => p.type === "customer")}
+              parties={parties as any[]}
               placeholder="Select party"
               hasError={!!errors.party}
             />
@@ -350,7 +358,20 @@ export default function OrderForm() {
             <div className="flex items-center justify-between">
               <Button type="button" variant="outline" className="h-10 flex-1" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 18, gstInclusive: false })])}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
             </div>
-            <div className="font-bold text-right text-base pt-1">Total: {formatCurrency(grandTotal)}</div>
+            <div className="flex justify-between items-center font-bold text-base border-t pt-2">
+              <span>Grand Total</span>
+              <div className="flex items-center gap-2">
+                {grandTotal % 1 !== 0 && grandTotal > 0 && (
+                  <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0" onClick={() => {
+                    const diff = Math.ceil(grandTotal) - grandTotal;
+                    if (diff > 0) {
+                      setCharges(prev => [...prev, { name: "Round Off", amount: String(diff.toFixed(2)), type: "add" }]);
+                    }
+                  }}>↑ Round Up</Button>
+                )}
+                <span>{formatCurrency(grandTotal)}</span>
+              </div>
+            </div>
           </div>
 
           {/* Desktop table layout */}

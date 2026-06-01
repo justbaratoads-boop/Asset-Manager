@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useGetCashBook } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -16,35 +17,40 @@ const ALL_COLUMNS = [
   { header: "Description", key: "description" },
   { header: "Ref#", key: "ref" },
   { header: "Party", key: "party" },
-  { header: "Cash In", key: "cashIn", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
-  { header: "Cash Out", key: "cashOut", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
+  { header: "Money In", key: "cashIn", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
+  { header: "Money Out", key: "cashOut", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
   { header: "Balance", key: "balance", format: (v: any) => String(Number(v).toFixed(2)) },
 ];
 
-export default function CashBook() {
+export default function BankBook() {
   const { fy, globalFrom: from, globalTo: to } = useFY();
   
   
   const [, setLocation] = useLocation();
-  const { data, isLoading } = useGetCashBook({ from, to });
+  
+  const { data, isLoading } = useQuery({
+    queryKey: ["bank-book", { from, to }],
+    queryFn: () => customFetch(`/api/reports/bank-book?from=${from || ""}&to=${to || ""}`)
+  });
+  
   const entries: any[] = (data as any)?.entries || [];
-  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("cash-book", ALL_COLUMNS);
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("bank-book", ALL_COLUMNS);
   const vis = visibleKeys;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-xl font-bold">Cash Book</h1>
+        <h1 className="text-xl font-bold">Bank Book</h1>
         <div className="flex flex-wrap items-center gap-2">
           
           
           <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={entries} columns={visibleColumns} filename={`cash-book-${from}-${to}`} title="Cash Book" />
+          <ExportButtons data={entries} columns={visibleColumns} filename={`bank-book-${from}-${to}`} title="Bank Book" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Cash In</p><p className="text-xl font-bold text-green-600">{formatCurrency((data as any)?.totalIn)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Cash Out</p><p className="text-xl font-bold text-red-600">{formatCurrency((data as any)?.totalOut)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Money In</p><p className="text-xl font-bold text-green-600">{formatCurrency((data as any)?.totalIn)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Money Out</p><p className="text-xl font-bold text-red-600">{formatCurrency((data as any)?.totalOut)}</p></CardContent></Card>
       </div>
       <Card>
         <CardContent className="p-4">
@@ -55,8 +61,8 @@ export default function CashBook() {
                 {vis.has("description") && <TableHead>Description</TableHead>}
                 {vis.has("ref") && <TableHead>Ref#</TableHead>}
                 {vis.has("party") && <TableHead>Party</TableHead>}
-                {vis.has("cashIn") && <TableHead className="text-right">Cash In</TableHead>}
-                {vis.has("cashOut") && <TableHead className="text-right">Cash Out</TableHead>}
+                {vis.has("cashIn") && <TableHead className="text-right">Money In</TableHead>}
+                {vis.has("cashOut") && <TableHead className="text-right">Money Out</TableHead>}
                 {vis.has("balance") && <TableHead className="text-right">Balance</TableHead>}
               </TableRow>
             </TableHeader>
@@ -64,7 +70,7 @@ export default function CashBook() {
               {isLoading
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
                 : !entries.length
-                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No cash entries for selected period</TableCell></TableRow>
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No bank entries for selected period</TableCell></TableRow>
                   : entries.map((e: any, i: number) => {
                     const destPath = e.id
                       ? e.type === "payment" ? `/accounts/payments/${e.id}/edit`

@@ -21,7 +21,7 @@ const BLANK = {
   purchaseRate: "", saleRate: "",
   minStockLevel: "", physicalStock: "",
   barcode: "",
-  gstApplicable: true, gstRate: "18",
+  gstApplicable: true, gstRate: "",
 };
 
 export function QuickAddItemDialog({ open, onClose, onAdded }: QuickAddItemDialogProps) {

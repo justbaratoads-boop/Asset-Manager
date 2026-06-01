@@ -239,7 +239,7 @@ function JournalViewSheet({ id, onClose, onEdit }: { id: number | null; onClose:
                     {drLines.map((l: any, i: number) => (
                       <tr key={`dr-${i}`} className="hover:bg-muted/20">
                         <td className="px-3 py-2.5 font-medium">
-                          {l.ledgerName || <span className="text-muted-foreground italic">Ledger #{l.ledgerId}</span>}
+                          {l.ledgerName || l.partyName || <span className="text-muted-foreground italic">Ledger #{l.ledgerId || 0}</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right font-semibold text-sky-700">{formatCurrency(Number(l.amount))}</td>
                         <td className="px-3 py-2.5 text-right text-muted-foreground">—</td>
@@ -249,7 +249,7 @@ function JournalViewSheet({ id, onClose, onEdit }: { id: number | null; onClose:
                     {crLines.map((l: any, i: number) => (
                       <tr key={`cr-${i}`} className="hover:bg-muted/20">
                         <td className="px-3 py-2.5 pl-8 font-medium">
-                          {l.ledgerName || <span className="text-muted-foreground italic">Ledger #{l.ledgerId}</span>}
+                          {l.ledgerName || l.partyName || <span className="text-muted-foreground italic">Ledger #{l.ledgerId || 0}</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right text-muted-foreground">—</td>
                         <td className="px-3 py-2.5 text-right font-semibold text-rose-700">{formatCurrency(Number(l.amount))}</td>

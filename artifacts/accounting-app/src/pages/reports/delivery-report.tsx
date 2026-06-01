@@ -33,9 +33,9 @@ const ALL_COLUMNS = [
 ];
 
 export default function DeliveryReport() {
-  const { fy } = useFY();
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
+  const { fy, globalFrom: from, globalTo: to } = useFY();
+  
+  
   const [, setLocation] = useLocation();
   const { data, isLoading } = useGetDeliveryReport({ from: from || undefined, to: to || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("delivery-report", ALL_COLUMNS);
@@ -55,8 +55,8 @@ export default function DeliveryReport() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2"><Label>From</Label><Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-36" /></div>
-        <div className="flex items-center gap-2"><Label>To</Label><Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" /></div>
+        
+        
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -123,3 +123,4 @@ export default function DeliveryReport() {
     </div>
   );
 }
+

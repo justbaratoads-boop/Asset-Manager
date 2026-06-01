@@ -49,7 +49,7 @@ router.get("/account-groups", authMiddleware, async (req, res) => {
   await ensureSeeded();
   const groups = await db.select().from(accountGroupsTable)
     .where(eq(accountGroupsTable.isDeleted, "false"))
-    .orderBy(accountGroupsTable.parentGroup, accountGroupsTable.name);
+    .orderBy(accountGroupsTable.name);
   res.json(groups);
 });
 

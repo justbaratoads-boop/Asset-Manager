@@ -6,11 +6,27 @@ import {
   paymentsTable, receiptsTable, journalEntriesTable, journalLinesTable,
   ledgersTable, stockItemsTable, stockBatchesTable, ordersTable,
   creditNotesTable, debitNotesTable, creditNoteItemsTable, debitNoteItemsTable
-} from "@workspace/db/schema";
+, partiesTable } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql, inArray, isNull } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
+
+async function getLedgersWithParties() {
+  const [dbLedgers, parties] = await Promise.all([
+    getLedgersWithParties(),
+    db.select().from(partiesTable).where(eq(partiesTable.isDeleted, "false")),
+  ]);
+  const partyLedgers = parties.map(p => ({
+    id: 1000000 + p.id,
+    name: p.name,
+    group: p.accountGroup || (p.type === 'customer' ? 'Sundry Debtors' : 'Sundry Creditors'),
+    nature: p.balanceType || (p.type === 'customer' ? 'dr' : 'cr'),
+    openingBalance: p.openingBalance,
+  }));
+  return [...dbLedgers, ...partyLedgers];
+}
+
 
 router.get("/reports/day-book", authMiddleware, async (req, res) => {
   const { date } = req.query;
@@ -79,7 +95,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     saleInvoicePayments,
     purchaseInvoicePayments,
   ] = await Promise.all([
-    db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
+    getLedgersWithParties(),
     db
       .select({ line: journalLinesTable })
       .from(journalLinesTable)
@@ -100,6 +116,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     db.select({
       mode: saleInvoicePaymentsTable.mode,
       amount: saleInvoicePaymentsTable.amount,
+      partyId: saleInvoicesTable.partyId,
     }).from(saleInvoicePaymentsTable)
       .innerJoin(saleInvoicesTable, and(
         eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
@@ -109,6 +126,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     db.select({
       mode: purchaseInvoicePaymentsTable.mode,
       amount: purchaseInvoicePaymentsTable.amount,
+      partyId: purchaseInvoicesTable.partyId,
     }).from(purchaseInvoicePaymentsTable)
       .innerJoin(purchaseInvoicesTable, and(
         eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
@@ -151,7 +169,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     const sgst = Number(inv.totalSgst);
     const igst = Number(inv.totalIgst);
     const taxable = grandTotal - cgst - sgst - igst;
-    add(inv.partyId ? LEDGER.ar : LEDGER.cash, "dr", grandTotal);
+    add(inv.partyId ? 1000000 + inv.partyId : LEDGER.cash, "dr", grandTotal);
     add(LEDGER.sales, "cr", taxable);
     add(LEDGER.cgstPayable, "cr", cgst);
     add(LEDGER.sgstPayable, "cr", sgst);
@@ -171,7 +189,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     add(LEDGER.cgstPayable, "dr", cgst);
     add(LEDGER.sgstPayable, "dr", sgst);
     add(LEDGER.igstPayable, "dr", igst);
-    add(inv.partyId ? LEDGER.ap : LEDGER.cash, "cr", grandTotal);
+    add(inv.partyId ? 1000000 + inv.partyId : LEDGER.cash, "cr", grandTotal);
   }
 
   // 4. Receipts (money received from customers)
@@ -180,7 +198,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   for (const r of receipts) {
     const amount = Number(r.amount);
     add(r.ledgerId, "dr", amount);
-    add(LEDGER.ar, "cr", amount);
+    add((typeof r !== "undefined" && r.partyId) ? 1000000 + r.partyId : ((typeof cn !== "undefined" && cn.partyId) ? 1000000 + cn.partyId : ((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : LEDGER.ar)), "cr", amount);
   }
 
   // 5. Payments (money paid to suppliers)
@@ -188,7 +206,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   //    Cr: ledger_id (cash/bank account from which money went out)
   for (const p of payments) {
     const amount = Number(p.amount);
-    add(LEDGER.ap, "dr", amount);
+    add((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : ((typeof dn !== "undefined" && dn.partyId) ? 1000000 + dn.partyId : LEDGER.ap), "dr", amount);
     add(p.ledgerId, "cr", amount);
   }
 
@@ -198,7 +216,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   for (const cn of creditNotes) {
     const amount = Number(cn.amount);
     add(LEDGER.sales, "dr", amount);
-    add(LEDGER.ar, "cr", amount);
+    add((typeof r !== "undefined" && r.partyId) ? 1000000 + r.partyId : ((typeof cn !== "undefined" && cn.partyId) ? 1000000 + cn.partyId : ((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : LEDGER.ar)), "cr", amount);
   }
 
   // 7. Debit notes (purchase returns) — reversal of a purchase
@@ -206,7 +224,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   //    Cr: Purchase (reduces purchase expense)
   for (const dn of debitNotes) {
     const amount = Number(dn.amount);
-    add(LEDGER.ap, "dr", amount);
+    add((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : ((typeof dn !== "undefined" && dn.partyId) ? 1000000 + dn.partyId : LEDGER.ap), "dr", amount);
     add(LEDGER.purchase, "cr", amount);
   }
 
@@ -226,7 +244,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   for (const p of saleInvoicePayments) {
     const amount = Number(p.amount);
     add(modeToLedgerId(p.mode), "dr", amount);
-    add(LEDGER.ar, "cr", amount);
+    add((typeof r !== "undefined" && r.partyId) ? 1000000 + r.partyId : ((typeof cn !== "undefined" && cn.partyId) ? 1000000 + cn.partyId : ((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : LEDGER.ar)), "cr", amount);
   }
 
   // 9. Inline purchase-invoice payments (recorded on purchase invoice form)
@@ -235,7 +253,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   //    Cr: Cash / Bank (mode-mapped)
   for (const p of purchaseInvoicePayments) {
     const amount = Number(p.amount);
-    add(LEDGER.ap, "dr", amount);
+    add((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : ((typeof dn !== "undefined" && dn.partyId) ? 1000000 + dn.partyId : LEDGER.ap), "dr", amount);
     add(modeToLedgerId(p.mode), "cr", amount);
   }
 
@@ -300,7 +318,7 @@ router.get("/reports/profit-loss", authMiddleware, async (req, res) => {
       .from(journalLinesTable)
       .innerJoin(journalEntriesTable, eq(journalLinesTable.entryId, journalEntriesTable.id))
       .where(and(...jeCond)),
-    db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
+    getLedgersWithParties(),
   ]);
 
   const salesRevenue = Number(saleRow[0]?.taxable ?? 0);
@@ -373,7 +391,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     saleInvoicePayments,
     purchaseInvoicePayments,
   ] = await Promise.all([
-    db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
+    getLedgersWithParties(),
     db
       .select({ line: journalLinesTable })
       .from(journalLinesTable)
@@ -393,6 +411,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     db.select({
       mode: saleInvoicePaymentsTable.mode,
       amount: saleInvoicePaymentsTable.amount,
+      partyId: saleInvoicesTable.partyId,
     }).from(saleInvoicePaymentsTable)
       .innerJoin(saleInvoicesTable, and(
         eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
@@ -401,6 +420,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     db.select({
       mode: purchaseInvoicePaymentsTable.mode,
       amount: purchaseInvoicePaymentsTable.amount,
+      partyId: purchaseInvoicesTable.partyId,
     }).from(purchaseInvoicePaymentsTable)
       .innerJoin(purchaseInvoicesTable, and(
         eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
@@ -441,7 +461,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     const sgst = Number(inv.totalSgst);
     const igst = Number(inv.totalIgst);
     const taxable = grandTotal - cgst - sgst - igst;
-    add(inv.partyId ? LEDGER.ar : LEDGER.cash, "dr", grandTotal);
+    add(inv.partyId ? 1000000 + inv.partyId : LEDGER.cash, "dr", grandTotal);
     add(LEDGER.sales, "cr", taxable);
     add(LEDGER.cgstPayable, "cr", cgst);
     add(LEDGER.sgstPayable, "cr", sgst);
@@ -459,30 +479,30 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     add(LEDGER.cgstPayable, "dr", cgst);
     add(LEDGER.sgstPayable, "dr", sgst);
     add(LEDGER.igstPayable, "dr", igst);
-    add(inv.partyId ? LEDGER.ap : LEDGER.cash, "cr", grandTotal);
+    add(inv.partyId ? 1000000 + inv.partyId : LEDGER.cash, "cr", grandTotal);
   }
 
   // 4. Receipts: Dr ledger (cash/bank), Cr AR
   for (const r of receipts) {
     add(r.ledgerId, "dr", Number(r.amount));
-    add(LEDGER.ar, "cr", Number(r.amount));
+    add(r.partyId ? 1000000 + r.partyId : LEDGER.ar, "cr", Number(r.amount));
   }
 
   // 5. Payments: Dr AP, Cr ledger (cash/bank)
   for (const p of payments) {
-    add(LEDGER.ap, "dr", Number(p.amount));
+    add(p.partyId ? 1000000 + p.partyId : LEDGER.ap, "dr", Number(p.amount));
     add(p.ledgerId, "cr", Number(p.amount));
   }
 
   // 6. Credit notes (sale returns): Dr Sales, Cr AR
   for (const cn of creditNotes) {
     add(LEDGER.sales, "dr", Number(cn.amount));
-    add(LEDGER.ar, "cr", Number(cn.amount));
+    add(cn.partyId ? 1000000 + cn.partyId : LEDGER.ar, "cr", Number(cn.amount));
   }
 
   // 7. Debit notes (purchase returns): Dr AP, Cr Purchase
   for (const dn of debitNotes) {
-    add(LEDGER.ap, "dr", Number(dn.amount));
+    add(dn.partyId ? 1000000 + dn.partyId : LEDGER.ap, "dr", Number(dn.amount));
     add(LEDGER.purchase, "cr", Number(dn.amount));
   }
 
@@ -500,7 +520,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
 
   // 9. Inline purchase-invoice payments: Dr AP, Cr Cash/Bank
   for (const p of purchaseInvoicePayments) {
-    add(LEDGER.ap, "dr", Number(p.amount));
+    add(p.partyId ? 1000000 + p.partyId : LEDGER.ap, "dr", Number(p.amount));
     add(modeToLedgerId(p.mode), "cr", Number(p.amount));
   }
 
@@ -619,24 +639,31 @@ router.get("/reports/purchase-register", authMiddleware, async (req, res) => {
 
 router.get("/reports/cash-book", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
+  const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.name, "Cash"));
+  const cashLedgerIds = cashLedgers.map(l => l.id);
+
   const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), eq(paymentsTable.paymentMode, "cash")];
   const rctCond: any[] = [eq(receiptsTable.isDeleted, "false"), eq(receiptsTable.paymentMode, "cash")];
   const saleInvPmtCond: any[] = [eq(saleInvoicePaymentsTable.mode, "cash"), eq(saleInvoicesTable.isDeleted, "false")];
   const purInvPmtCond: any[] = [eq(purchaseInvoicePaymentsTable.mode, "cash"), eq(purchaseInvoicesTable.isDeleted, "false")];
+  const jeCond: any[] = [eq(journalEntriesTable.isDeleted, "false"), inArray(journalLinesTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
+  
   if (from) {
     pmtCond.push(gte(paymentsTable.date, from as string));
     rctCond.push(gte(receiptsTable.date, from as string));
     saleInvPmtCond.push(gte(saleInvoicesTable.date, from as string));
     purInvPmtCond.push(gte(purchaseInvoicesTable.date, from as string));
+    jeCond.push(gte(journalEntriesTable.date, from as string));
   }
   if (to) {
     pmtCond.push(lte(paymentsTable.date, to as string));
     rctCond.push(lte(receiptsTable.date, to as string));
     saleInvPmtCond.push(lte(saleInvoicesTable.date, to as string));
     purInvPmtCond.push(lte(purchaseInvoicesTable.date, to as string));
+    jeCond.push(lte(journalEntriesTable.date, to as string));
   }
 
-  const [pmts, rcts, saleInvPmts, purInvPmts] = await Promise.all([
+  const [pmts, rcts, saleInvPmts, purInvPmts, journalLines] = await Promise.all([
     db.select().from(paymentsTable).where(and(...pmtCond)),
     db.select().from(receiptsTable).where(and(...rctCond)),
     db.select({
@@ -657,14 +684,25 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
     }).from(purchaseInvoicePaymentsTable)
       .innerJoin(purchaseInvoicesTable, eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id))
       .where(and(...purInvPmtCond)),
+    db.select({
+      id: journalEntriesTable.id,
+      date: journalEntriesTable.date,
+      ref: journalEntriesTable.voucherNumber,
+      description: journalEntriesTable.narration,
+      amount: journalLinesTable.amount,
+      type: journalLinesTable.type,
+    }).from(journalLinesTable)
+      .innerJoin(journalEntriesTable, eq(journalLinesTable.entryId, journalEntriesTable.id))
+      .where(and(...jeCond)),
   ]);
 
   const out = pmts.map(p => ({ id: p.id, date: p.date, type: "payment" as const, ref: p.voucherNumber, party: p.partyName || "", description: p.narration || `Payment to ${p.partyName || ""}`, cashIn: 0, cashOut: Number(p.amount) }));
   const inc = rcts.map(r => ({ id: r.id, date: r.date, type: "receipt" as const, ref: r.voucherNumber, party: r.partyName || "", description: r.narration || `Receipt from ${r.partyName || ""}`, cashIn: Number(r.amount), cashOut: 0 }));
   const saleInvInc = saleInvPmts.map(p => ({ id: p.id, date: p.date, type: "sale-invoice" as const, ref: p.ref, party: p.party || "", description: `Cash collection — ${p.ref}`, cashIn: Number(p.amount), cashOut: 0 }));
   const purInvOut = purInvPmts.map(p => ({ id: p.id, date: p.date, type: "purchase-invoice" as const, ref: p.ref, party: p.party || "", description: `Cash payment — ${p.ref}`, cashIn: 0, cashOut: Number(p.amount) }));
+  const jeEntries = journalLines.map(j => ({ id: j.id, date: j.date, type: "journal" as const, ref: j.ref, party: "", description: j.description || `Journal Entry — ${j.ref}`, cashIn: j.type === "dr" ? Number(j.amount) : 0, cashOut: j.type === "cr" ? Number(j.amount) : 0 }));
 
-  const sorted = [...out, ...inc, ...saleInvInc, ...purInvOut].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+  const sorted = [...out, ...inc, ...saleInvInc, ...purInvOut, ...jeEntries].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
 
   let balance = 0;
   const entries = sorted.map(e => {
@@ -672,8 +710,93 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
     return { ...e, balance };
   });
 
-  const totalIn = inc.reduce((s, r) => s + r.cashIn, 0) + saleInvInc.reduce((s, r) => s + r.cashIn, 0);
-  const totalOut2 = out.reduce((s, r) => s + r.cashOut, 0) + purInvOut.reduce((s, r) => s + r.cashOut, 0);
+  const totalIn = inc.reduce((s, r) => s + r.cashIn, 0) + saleInvInc.reduce((s, r) => s + r.cashIn, 0) + jeEntries.reduce((s, j) => s + j.cashIn, 0);
+  const totalOut2 = out.reduce((s, r) => s + r.cashOut, 0) + purInvOut.reduce((s, r) => s + r.cashOut, 0) + jeEntries.reduce((s, j) => s + j.cashOut, 0);
+  res.json({ entries, totalOut: totalOut2, totalIn });
+});
+
+router.get("/reports/bank-book", authMiddleware, async (req, res) => {
+  const { from, to } = req.query;
+  
+  const bankLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.group, "Bank Accounts"));
+  const bankLedgerIds = bankLedgers.map(l => l.id);
+  
+  if (bankLedgerIds.length === 0) {
+    return res.json({ entries: [], totalOut: 0, totalIn: 0 });
+  }
+
+  const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), inArray(paymentsTable.ledgerId, bankLedgerIds)];
+  const rctCond: any[] = [eq(receiptsTable.isDeleted, "false"), inArray(receiptsTable.ledgerId, bankLedgerIds)];
+  const saleInvPmtCond: any[] = [sql`${saleInvoicePaymentsTable.mode} != 'cash'`, eq(saleInvoicesTable.isDeleted, "false")];
+  const purInvPmtCond: any[] = [sql`${purchaseInvoicePaymentsTable.mode} != 'cash'`, eq(purchaseInvoicesTable.isDeleted, "false")];
+  const jeCond: any[] = [eq(journalEntriesTable.isDeleted, "false"), inArray(journalLinesTable.ledgerId, bankLedgerIds)];
+  
+  if (from) {
+    pmtCond.push(gte(paymentsTable.date, from as string));
+    rctCond.push(gte(receiptsTable.date, from as string));
+    saleInvPmtCond.push(gte(saleInvoicesTable.date, from as string));
+    purInvPmtCond.push(gte(purchaseInvoicesTable.date, from as string));
+    jeCond.push(gte(journalEntriesTable.date, from as string));
+  }
+  if (to) {
+    pmtCond.push(lte(paymentsTable.date, to as string));
+    rctCond.push(lte(receiptsTable.date, to as string));
+    saleInvPmtCond.push(lte(saleInvoicesTable.date, to as string));
+    purInvPmtCond.push(lte(purchaseInvoicesTable.date, to as string));
+    jeCond.push(lte(journalEntriesTable.date, to as string));
+  }
+
+  const [pmts, rcts, saleInvPmts, purInvPmts, journalLines] = await Promise.all([
+    db.select().from(paymentsTable).where(and(...pmtCond)),
+    db.select().from(receiptsTable).where(and(...rctCond)),
+    db.select({
+      id: saleInvoicesTable.id,
+      date: saleInvoicesTable.date,
+      ref: saleInvoicesTable.invoiceNumber,
+      party: saleInvoicesTable.partyName,
+      amount: saleInvoicePaymentsTable.amount,
+      mode: saleInvoicePaymentsTable.mode,
+    }).from(saleInvoicePaymentsTable)
+      .innerJoin(saleInvoicesTable, eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id))
+      .where(and(...saleInvPmtCond)),
+    db.select({
+      id: purchaseInvoicesTable.id,
+      date: purchaseInvoicesTable.date,
+      ref: purchaseInvoicesTable.invoiceNumber,
+      party: purchaseInvoicesTable.partyName,
+      amount: purchaseInvoicePaymentsTable.amount,
+      mode: purchaseInvoicePaymentsTable.mode,
+    }).from(purchaseInvoicePaymentsTable)
+      .innerJoin(purchaseInvoicesTable, eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id))
+      .where(and(...purInvPmtCond)),
+    db.select({
+      id: journalEntriesTable.id,
+      date: journalEntriesTable.date,
+      ref: journalEntriesTable.voucherNumber,
+      description: journalEntriesTable.narration,
+      amount: journalLinesTable.amount,
+      type: journalLinesTable.type,
+    }).from(journalLinesTable)
+      .innerJoin(journalEntriesTable, eq(journalLinesTable.entryId, journalEntriesTable.id))
+      .where(and(...jeCond)),
+  ]);
+
+  const out = pmts.map(p => ({ id: p.id, date: p.date, type: "payment" as const, ref: p.voucherNumber, party: p.partyName || "", description: p.narration || `Payment to ${p.partyName || ""} (${p.paymentMode})`, cashIn: 0, cashOut: Number(p.amount) }));
+  const inc = rcts.map(r => ({ id: r.id, date: r.date, type: "receipt" as const, ref: r.voucherNumber, party: r.partyName || "", description: r.narration || `Receipt from ${r.partyName || ""} (${r.paymentMode})`, cashIn: Number(r.amount), cashOut: 0 }));
+  const saleInvInc = saleInvPmts.map(p => ({ id: p.id, date: p.date, type: "sale-invoice" as const, ref: p.ref, party: p.party || "", description: `Bank collection (${p.mode}) — ${p.ref}`, cashIn: Number(p.amount), cashOut: 0 }));
+  const purInvOut = purInvPmts.map(p => ({ id: p.id, date: p.date, type: "purchase-invoice" as const, ref: p.ref, party: p.party || "", description: `Bank payment (${p.mode}) — ${p.ref}`, cashIn: 0, cashOut: Number(p.amount) }));
+  const jeEntries = journalLines.map(j => ({ id: j.id, date: j.date, type: "journal" as const, ref: j.ref, party: "", description: j.description || `Journal Entry — ${j.ref}`, cashIn: j.type === "dr" ? Number(j.amount) : 0, cashOut: j.type === "cr" ? Number(j.amount) : 0 }));
+
+  const sorted = [...out, ...inc, ...saleInvInc, ...purInvOut, ...jeEntries].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+
+  let balance = 0;
+  const entries = sorted.map(e => {
+    balance += e.cashIn - e.cashOut;
+    return { ...e, balance };
+  });
+
+  const totalIn = inc.reduce((s, r) => s + r.cashIn, 0) + saleInvInc.reduce((s, r) => s + r.cashIn, 0) + jeEntries.reduce((s, j) => s + j.cashIn, 0);
+  const totalOut2 = out.reduce((s, r) => s + r.cashOut, 0) + purInvOut.reduce((s, r) => s + r.cashOut, 0) + jeEntries.reduce((s, j) => s + j.cashOut, 0);
   res.json({ entries, totalOut: totalOut2, totalIn });
 });
 
@@ -722,41 +845,177 @@ router.get("/reports/all-transactions", authMiddleware, async (req, res) => {
 
 router.get("/reports/party-statement", authMiddleware, async (req, res) => {
   const { partyId, from, to } = req.query;
-  if (!partyId) { res.json({ transactions: [], openingBalance: 0, closingBalance: 0 }); return; }
+  if (!partyId) { return res.json({ transactions: [], openingBalance: 0, closingBalance: 0 }); }
 
-  const pid = Number(partyId);
-  const addCond = (conditions: any[], dateField: any) => {
-    if (from) conditions.push(gte(dateField, from as string));
-    if (to) conditions.push(lte(dateField, to as string));
-    return conditions;
-  };
+  let targetIdStr = String(partyId);
+  let isParty = true;
+  let targetId = 0;
+  if (targetIdStr.startsWith("ledger_")) {
+    isParty = false;
+    targetId = Number(targetIdStr.replace("ledger_", ""));
+  } else if (targetIdStr.startsWith("party_")) {
+    isParty = true;
+    targetId = Number(targetIdStr.replace("party_", ""));
+  } else {
+    isParty = true;
+    targetId = Number(targetIdStr);
+  }
+  const targetInternalId = isParty ? 1000000 + targetId : targetId;
 
-  const saleCond = addCond([eq(saleInvoicesTable.isDeleted, "false"), sql`party_id = ${pid}`], saleInvoicesTable.date);
-  const purCond = addCond([eq(purchaseInvoicesTable.isDeleted, "false"), sql`party_id = ${pid}`], purchaseInvoicesTable.date);
-  const pmtCond = addCond([eq(paymentsTable.isDeleted, "false"), sql`party_id = ${pid}`], paymentsTable.date);
-  const rctCond = addCond([eq(receiptsTable.isDeleted, "false"), sql`party_id = ${pid}`], receiptsTable.date);
-
-  const [sales, purchases, payments, receipts] = await Promise.all([
-    db.select().from(saleInvoicesTable).where(and(...saleCond)),
-    db.select().from(purchaseInvoicesTable).where(and(...purCond)),
-    db.select().from(paymentsTable).where(and(...pmtCond)),
-    db.select().from(receiptsTable).where(and(...rctCond)),
+  const [
+    ledgers,
+    journalLines,
+    saleInvoices,
+    purchaseInvoices,
+    receipts,
+    payments,
+    creditNotes,
+    debitNotes,
+    saleInvoicePayments,
+    purchaseInvoicePayments,
+  ] = await Promise.all([
+    getLedgersWithParties(),
+    db
+      .select({ line: journalLinesTable, date: journalEntriesTable.date, ref: journalEntriesTable.voucherNumber, narration: journalEntriesTable.narration })
+      .from(journalLinesTable)
+      .innerJoin(journalEntriesTable, and(eq(journalLinesTable.entryId, journalEntriesTable.id), eq(journalEntriesTable.isDeleted, "false"))),
+    db.select().from(saleInvoicesTable).where(eq(saleInvoicesTable.isDeleted, "false")),
+    db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.isDeleted, "false")),
+    db.select().from(receiptsTable).where(eq(receiptsTable.isDeleted, "false")),
+    db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
+    db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
+    db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+    db.select({
+      mode: saleInvoicePaymentsTable.mode,
+      amount: saleInvoicePaymentsTable.amount,
+      partyId: saleInvoicesTable.partyId,
+      date: saleInvoicesTable.date,
+      ref: saleInvoicesTable.invoiceNumber,
+    }).from(saleInvoicePaymentsTable)
+      .innerJoin(saleInvoicesTable, and(eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id), eq(saleInvoicesTable.isDeleted, "false"))),
+    db.select({
+      mode: purchaseInvoicePaymentsTable.mode,
+      amount: purchaseInvoicePaymentsTable.amount,
+      partyId: purchaseInvoicesTable.partyId,
+      date: purchaseInvoicesTable.date,
+      ref: purchaseInvoicesTable.invoiceNumber,
+    }).from(purchaseInvoicePaymentsTable)
+      .innerJoin(purchaseInvoicesTable, and(eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id), eq(purchaseInvoicesTable.isDeleted, "false"))),
   ]);
 
-  const all = [
-    ...sales.map(i => ({ id: i.id, date: i.date, type: "Sale Invoice", number: i.invoiceNumber, debit: Number(i.grandTotal), credit: 0 })),
-    ...purchases.map(i => ({ id: i.id, date: i.date, type: "Purchase Invoice", number: i.invoiceNumber, debit: 0, credit: Number(i.grandTotal) })),
-    ...payments.map(p => ({ id: p.id, date: p.date, type: "Payment", number: p.voucherNumber, debit: Number(p.amount), credit: 0 })),
-    ...receipts.map(r => ({ id: r.id, date: r.date, type: "Receipt", number: r.voucherNumber, debit: 0, credit: Number(r.amount) })),
-  ].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+  const byName = (name: string) => ledgers.find(l => l.name === name)?.id;
+  const LEDGER = {
+    cash:        byName("Cash")                ?? 1,
+    ar:          byName("Accounts Receivable") ?? 3,
+    ap:          byName("Accounts Payable")    ?? 5,
+    sales:       byName("Sales")               ?? 9,
+    purchase:    byName("Purchase")            ?? 10,
+    cgstPayable: byName("CGST") ?? byName("CGST Payable") ?? 20,
+    sgstPayable: byName("SGST") ?? byName("SGST Payable") ?? 21,
+    igstPayable: byName("IGST") ?? byName("IGST Payable") ?? 22,
+  };
 
-  let balance = 0;
-  const transactions = all.map(t => {
-    balance += t.debit - t.credit;
-    return { ...t, balance };
-  });
+  const all: any[] = [];
+  const addTx = (ledgerId: number, type: "dr" | "cr", amount: number, tx: any) => {
+    if (amount === 0) return;
+    if (ledgerId === targetInternalId) {
+      all.push({ ...tx, debit: type === "dr" ? amount : 0, credit: type === "cr" ? amount : 0 });
+    }
+  };
 
-  res.json({ transactions, closingBalance: balance });
+  for (const row of journalLines) {
+    addTx(row.line.ledgerId, row.line.type as "dr" | "cr", Number(row.line.amount), { id: row.line.entryId, date: row.date, type: "Journal", number: row.ref, narration: row.narration });
+  }
+
+  for (const inv of saleInvoices) {
+    const grandTotal = Number(inv.grandTotal);
+    const cgst = Number(inv.totalCgst);
+    const sgst = Number(inv.totalSgst);
+    const igst = Number(inv.totalIgst);
+    const taxable = grandTotal - cgst - sgst - igst;
+    const baseTx = { id: inv.id, date: inv.date, type: "Sale Invoice", number: inv.invoiceNumber, narration: `Sale to ${inv.partyName}` };
+    addTx(inv.partyId ? 1000000 + inv.partyId : LEDGER.cash, "dr", grandTotal, baseTx);
+    addTx(LEDGER.sales, "cr", taxable, baseTx);
+    addTx(LEDGER.cgstPayable, "cr", cgst, baseTx);
+    addTx(LEDGER.sgstPayable, "cr", sgst, baseTx);
+    addTx(LEDGER.igstPayable, "cr", igst, baseTx);
+  }
+
+  for (const inv of purchaseInvoices) {
+    const grandTotal = Number(inv.grandTotal);
+    const cgst = Number(inv.totalCgst);
+    const sgst = Number(inv.totalSgst);
+    const igst = Number(inv.totalIgst);
+    const taxable = grandTotal - cgst - sgst - igst;
+    const baseTx = { id: inv.id, date: inv.date, type: "Purchase Invoice", number: inv.invoiceNumber, narration: `Purchase from ${inv.partyName}` };
+    addTx(LEDGER.purchase, "dr", taxable, baseTx);
+    addTx(LEDGER.cgstPayable, "dr", cgst, baseTx);
+    addTx(LEDGER.sgstPayable, "dr", sgst, baseTx);
+    addTx(LEDGER.igstPayable, "dr", igst, baseTx);
+    addTx(inv.partyId ? 1000000 + inv.partyId : LEDGER.cash, "cr", grandTotal, baseTx);
+  }
+
+  for (const r of receipts) {
+    const baseTx = { id: r.id, date: r.date, type: "Receipt", number: r.voucherNumber, narration: r.narration || `Receipt from ${r.partyName || "Cash/Bank"}` };
+    addTx(r.ledgerId, "dr", Number(r.amount), baseTx);
+    addTx(r.partyId ? 1000000 + r.partyId : LEDGER.ar, "cr", Number(r.amount), baseTx);
+  }
+
+  for (const p of payments) {
+    const baseTx = { id: p.id, date: p.date, type: "Payment", number: p.voucherNumber, narration: p.narration || `Payment to ${p.partyName || "Cash/Bank"}` };
+    addTx(p.partyId ? 1000000 + p.partyId : LEDGER.ap, "dr", Number(p.amount), baseTx);
+    addTx(p.ledgerId, "cr", Number(p.amount), baseTx);
+  }
+
+  for (const cn of creditNotes) {
+    const baseTx = { id: cn.id, date: cn.date, type: "Credit Note", number: cn.noteNumber, narration: cn.narration || `Sale Return` };
+    addTx(LEDGER.sales, "dr", Number(cn.amount), baseTx);
+    addTx(cn.partyId ? 1000000 + cn.partyId : LEDGER.ar, "cr", Number(cn.amount), baseTx);
+  }
+
+  for (const dn of debitNotes) {
+    const baseTx = { id: dn.id, date: dn.date, type: "Debit Note", number: dn.noteNumber, narration: dn.narration || `Purchase Return` };
+    addTx(dn.partyId ? 1000000 + dn.partyId : LEDGER.ap, "dr", Number(dn.amount), baseTx);
+    addTx(LEDGER.purchase, "cr", Number(dn.amount), baseTx);
+  }
+
+  const modeToLedgerId = (mode: string): number => {
+    if (!mode || mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") return LEDGER.cash;
+    return byName(mode) ?? LEDGER.cash;
+  };
+
+  for (const p of saleInvoicePayments) {
+    const baseTx = { id: null, date: p.date, type: "Receipt", number: p.ref, narration: `Collection for ${p.ref}` };
+    addTx(modeToLedgerId(p.mode), "dr", Number(p.amount), baseTx);
+    addTx(LEDGER.ar, "cr", Number(p.amount), baseTx);
+  }
+
+  for (const p of purchaseInvoicePayments) {
+    const baseTx = { id: null, date: p.date, type: "Payment", number: p.ref, narration: `Payment for ${p.ref}` };
+    addTx(p.partyId ? 1000000 + p.partyId : LEDGER.ap, "dr", Number(p.amount), baseTx);
+    addTx(modeToLedgerId(p.mode), "cr", Number(p.amount), baseTx);
+  }
+
+  const targetLedger = ledgers.find(l => l.id === targetInternalId);
+  const isCrNature = targetLedger?.nature === "cr";
+  let runningBalance = targetLedger ? Number(targetLedger.openingBalance) : 0;
+  if (isCrNature) { runningBalance = -runningBalance; } // Keep balance conceptually dr-positive during math
+
+  all.sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+
+  const transactions: any[] = [];
+  for (const t of all) {
+    if (from && t.date < from) {
+      runningBalance += t.debit - t.credit;
+    } else if (to && t.date > to) {
+      // ignore
+    } else {
+      runningBalance += t.debit - t.credit;
+      transactions.push({ ...t, balance: runningBalance });
+    }
+  }
+
+  res.json({ transactions, closingBalance: runningBalance });
 });
 
 router.get("/reports/stock-summary", authMiddleware, async (req, res) => {

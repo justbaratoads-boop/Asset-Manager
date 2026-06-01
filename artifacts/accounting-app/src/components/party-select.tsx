@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/format";
 
-export interface PartyOption { id: number; name: string; }
+export interface PartyOption { id: number; name: string; closingBalance?: number | string; }
 
 interface Props {
   value: number | undefined;
@@ -40,8 +41,17 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
           hasError ? "border-destructive" : "border-input hover:border-primary/50"
         )}
       >
-        <span className={cn("truncate flex-1", !selected && "text-muted-foreground")}>
-          {selected ? selected.name : placeholder}
+        <span className={cn("truncate flex-1 flex justify-between pr-2 items-center", !selected && "text-muted-foreground")}>
+          {selected ? (
+            <>
+              <span>{selected.name}</span>
+              {selected.closingBalance !== undefined && (
+                <span className={cn("text-xs font-normal ml-2", Number(selected.closingBalance) < 0 ? "text-red-600" : "text-green-600")}>
+                  {formatCurrency(Math.abs(Number(selected.closingBalance)))} {Number(selected.closingBalance) < 0 ? 'Cr' : 'Dr'}
+                </span>
+              )}
+            </>
+          ) : placeholder}
         </span>
         <ChevronDown className="h-4 w-4 text-muted-foreground ml-1 shrink-0 opacity-50" />
       </button>
@@ -70,7 +80,14 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
                 )}
                 onClick={() => { onChange(p.id); setOpen(false); setSearch(""); }}
               >
-                {p.name}
+                <div className="flex justify-between items-center">
+                  <span>{p.name}</span>
+                  {p.closingBalance !== undefined && (
+                    <span className={cn("text-xs font-normal ml-2", Number(p.closingBalance) < 0 ? "text-red-600" : "text-green-600")}>
+                      {formatCurrency(Math.abs(Number(p.closingBalance)))} {Number(p.closingBalance) < 0 ? 'Cr' : 'Dr'}
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
           </div>

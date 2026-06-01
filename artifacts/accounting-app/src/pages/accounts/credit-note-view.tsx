@@ -113,10 +113,10 @@ export default function CreditNoteView() {
             )}
             {igst > 0 && <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(igst)}</span></div>}
             {(() => {
-              let parsedCharges: {name: string; amount: number}[] = [];
+              let parsedCharges: any[] = [];
               try { parsedCharges = JSON.parse(n.otherCharges || "[]"); } catch {}
               return parsedCharges.map((c, i) => (
-                <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || "Other Charges"}</span><span>{formatCurrency(Number(c.amount))}</span></div>
+                <div key={i} className="flex justify-between"><span className="text-gray-600">{c.ledgerName || c.name || "Other Charges"}</span><span>{formatCurrency(Number(c.amount))}</span></div>
               ));
             })()}
             <div className="flex justify-between font-bold text-base border-t pt-2">

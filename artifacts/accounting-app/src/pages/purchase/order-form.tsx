@@ -199,7 +199,7 @@ export default function PurchaseOrderForm() {
             <PartySelect
               value={partyId}
               onChange={v => selectParty(String(v))}
-              parties={(parties as any[]).filter((p: any) => p.type === "supplier")}
+              parties={parties as any[]}
               placeholder="Select supplier"
               hasError={!!errors.party}
             />

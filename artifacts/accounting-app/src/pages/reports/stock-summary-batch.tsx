@@ -293,9 +293,9 @@ function SummaryCard({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function StockSummaryBatch() {
-  const { fy } = useFY();
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
+  const { fy, globalFrom: from, globalTo: to } = useFY();
+  
+  
   const [selected, setSelected] = useState<SelectedRow | null>(null);
 
   const { data, isLoading } = useFetch<{ items: ItemGroup[] }>(
@@ -510,3 +510,5 @@ export default function StockSummaryBatch() {
     </div>
   );
 }
+
+

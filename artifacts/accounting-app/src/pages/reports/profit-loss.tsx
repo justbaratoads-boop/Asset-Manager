@@ -10,10 +10,10 @@ import { Printer } from "lucide-react";
 import { useFY } from "@/lib/financial-year";
 
 export default function ProfitLoss() {
-  const { fy } = useFY();
-  const [from, setFrom] = useState(fy.from);
-  const [to, setTo] = useState(fy.to);
-  const { data, isLoading } = useGetProfitLoss({ from: from || undefined, to: to || undefined });
+  const { fy, globalFrom: from, globalTo: to } = useFY();
+  
+  
+  const { data, isLoading } = useGetProfitLoss({ from, to });
 
   const d = data as any;
 
@@ -29,8 +29,8 @@ export default function ProfitLoss() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold">Profit & Loss Statement</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2"><Label>From</Label><Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-36" /></div>
-          <div className="flex items-center gap-2"><Label>To</Label><Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" /></div>
+          
+          
           <Button type="button" variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5 print:hidden">
             <Printer className="h-3.5 w-3.5" />Print PDF
           </Button>
@@ -128,3 +128,5 @@ export default function ProfitLoss() {
     </div>
   );
 }
+
+

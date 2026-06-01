@@ -54,7 +54,7 @@ const navigation: NavItem[] = [
     items: [
       { name: "Stock Summary",            href: "/reports/stock-summary",      perm: "reports" },
       { name: "Current Stock Report",     href: "/reports/stock-availability",  perm: "reports" },
-      { name: "Stock Report Batch Wise",  href: "/reports/stock-batch",         perm: "reports" },
+      { name: "Stock Report Batch Wise",  href: "/reports/stock-summary-batch",         perm: "reports" },
       { name: "Stock Report Item Wise",   href: "/reports/stock-item-wise",     perm: "reports" },
       { name: "Stock Category",           href: "/inventory/categories",        perm: "inventory_categories" },
       { name: "Stock Items",              href: "/inventory/items",             perm: "inventory_items" },
@@ -91,8 +91,8 @@ const navigation: NavItem[] = [
     kind: "group", name: "Delivery & Logistics", icon: Truck,
     items: [
       { name: "Delivery Assign",  href: "/delivery",                perm: "delivery" },
-      { name: "Delivery Report",  href: "/reports/delivery-report", perm: "delivery" },
-      { name: "Driver & Vehicle", href: "/delivery/drivers",        perm: "delivery" },
+      { name: "Deliveries",        href: "/delivery",                 perm: "delivery" },
+      { name: "Driver & Vehicle",  href: "/delivery/drivers",         perm: "delivery" },
     ],
   },
 
@@ -111,6 +111,7 @@ const navigation: NavItem[] = [
   { kind: "link", name: "Business Profile", href: "/settings", icon: Building2, perm: "settings_company" },
 
   // ── Manage Company ─────────────────────────────────────────
+  /*
   {
     kind: "group", name: "Manage Company", icon: Layers,
     items: [
@@ -118,6 +119,7 @@ const navigation: NavItem[] = [
       { name: "Switch Company", href: "/company/switch", perm: "settings_company" },
     ],
   },
+  */
 
   // ── separator ──────────────────────────────────────────────
   { kind: "sep", label: "Settings" },
