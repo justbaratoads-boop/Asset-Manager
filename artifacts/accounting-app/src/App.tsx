@@ -13,10 +13,7 @@ import { FYProvider } from "./lib/financial-year";
 import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
 import NotFound from "@/pages/not-found";
-import HsnSummary from "@/pages/gst/hsn-summary";
 import GSTR1 from "@/pages/gst/gstr1";
-import GSTR2B from "@/pages/gst/gstr2b";
-import GSTR3B from "@/pages/gst/gstr3b";
 
 // Sales
 import SaleInvoiceList from "@/pages/sales/invoice-list";
@@ -217,10 +214,7 @@ function Router() {
       <PR path="/reports/delivery-report" component={DeliveryReport} />
 
       {/* GST Reports */}
-      <PR path="/gst/hsn-summary" component={HsnSummary} />
       <PR path="/gst/gstr1" component={GSTR1} />
-      <PR path="/gst/gstr2b" component={GSTR2B} />
-      <PR path="/gst/gstr3b" component={GSTR3B} />
 
       {/* GST */}
       <PR path="/gst" component={GSTDashboard} />
