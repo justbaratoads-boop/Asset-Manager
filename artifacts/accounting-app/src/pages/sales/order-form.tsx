@@ -361,14 +361,7 @@ export default function OrderForm() {
             <div className="flex justify-between items-center font-bold text-base border-t pt-2">
               <span>Grand Total</span>
               <div className="flex items-center gap-2">
-                {grandTotal % 1 !== 0 && grandTotal > 0 && (
-                  <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0" onClick={() => {
-                    const diff = Math.ceil(grandTotal) - grandTotal;
-                    if (diff > 0) {
-                      setCharges(prev => [...prev, { name: "Round Off", amount: String(diff.toFixed(2)), type: "add" }]);
-                    }
-                  }}>↑ Round Up</Button>
-                )}
+
                 <span>{formatCurrency(grandTotal)}</span>
               </div>
             </div>

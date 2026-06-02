@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetStockItems, useGetStockItem } from "@workspace/api-client-react";
+import { useListStockItems, useGetStockItem } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ export default function StockReportItemWise() {
   
   const [itemId, setItemId] = useState<string>("");
 
-  const { data: items = [] } = useGetStockItems();
+  const { data: items = [] } = useListStockItems();
   const { data: itemData, isLoading } = useGetStockItem(Number(itemId), { query: { enabled: !!itemId } });
 
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-item-wise", ALL_COLUMNS);

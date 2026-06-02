@@ -293,7 +293,7 @@ function SummaryCard({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function StockSummaryBatch() {
-  const { fy, globalFrom: from, globalTo: to } = useFY();
+  const { fy, globalFrom: from, globalTo: to, setGlobalFrom, setGlobalTo } = useFY();
   
   
   const [selected, setSelected] = useState<SelectedRow | null>(null);
@@ -339,11 +339,11 @@ export default function StockSummaryBatch() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <Label>From</Label>
-          <Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-36" />
+          <Input type="date" value={from} onChange={e => setGlobalFrom(e.target.value)} className="w-36" />
         </div>
         <div className="flex items-center gap-2">
           <Label>To</Label>
-          <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-36" />
+          <Input type="date" value={to} onChange={e => setGlobalTo(e.target.value)} className="w-36" />
         </div>
       </div>
 
