@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/format";
-import { useLocation } from "wouter";`nimport { useFY } from "@/lib/financial-year";
+import { useLocation } from "wouter";
+import { useFY } from "@/lib/financial-year";
 
 function GSTR3B({ from, to }: { from: string; to: string }) {
   const { data, isLoading } = useGetGstr3b({ from: from || undefined, to: to || undefined });
@@ -107,8 +108,7 @@ function HSNSummary({ from, to }: { from: string; to: string }) {
 }
 
 export default function GSTDashboard() {
-  
-  
+  const { globalFrom: from, globalTo: to } = useFY();
 
   return (
     <div className="space-y-4">
