@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { INDIAN_STATES } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Image } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export default function CompanySettings() {
   const { data: settings } = useGetCompanySettings();
@@ -21,7 +22,7 @@ export default function CompanySettings() {
     bankName: "", bankAccount: "", bankIfsc: "", bankBranch: "",
     currency: "INR", financialYearStart: "04",
     invoicePrefix: "INV", poPrefix: "PO",
-    billFooter: "", logoUrl: "",
+    billFooter: "", logoUrl: "", enableDiscount: false,
   });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -118,6 +119,16 @@ export default function CompanySettings() {
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1"><Label>Invoice Prefix</Label><Input value={form.invoicePrefix} onChange={e => set("invoicePrefix", e.target.value)} /></div>
           <div className="space-y-1"><Label>PO Prefix</Label><Input value={form.poPrefix} onChange={e => set("poPrefix", e.target.value)} /></div>
+          <div className="space-y-1 sm:col-span-2 flex items-center justify-between border rounded-md p-3">
+            <div className="space-y-0.5">
+              <Label>Enable Discount in Invoices</Label>
+              <p className="text-xs text-muted-foreground">Allow adding line-item discounts when creating vouchers.</p>
+            </div>
+            <Switch
+              checked={form.enableDiscount as boolean}
+              onCheckedChange={(c) => set("enableDiscount", c as unknown as string)}
+            />
+          </div>
           <div className="space-y-1"><Label>Financial Year Start</Label>
             <Select value={form.financialYearStart} onValueChange={v => set("financialYearStart", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>

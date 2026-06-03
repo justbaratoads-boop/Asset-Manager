@@ -19,6 +19,7 @@ export const companySettingsTable = pgTable("company_settings", {
   financialYearStart: integer("financial_year_start").notNull().default(4),
   invoicePrefix: text("invoice_prefix").notNull().default("INV"),
   enableGst: boolean("enable_gst").notNull().default(true),
+  enableDiscount: boolean("enable_discount").notNull().default(false),
   isComposition: boolean("is_composition").notNull().default(false),
   defaultState: text("default_state"),
   bankName: text("bank_name"),

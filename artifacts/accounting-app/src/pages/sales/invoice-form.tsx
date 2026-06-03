@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect, useRef } from "react";
-import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey, getListStockItemsQueryKey } from "@workspace/api-client-react";
+import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey, getListStockItemsQueryKey, useGetCompanySettings } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
@@ -115,7 +115,9 @@ export default function SaleInvoiceForm() {
   const queryClient = useQueryClient();
   const createMutation = useCreateSaleInvoice();
   const { data: parties = [] } = useListParties({ type: "customer" });
-  const { data: stockItems = [] } = useListStockItems({});
+  const { data: stockItems } = useListStockItems();
+  const { data: companySettings } = useGetCompanySettings();
+  const enableDiscount = (companySettings as any)?.enableDiscount ?? false;
   const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetSaleInvoice(editId!, { query: { enabled: isEdit } });
@@ -487,7 +489,9 @@ export default function SaleInvoiceForm() {
                       )}
                     </div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Rate *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="0.00" /></div>
-                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Disc%</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></div>
+                    {enableDiscount && (
+                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Disc%</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></div>
+                    )}
                     {/* GST Type + Rate */}
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">GST Type</Label>
@@ -585,7 +589,7 @@ export default function SaleInvoiceForm() {
                     <TableHead className="w-24">Qty *</TableHead>
                     <TableHead className="w-20">Unit</TableHead>
                     <TableHead className="w-28">Rate *</TableHead>
-                    <TableHead className="w-20">Disc%</TableHead>
+                    {enableDiscount && <TableHead className="w-20">Disc%</TableHead>}
                     <TableHead className="w-32">GST Type / %</TableHead>
                     <TableHead className="w-28 text-right">Total</TableHead>
                     <TableHead className="w-8"></TableHead>
