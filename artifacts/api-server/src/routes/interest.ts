@@ -1,9 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { partiesTable, transactionsTable } from "@workspace/db/schema";
-import { eq, and, gte, lte, asc, or } from "drizzle-orm";
-import { authMiddleware } from "../middleware/auth";
-import { getFinancialYearDates } from "../utils/financial-year";
+import { eq, and, lte, asc } from "drizzle-orm";
+import { authMiddleware } from "../lib/auth";
 
 const router = Router();
 
@@ -26,9 +25,8 @@ router.get("/reports/interest-calculation", authMiddleware, async (req, res) => 
     const graceDays = Number(party.interestGracePeriod) || 0;
     const byTransaction = party.interestByTransaction === "true" || party.interestByTransaction === true as any;
 
-    const fyDates = await getFinancialYearDates();
-    const fromDate = from ? new Date(from as string) : fyDates.startDate;
-    const toDate = to ? new Date(to as string) : fyDates.endDate;
+    const fromDate = from ? new Date(from as string) : new Date(new Date().getFullYear(), 3, 1);
+    const toDate = to ? new Date(to as string) : new Date();
     
     if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
       return res.status(400).json({ error: "Invalid date format" });
