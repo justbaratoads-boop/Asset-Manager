@@ -1,7 +1,15 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { partiesTable, transactionsTable } from "@workspace/db/schema";
-import { eq, and, lte, asc } from "drizzle-orm";
+import { 
+  partiesTable, 
+  saleInvoicesTable, 
+  purchaseInvoicesTable, 
+  receiptsTable, 
+  paymentsTable, 
+  debitNotesTable, 
+  creditNotesTable 
+} from "@workspace/db/schema";
+import { eq, and, lte } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -32,17 +40,29 @@ router.get("/reports/interest-calculation", authMiddleware, async (req, res) => 
       return res.status(400).json({ error: "Invalid date format" });
     }
 
-    // Fetch transactions
-    const txns = await db.select()
-      .from(transactionsTable)
-      .where(
-        and(
-          eq(transactionsTable.partyId, pId),
-          eq(transactionsTable.isDeleted, "false"),
-          lte(transactionsTable.date, toDate)
-        )
-      )
-      .orderBy(asc(transactionsTable.date));
+    const [sales, purchases, receipts, payments, debitNotes, creditNotes] = await Promise.all([
+      db.select({ date: saleInvoicesTable.date, amount: saleInvoicesTable.grandTotal, voucherType: saleInvoicesTable.invoiceNumber })
+        .from(saleInvoicesTable).where(and(eq(saleInvoicesTable.partyId, pId), eq(saleInvoicesTable.isDeleted, "false"), lte(saleInvoicesTable.date, toDate as any))),
+      db.select({ date: purchaseInvoicesTable.date, amount: purchaseInvoicesTable.grandTotal, voucherType: purchaseInvoicesTable.invoiceNumber })
+        .from(purchaseInvoicesTable).where(and(eq(purchaseInvoicesTable.partyId, pId), eq(purchaseInvoicesTable.isDeleted, "false"), lte(purchaseInvoicesTable.date, toDate as any))),
+      db.select({ date: receiptsTable.date, amount: receiptsTable.amount, voucherType: receiptsTable.voucherNumber })
+        .from(receiptsTable).where(and(eq(receiptsTable.partyId, pId), eq(receiptsTable.isDeleted, "false"), lte(receiptsTable.date, toDate as any))),
+      db.select({ date: paymentsTable.date, amount: paymentsTable.amount, voucherType: paymentsTable.voucherNumber })
+        .from(paymentsTable).where(and(eq(paymentsTable.partyId, pId), eq(paymentsTable.isDeleted, "false"), lte(paymentsTable.date, toDate as any))),
+      db.select({ date: debitNotesTable.date, amount: debitNotesTable.amount, voucherType: debitNotesTable.noteNumber })
+        .from(debitNotesTable).where(and(eq(debitNotesTable.partyId, pId), eq(debitNotesTable.isDeleted, "false"), lte(debitNotesTable.date, toDate as any))),
+      db.select({ date: creditNotesTable.date, amount: creditNotesTable.amount, voucherType: creditNotesTable.noteNumber })
+        .from(creditNotesTable).where(and(eq(creditNotesTable.partyId, pId), eq(creditNotesTable.isDeleted, "false"), lte(creditNotesTable.date, toDate as any)))
+    ]);
+
+    const txns = [
+      ...sales.map(t => ({ ...t, type: "dr", particulars: "Sale Invoice " + t.voucherType })),
+      ...purchases.map(t => ({ ...t, type: "cr", particulars: "Purchase Invoice " + t.voucherType })),
+      ...receipts.map(t => ({ ...t, type: "cr", particulars: "Receipt " + t.voucherType })),
+      ...payments.map(t => ({ ...t, type: "dr", particulars: "Payment " + t.voucherType })),
+      ...debitNotes.map(t => ({ ...t, type: "dr", particulars: "Debit Note " + t.voucherType })),
+      ...creditNotes.map(t => ({ ...t, type: "cr", particulars: "Credit Note " + t.voucherType }))
+    ].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
 
     let calculationLines = [];
     let totalInterest = 0;
