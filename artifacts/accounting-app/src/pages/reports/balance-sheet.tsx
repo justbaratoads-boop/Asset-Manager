@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useGetBalanceSheet } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";

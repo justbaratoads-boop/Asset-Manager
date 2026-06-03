@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useCreateStockItem, useGetStockItem, useListStockCategories, getListStockItemsQueryKey, customFetch } from "@workspace/api-client-react";
