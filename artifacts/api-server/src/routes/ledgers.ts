@@ -227,7 +227,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     try {
       const charges = JSON.parse(inv.otherCharges as string || "[]");
       for (const charge of charges) {
-        if (typeof charge.ledgerId === "number" && charge.ledgerId === Number(id) && Number(charge.amount) > 0) {
+        if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
           transactions.push({
             date: inv.date,
             type: "sale_invoice",
@@ -260,7 +260,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     try {
       const charges = JSON.parse(inv.otherCharges as string || "[]");
       for (const charge of charges) {
-        if (typeof charge.ledgerId === "number" && charge.ledgerId === Number(id) && Number(charge.amount) > 0) {
+        if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
           transactions.push({
             date: inv.date,
             type: "purchase_invoice",
@@ -278,10 +278,11 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   // For CGST Payable / SGST Payable / IGST Payable:
   //   Sale invoice → Cr (output tax collected)
   //   Purchase invoice → Dr (input tax credit)
+  const lName = ledger.name.toLowerCase();
   const gstField: "totalCgst" | "totalSgst" | "totalIgst" | null =
-    (ledger.name === "CGST" || ledger.name === "CGST Payable") ? "totalCgst" :
-    (ledger.name === "SGST" || ledger.name === "SGST Payable") ? "totalSgst" :
-    (ledger.name === "IGST" || ledger.name === "IGST Payable") ? "totalIgst" : null;
+    (lName.includes("cgst")) ? "totalCgst" :
+    (lName.includes("sgst")) ? "totalSgst" :
+    (lName.includes("igst")) ? "totalIgst" : null;
 
   if (gstField) {
     const salGstConds: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
