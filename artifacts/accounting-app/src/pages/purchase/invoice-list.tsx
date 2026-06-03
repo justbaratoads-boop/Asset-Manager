@@ -357,7 +357,7 @@ export default function PurchaseInvoiceList() {
   const [viewId, setViewId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
-  const { data: invoices = [], isLoading } = useListPurchaseInvoices({ search: search || undefined });
+  const { data: invoices = [], isLoading } = useListPurchaseInvoices(({ search: search || undefined } as any));
   const deleteMutation = useDeletePurchaseInvoice();
   const queryClient = useQueryClient();
   const { toast } = useToast();

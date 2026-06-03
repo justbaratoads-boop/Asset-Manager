@@ -26,7 +26,7 @@ const ALL_COLUMNS = [
 ];
 
 export default function TrialBalance() {
-  const { data, isLoading } = useGetTrialBalance();
+  const { data, isLoading } = useGetTrialBalance({});
   const rows: any[] = (data as any)?.rows || [];
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("trial-balance", ALL_COLUMNS);
   const vis = visibleKeys;

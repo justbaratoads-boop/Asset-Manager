@@ -13,7 +13,7 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 export default function BalanceSheet() {
-  const { data, isLoading } = useGetBalanceSheet();
+  const { data, isLoading } = useGetBalanceSheet({});
   const d = data as any;
 
   // Group asset items by their group field for display

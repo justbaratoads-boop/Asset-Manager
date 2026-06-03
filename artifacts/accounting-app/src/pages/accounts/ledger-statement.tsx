@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate, today } from "@/lib/format";
 import { ArrowLeft } from "lucide-react";
+import { useFY } from "@/lib/financial-year";
 
 const txTypeLabel: Record<string, string> = {
   journal: "Journal",
