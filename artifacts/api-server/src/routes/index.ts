@@ -15,6 +15,7 @@ import deliveryRouter from "./delivery";
 import usersRouter from "./users";
 import accountGroupsRouter from "./account-groups";
 import recycleBinRouter from "./recycle-bin";
+import interestRouter from "./interest";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(deliveryRouter);
 router.use(usersRouter);
 router.use(accountGroupsRouter);
 router.use(recycleBinRouter);
+router.use(interestRouter);
 
 export default router;

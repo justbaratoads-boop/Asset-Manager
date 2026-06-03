@@ -75,6 +75,7 @@ import StockSummary from "@/pages/reports/stock-summary";
 import StockSummaryBatch from "@/pages/reports/stock-summary-batch";
 import StockAvailability from "@/pages/reports/stock-availability";
 import DeliveryReport from "@/pages/reports/delivery-report";
+import InterestCalculationReport from "@/pages/reports/interest-calculation";
 import DriversAndVehicles from "@/pages/delivery/drivers";
 
 // GST
@@ -213,6 +214,7 @@ function Router() {
       <PR path="/reports/stock-summary-batch" component={StockSummaryBatch} />
       <PR path="/reports/stock-availability" component={StockAvailability} />
       <PR path="/reports/delivery-report" component={DeliveryReport} />
+      <PR path="/reports/interest-calculation" component={InterestCalculationReport} />
 
       {/* GST Reports */}
       <PR path="/gst/gstr1" component={GSTR1} />

@@ -27,6 +27,7 @@ const BLANK_FORM = {
   paymentTerms: "",
   openingBalance: "", balanceType: "dr",
   creditLimitEnabled: false, creditLimit: "",
+  interestEnabled: false, interestRate: "", interestGracePeriod: "0", interestByTransaction: false,
 };
 
 function useAccountGroups() {
@@ -147,6 +148,10 @@ export default function PartyForm() {
       balanceType: e.balanceType || "dr",
       creditLimitEnabled: e.creditLimitEnabled === "true" || e.creditLimitEnabled === true,
       creditLimit: e.creditLimit ? String(e.creditLimit) : "",
+      interestEnabled: e.interestEnabled === "true" || e.interestEnabled === true,
+      interestRate: e.interestRate ? String(e.interestRate) : "",
+      interestGracePeriod: e.interestGracePeriod ? String(e.interestGracePeriod) : "0",
+      interestByTransaction: e.interestByTransaction === "true" || e.interestByTransaction === true,
     });
     setGstHistory(Array.isArray(e.gstHistory) ? e.gstHistory : []);
   }, [existing]);
@@ -181,6 +186,10 @@ export default function PartyForm() {
       openingBalance: Number(form.openingBalance) || 0,
       creditLimitEnabled: form.creditLimitEnabled,
       creditLimit: form.creditLimitEnabled && form.creditLimit ? Number(form.creditLimit) : undefined,
+      interestEnabled: form.interestEnabled,
+      interestRate: form.interestEnabled && form.interestRate ? Number(form.interestRate) : undefined,
+      interestGracePeriod: form.interestEnabled ? Number(form.interestGracePeriod) || 0 : undefined,
+      interestByTransaction: form.interestByTransaction,
       gstHistory,
     };
     try {
@@ -449,6 +458,53 @@ export default function PartyForm() {
                   placeholder="e.g. 50000"
                   disabled={hasInvoices}
                 />
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-3 border rounded-lg p-3 bg-muted/30 mt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Interest Calculation</p>
+                <p className="text-xs text-muted-foreground">Charge interest on overdue balances</p>
+              </div>
+              <Switch checked={form.interestEnabled} onCheckedChange={v => set("interestEnabled", v)} disabled={hasInvoices} />
+            </div>
+            {form.interestEnabled && (
+              <div className="grid grid-cols-1 gap-4 mt-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Rate of Interest (%) *</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.interestRate}
+                    onChange={e => set("interestRate", e.target.value)}
+                    placeholder="e.g. 12"
+                    disabled={hasInvoices}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Grace Period (days)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={form.interestGracePeriod}
+                    onChange={e => set("interestGracePeriod", e.target.value)}
+                    placeholder="0"
+                    disabled={hasInvoices}
+                  />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer mt-1">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 w-4 h-4 text-primary focus:ring-primary"
+                    checked={form.interestByTransaction}
+                    onChange={e => set("interestByTransaction", e.target.checked)}
+                    disabled={hasInvoices}
+                  />
+                  <span className="text-sm font-medium">Calculate interest transaction by transaction</span>
+                </label>
               </div>
             )}
           </div>

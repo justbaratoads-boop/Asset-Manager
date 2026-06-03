@@ -84,6 +84,34 @@ export default function DebitNoteForm() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    if (isEdit || parties.length === 0) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const qsPartyId = searchParams.get("partyId");
+    const amount = searchParams.get("interestAmount");
+    const qsReason = searchParams.get("reason");
+
+    if (qsPartyId && !partyId) {
+      const party = (parties as any[]).find((p: any) => p.id === Number(qsPartyId));
+      if (party) setPartyId(party.id);
+    }
+
+    if (qsReason && !reason) {
+      setReason(qsReason === "interest" ? "Interest charged on overdue balance" : qsReason);
+    }
+
+    if (amount && items.length === 1 && items[0].itemName === "") {
+      const rate = Number(amount);
+      const isInter = selectedParty?.isOutOfState === "true" || selectedParty?.isOutOfState === true;
+      setItems([calcItem({
+        itemName: "Interest Charges",
+        unit: "n/a",
+        quantity: 1,
+        rate,
+      }, isInter)]);
+    }
+  }, [parties, isEdit, selectedParty]);
+
+  useEffect(() => {
     if (!existing || !isEdit) return;
     const n = existing as any;
     if (n.partyId) setPartyId(n.partyId);

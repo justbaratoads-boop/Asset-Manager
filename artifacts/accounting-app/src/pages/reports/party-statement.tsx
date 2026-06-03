@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState } from "react";
 import { useListParties, useGetPartyStatement, useListLedgers } from "@workspace/api-client-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,11 @@ export default function PartyStatement() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Ledger Statement</h1>
         <div className="flex items-center gap-2">
+          {partyId && partyId.startsWith("party_") && (
+            <Button variant="outline" size="sm" onClick={() => setLocation(`/reports/interest-calculation?partyId=${partyId.split('_')[1]}`)}>
+              Interest Calculation
+            </Button>
+          )}
           <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
           {transactions.length > 0 && (
             <ExportButtons data={transactions} columns={visibleColumns} filename={`ledger-statement-${selectedAccount?.name || ""}`} title={`Ledger Statement — ${selectedAccount?.name || ""}`} />

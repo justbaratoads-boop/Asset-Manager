@@ -77,6 +77,10 @@ router.post("/parties", authMiddleware, async (req, res) => {
     paymentTerms: data.paymentTerms || null,
     openingBalance: String(data.openingBalance || 0),
     balanceType: data.balanceType || "dr",
+    interestEnabled: data.interestEnabled === true || data.interestEnabled === "true" ? "true" : "false",
+    interestGracePeriod: data.interestEnabled && data.interestGracePeriod != null ? String(data.interestGracePeriod) : "0",
+    interestRate: data.interestEnabled && data.interestRate != null ? String(data.interestRate) : null,
+    interestByTransaction: data.interestByTransaction === true || data.interestByTransaction === "true" ? "true" : "false",
   }).returning();
   res.status(201).json({ ...party, openingBalance: Number(party.openingBalance), gstHistory: data.gstHistory || [] });
 });
@@ -139,6 +143,10 @@ router.put("/parties/:id", authMiddleware, async (req, res) => {
     paymentTerms: data.paymentTerms || null,
     openingBalance: String(data.openingBalance || 0),
     balanceType: data.balanceType || "dr",
+    interestEnabled: data.interestEnabled === true || data.interestEnabled === "true" ? "true" : "false",
+    interestGracePeriod: data.interestEnabled && data.interestGracePeriod != null ? String(data.interestGracePeriod) : "0",
+    interestRate: data.interestEnabled && data.interestRate != null ? String(data.interestRate) : null,
+    interestByTransaction: data.interestByTransaction === true || data.interestByTransaction === "true" ? "true" : "false",
   }).where(eq(partiesTable.id, Number(id))).returning();
   if (!party) return res.status(404).json({ error: "Party not found" });
   let gstHistory: any[] = [];
