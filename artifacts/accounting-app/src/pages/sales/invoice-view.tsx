@@ -73,6 +73,8 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
     try { return JSON.parse(inv?.otherCharges || "[]"); } catch { return []; }
   })();
 
+  const hasDiscount = items.some((item: any) => Number(item.discountPct) > 0) || Number(inv?.totalDiscount) > 0;
+
   const itemRows = items.map((item: any, i: number) => `
     <tr>
       <td>${i + 1}</td>
@@ -80,7 +82,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
       ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
       <td class="tr">${fmtN(itemBaseRate(item))}</td>
-      <td class="tr">${item.discountPct || 0}%</td>
+      ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
       <td class="tr">${item.gstPct || 0}%</td>
       <td class="tr"><strong>${fmtN(item.total)}</strong></td>
     </tr>`).join("");
@@ -133,7 +135,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
     <thead><tr>
       <th>#</th><th>Item</th>
       ${showHsn ? "<th>HSN</th>" : ""}
-      <th class="tr">Qty</th><th class="tr">Rate</th><th class="tr">Disc%</th><th class="tr">GST%</th><th class="tr">Amount</th>
+      <th class="tr">Qty</th><th class="tr">Rate</th>${hasDiscount ? '<th class="tr">Disc%</th>' : ""}<th class="tr">GST%</th><th class="tr">Amount</th>
     </tr></thead>
     <tbody>${itemRows}</tbody>
   </table>
@@ -341,6 +343,8 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
   const showFooter = ps.showFooter !== false;
   const showAddress = ps.showAddress !== false;
   const termsAndConditions = ps.termsAndConditions || "";
+  
+  const hasDiscount = (invoice?.items || []).some((item: any) => Number(item.discountPct) > 0) || Number(invoice?.totalDiscount) > 0;
 
   return (
     <div className="bg-white border rounded-xl p-4 sm:p-8 max-w-3xl mx-auto text-black" id="invoice-print">
@@ -391,7 +395,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
               {showHsnCode && <th className="text-left py-2 font-semibold">HSN</th>}
               <th className="text-right py-2 font-semibold">Qty</th>
               <th className="text-right py-2 font-semibold">Rate</th>
-              <th className="text-right py-2 font-semibold">Disc%</th>
+              {hasDiscount && <th className="text-right py-2 font-semibold">Disc%</th>}
               <th className="text-right py-2 font-semibold">GST%</th>
               <th className="text-right py-2 pr-4 sm:pr-0 font-semibold">Total</th>
             </tr>
@@ -407,7 +411,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
                 {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
                 <td className="py-2 text-right">{item.quantity} {item.unit}</td>
                 <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
-                <td className="py-2 text-right">{item.discountPct}%</td>
+                {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
                 <td className="py-2 text-right">{item.gstPct}%</td>
                 <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.total)}</td>
               </tr>
