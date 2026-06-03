@@ -38,9 +38,7 @@ function fyStart(): string {
 export default function LedgerStatement() {
   const [, params] = useRoute("/accounts/ledgers/:id");
   const id = Number(params?.id);
-
-  
-  
+  const { globalFrom: from, globalTo: to, setGlobalFrom: setFrom, setGlobalTo: setTo } = useFY();
 
   const { data: ledger } = useGetLedger(id, { query: { enabled: !!id } });
 

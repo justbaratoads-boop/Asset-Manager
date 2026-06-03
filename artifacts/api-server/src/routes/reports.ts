@@ -639,7 +639,7 @@ router.get("/reports/purchase-register", authMiddleware, async (req, res) => {
 
 router.get("/reports/cash-book", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
-  const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.group, "Cash-in-hand"));
+  const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.group, "Cash-in-Hand"));
   const cashLedgerIds = cashLedgers.map(l => l.id);
 
   const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), eq(paymentsTable.paymentMode, "cash")];
