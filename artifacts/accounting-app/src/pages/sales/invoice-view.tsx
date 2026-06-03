@@ -145,7 +145,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
 }
 
 const BASE_CSS = `
-  *{margin:0;padding:0;box-sizing:border-box}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .tr{text-align:right}
   .co-info{display:flex;align-items:flex-start;gap:10px}
   .co-logo{height:52px;width:auto;object-fit:contain;flex-shrink:0}

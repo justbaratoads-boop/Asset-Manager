@@ -61,6 +61,11 @@ export default function PartyView() {
               </p>
             </div>
           )}
+          <Link href={`/reports/interest-calculation?partyId=${id}`}>
+            <Button size="sm" variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+              Interest Calculation
+            </Button>
+          </Link>
           <Link href={`/accounts/parties/${id}/edit`}>
             <Button size="sm" variant="outline"><Pencil className="h-3.5 w-3.5 mr-1.5" />Edit</Button>
           </Link>

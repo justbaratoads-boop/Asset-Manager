@@ -50,7 +50,7 @@ export default function PartyStatement() {
   const [, setLocation] = useLocation();
   const { data: rawParties = [] } = useListParties();
   const { data: rawLedgers = [] } = useListLedgers({});
-  const { data, isLoading } = useGetPartyStatement({ partyId: partyId ? Number(partyId) : undefined, from, to });
+  const { data, isLoading } = useGetPartyStatement({ partyId: partyId ? partyId as any : undefined, from, to });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("party-statement", ALL_COLUMNS);
   const vis = visibleKeys;
 
