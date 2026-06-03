@@ -598,19 +598,7 @@ export default function LedgerAccounts() {
                   </div>
                   {!isSystemEdit && <p className="text-xs text-muted-foreground">Dr/Cr is auto-set from the account group</p>}
                 </div>
-                {!isSystemEdit && (
-                  <div className="space-y-1">
-                    <Label>Nature</Label>
-                    <Select value={ledgerForm.nature} onValueChange={v => setLedgerForm(p => ({ ...p, nature: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dr">Debit (Dr)</SelectItem>
-                        <SelectItem value="cr">Credit (Cr)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Auto-set from the group you choose</p>
-                  </div>
-                )}
+
 
                 {["Indirect Expenses", "Indirect Incomes", "Direct Expenses", "Direct Incomes", "Fixed Assets", "Purchase Accounts", "Sales Accounts"].includes(ledgerForm.group) && (
                   <div className="border-t pt-3 space-y-3">
