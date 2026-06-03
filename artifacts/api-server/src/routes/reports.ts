@@ -14,7 +14,7 @@ const router = Router();
 
 async function getLedgersWithParties() {
   const [dbLedgers, parties] = await Promise.all([
-    getLedgersWithParties(),
+    db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
     db.select().from(partiesTable).where(eq(partiesTable.isDeleted, "false")),
   ]);
   const partyLedgers = parties.map(p => ({
@@ -639,7 +639,7 @@ router.get("/reports/purchase-register", authMiddleware, async (req, res) => {
 
 router.get("/reports/cash-book", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
-  const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.name, "Cash"));
+  const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.group, "Cash-in-hand"));
   const cashLedgerIds = cashLedgers.map(l => l.id);
 
   const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), eq(paymentsTable.paymentMode, "cash")];
