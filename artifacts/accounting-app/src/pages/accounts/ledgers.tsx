@@ -34,7 +34,9 @@ const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 function useAccountGroups() {
   return useQuery({
     queryKey: ["account-groups"],
-    queryFn: () => customFetch<any[]>("/api/account-groups"),
+    queryFn: () => customFetch<any[]>("/api/account-groups").then(groups => 
+      groups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    ),
   });
 }
 
@@ -222,6 +224,8 @@ export default function LedgerAccounts() {
   const handleSave = async () => {
     if (dialogType === "ledger") {
       if (!ledgerForm.name.trim()) { setLedgerNameError("Name is required"); return; }
+      const duplicate = ledgers.find((l: any) => l.name.trim().toLowerCase() === ledgerForm.name.trim().toLowerCase() && l.id !== editItem?.id);
+      if (duplicate) { setLedgerNameError("A ledger with this name already exists"); return; }
       if (!ledgerForm.group) { toast({ title: "Account group is required", variant: "destructive" }); return; }
       setLedgerNameError("");
       setIsSaving(true);
@@ -251,6 +255,8 @@ export default function LedgerAccounts() {
     } else {
       const errs = validateParty();
       if (Object.keys(errs).length > 0) { setPartyErrors(errs); return; }
+      const duplicate = ledgers.find((l: any) => l.name.trim().toLowerCase() === partyForm.name.trim().toLowerCase() && l.id !== editItem?.id);
+      if (duplicate) { setPartyErrors({ ...errs, name: "A ledger with this name already exists" }); return; }
       setIsSaving(true);
       try {
         const payload = {
