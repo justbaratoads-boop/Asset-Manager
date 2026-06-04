@@ -794,7 +794,11 @@ export default function SaleInvoiceView() {
         </div>
       )}
 
-      <InvoiceDocument invoice={inv} company={company as any} />
+      {/* Render the actual selected template on-screen and for Ctrl+P */}
+      <div className="bg-white border print:border-0 rounded-xl overflow-hidden max-w-4xl mx-auto shadow-sm print:shadow-none" id="invoice-print">
+        <style dangerouslySetInnerHTML={{ __html: (PRINT_CSS[`${ps.printerType || "a4"}_${ps.layoutStyle || "1"}`] || PRINT_CSS["a4_1"]).replace(/body\s*\{/g, ".inv-template-wrapper{").replace(/@media print\s*\{\s*@page\s*\{[^}]*\}\s*\}/g, "") }} />
+        <div className="inv-template-wrapper" dangerouslySetInnerHTML={{ __html: buildInvoiceHtml(inv, company, ps) }} />
+      </div>
 
       {/* Hidden acknowledgment document — rendered offscreen for print */}
       {acknowledgmentEnabled && (
