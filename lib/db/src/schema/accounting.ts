@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,6 +11,7 @@ export const journalEntriesTable = pgTable("journal_entries", {
   totalDebit: numeric("total_debit", { precision: 15, scale: 2 }).notNull().default("0"),
   totalCredit: numeric("total_credit", { precision: 15, scale: 2 }).notNull().default("0"),
   isDeleted: text("is_deleted").notNull().default("false"),
+  isKaccha: boolean("is_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -38,6 +39,7 @@ export const paymentsTable = pgTable("payment_vouchers", {
   reference: text("reference"),
   ledgerAllocations: text("ledger_allocations"),
   isDeleted: text("is_deleted").notNull().default("false"),
+  isKaccha: boolean("is_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -55,6 +57,7 @@ export const receiptsTable = pgTable("receipt_vouchers", {
   reference: text("reference"),
   ledgerAllocations: text("ledger_allocations"),
   isDeleted: text("is_deleted").notNull().default("false"),
+  isKaccha: boolean("is_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

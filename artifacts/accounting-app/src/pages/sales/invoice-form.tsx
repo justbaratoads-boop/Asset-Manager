@@ -44,6 +44,7 @@ interface InvoiceItem {
   sgst: number;
   igst: number;
   total: number;
+  isTaxLiability?: boolean;
 }
 
 function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceItem {
@@ -83,6 +84,7 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
     gstAmount,
     cgst, sgst, igst,
     total,
+    isTaxLiability: item.isTaxLiability,
   };
 }
 
@@ -118,6 +120,7 @@ export default function SaleInvoiceForm() {
   const { data: stockItems } = useListStockItems();
   const { data: companySettings } = useGetCompanySettings();
   const enableDiscount = (companySettings as any)?.enableDiscount ?? false;
+  const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
   const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetSaleInvoice(editId!, { query: { enabled: isEdit } });
@@ -139,6 +142,7 @@ export default function SaleInvoiceForm() {
 
   const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
+  const [kacchaPayRows, setKacchaPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
   const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
   const [indirectLedgers, setIndirectLedgers] = useState<{ id: number; name: string; group: string }[]>([]);
   const hasLoadedRef = useRef(false);
@@ -176,19 +180,30 @@ export default function SaleInvoiceForm() {
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
 
+  const pakkaGrandTotal = items.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0) + chargesTotal;
+  const kacchaGrandTotal = items.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
+
   const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-  const balanceDue = grandTotal - amountPaid;
+  const kacchaAmountPaid = kacchaPayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+
+  const balanceDue = pakkaGrandTotal - amountPaid;
+  const kacchaBalanceDue = kacchaGrandTotal - kacchaAmountPaid;
 
   const updatePayRow = (i: number, field: string, value: string) => {
     setPayRows(prev => { const u = [...prev]; u[i] = { ...u[i], [field]: value }; return u; });
+  };
+  const updateKacchaPayRow = (i: number, field: string, value: string) => {
+    setKacchaPayRows(prev => { const u = [...prev]; u[i] = { ...u[i], [field]: value }; return u; });
   };
 
   const handleBillTypeChange = (type: "credit" | "cash") => {
     setBillType(type);
     if (type === "cash") {
-      setPayRows([{ mode: "cash", amount: grandTotal > 0 ? String(grandTotal.toFixed(2)) : "", reference: "" }]);
+      if (pakkaGrandTotal > 0) setPayRows([{ mode: "cash", amount: String(pakkaGrandTotal.toFixed(2)), reference: "" }]);
+      if (kacchaGrandTotal > 0) setKacchaPayRows([{ mode: "cash", amount: String(kacchaGrandTotal.toFixed(2)), reference: "" }]);
     } else {
       setPayRows([]);
+      setKacchaPayRows([]);
     }
   };
 
@@ -214,6 +229,11 @@ export default function SaleInvoiceForm() {
       setPayRows(inv.payments.map((p: any) => ({ mode: p.mode || "cash", amount: String(p.amount || ""), reference: p.reference || "" })));
     } else {
       setPayRows([]);
+    }
+    if (inv.kacchaPayments?.length) {
+      setKacchaPayRows(inv.kacchaPayments.map((p: any) => ({ mode: p.mode || "cash", amount: String(p.amount || ""), reference: p.reference || "" })));
+    } else {
+      setKacchaPayRows([]);
     }
     if (inv.otherCharges) {
       try { setCharges(JSON.parse(inv.otherCharges)); } catch { setCharges([]); }
@@ -259,7 +279,7 @@ export default function SaleInvoiceForm() {
       const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true }, isInterstate);
+        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true }, isInterstate);
         return updated;
       });
     }
@@ -268,7 +288,7 @@ export default function SaleInvoiceForm() {
   const clearItem = (index: number) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = calcItem({ ...updated[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false }, isInterstate);
+      updated[index] = calcItem({ ...updated[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false, isTaxLiability: true }, isInterstate);
       return updated;
     });
   };
@@ -295,7 +315,8 @@ export default function SaleInvoiceForm() {
       if (!items[i].rate || items[i].rate <= 0) { e.items = `Row ${i + 1}: Rate must be > 0`; break; }
     }
     if (items.length === 0) e.items = "Add at least one item";
-    if (amountPaid > grandTotal + 0.01) e.payment = `Total payments (${formatCurrency(amountPaid)}) cannot exceed invoice total (${formatCurrency(grandTotal)})`;
+    if (amountPaid > pakkaGrandTotal + 0.01) e.payment = `Total payments (${formatCurrency(amountPaid)}) cannot exceed pakka invoice total (${formatCurrency(pakkaGrandTotal)})`;
+    if (kacchaAmountPaid > kacchaGrandTotal + 0.01) e.kacchaPayment = `Total kaccha payments (${formatCurrency(kacchaAmountPaid)}) cannot exceed kaccha invoice total (${formatCurrency(kacchaGrandTotal)})`;
     return e;
   };
 
@@ -320,9 +341,12 @@ export default function SaleInvoiceForm() {
       grandTotal,
       amountPaid,
       balanceDue,
+      kacchaAmountPaid,
+      kacchaBalanceDue,
       notes,
       items,
       payments,
+      kacchaPayments: kacchaPayRows.filter(r => Number(r.amount) > 0).map(r => ({ mode: r.mode, amount: Number(r.amount), reference: r.reference })),
       otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
       fromOrderId: fromOrderId ? Number(fromOrderId) : undefined,
     };
@@ -766,7 +790,7 @@ export default function SaleInvoiceForm() {
             <CardHeader className="pb-2"><CardTitle className="text-sm text-primary">Payment Entry</CardTitle></CardHeader>
             <CardContent className="space-y-2 px-4 pb-4 pt-1">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground">Add one or more payment rows</span>
+                <span className="text-xs text-muted-foreground">{kacchaGrandTotal > 0 ? "Pakka Payments" : "Add one or more payment rows"}</span>
                 <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1"
                   onClick={() => setPayRows(p => [...p, { mode: "cash", amount: "", reference: "" }])}>
                   <Plus className="h-3.5 w-3.5" />Add Payment
@@ -800,9 +824,52 @@ export default function SaleInvoiceForm() {
               ))}
               {errors.payment && <p className="text-xs text-destructive">{errors.payment}</p>}
               <div className="border-t pt-2 space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Amount Paid</span><span className="font-semibold text-green-600">{formatCurrency(amountPaid)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{kacchaGrandTotal > 0 ? "Pakka Due" : "Amount Paid"}</span><span className="font-semibold text-green-600">{formatCurrency(amountPaid)}</span></div>
                 <div className="flex justify-between font-bold"><span>Balance Due</span><span className={balanceDue > 0 ? "text-red-600" : "text-green-600"}>{formatCurrency(balanceDue)}</span></div>
               </div>
+
+              {kacchaGrandTotal > 0 && (
+                <>
+                  <div className="flex items-center justify-between mb-1 mt-4 pt-4 border-t">
+                    <span className="text-xs text-muted-foreground">Kaccha Payments</span>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1"
+                      onClick={() => setKacchaPayRows(p => [...p, { mode: "cash", amount: "", reference: "" }])}>
+                      <Plus className="h-3.5 w-3.5" />Add Payment
+                    </Button>
+                  </div>
+                  {kacchaPayRows.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-1 italic">No kaccha payment recorded — balance will be due.</p>
+                  )}
+                  {kacchaPayRows.map((row, i) => (
+                    <div key={i} className="flex flex-wrap gap-1.5 items-center">
+                      <Select value={row.mode} onValueChange={v => updateKacchaPayRow(i, "mode", v)}>
+                        <SelectTrigger className="h-8 text-xs w-full sm:w-[120px] shrink-0"><SelectValue /></SelectTrigger>
+                        <SelectContent>{allPaymentModes.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <div className="flex gap-1.5 items-center flex-1 min-w-0">
+                        <div className="relative flex-1 min-w-[70px]">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
+                          <Input className="pl-5 h-8 text-sm" type="number" inputMode="decimal" min="0" step="any"
+                            value={row.amount}
+                            onChange={e => { updateKacchaPayRow(i, "amount", e.target.value); setErrors(p => { const n = { ...p }; delete n.kacchaPayment; return n; }); }}
+                            placeholder="0.00" />
+                        </div>
+                        <Input className="h-8 text-xs flex-1 min-w-[60px]" placeholder="Ref / UTR" value={row.reference}
+                          onChange={e => updateKacchaPayRow(i, "reference", e.target.value)} />
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0"
+                          onClick={() => setKacchaPayRows(p => p.filter((_, j) => j !== i))}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {errors.kacchaPayment && <p className="text-xs text-destructive">{errors.kacchaPayment}</p>}
+                  <div className="border-t pt-2 space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Kaccha Due</span><span className="font-semibold text-amber-600">{formatCurrency(kacchaAmountPaid)}</span></div>
+                    <div className="flex justify-between font-bold"><span>Kaccha Balance</span><span className={kacchaBalanceDue > 0 ? "text-red-600" : "text-amber-600"}>{formatCurrency(kacchaBalanceDue)}</span></div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

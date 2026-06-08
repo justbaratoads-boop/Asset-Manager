@@ -26,6 +26,7 @@ export const saleInvoicesTable = pgTable("sale_invoices", {
   otherCharges: text("other_charges"),
   status: text("status").notNull().default("confirmed"),
   isDeleted: text("is_deleted").notNull().default("false"),
+  isKaccha: boolean("is_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -24,6 +24,7 @@ export const purchaseInvoicesTable = pgTable("purchase_invoices", {
   notes: text("notes"),
   otherCharges: text("other_charges"),
   isDeleted: text("is_deleted").notNull().default("false"),
+  isKaccha: boolean("is_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -68,6 +69,7 @@ export const purchaseOrdersTable = pgTable("purchase_orders", {
   notes: text("notes"),
   deliveryDate: text("delivery_date"),
   isDeleted: text("is_deleted").notNull().default("false"),
+  isKaccha: boolean("is_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

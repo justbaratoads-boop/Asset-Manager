@@ -8,7 +8,7 @@ import { adjustStock, adjustReservedStock } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
 import { eq, and, ilike, gte, lte, sql, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
-import { makeInvoiceNumber } from "../lib/counter";
+import { makeInvoiceNumber, makeKacchaInvoiceNumber } from "../lib/counter";
 import { companySettingsTable } from "@workspace/db/schema";
 
 async function checkCreditLimit(partyId: number, newBalanceDue: number, excludeInvoiceId?: number): Promise<string | null> {
@@ -70,44 +70,77 @@ router.get("/sale-invoices", authMiddleware, async (req, res) => {
 router.post("/sale-invoices", authMiddleware, async (req, res) => {
   const data = req.body;
 
-  // Credit limit check — only for credit invoices with a party
-  if (data.partyId && Number(data.balanceDue) > 0) {
-    const limitError = await checkCreditLimit(Number(data.partyId), Number(data.balanceDue));
+  const settings = await db.select().from(companySettingsTable).limit(1);
+  const enableDualLedger = settings[0]?.enableDualLedger === "true" || settings[0]?.enableDualLedger === true;
+  const prefix = settings[0]?.invoicePrefix || "INV";
+  const kacchaPrefix = settings[0]?.kacchaInvoicePrefix || "KCH";
+  const finYearStr = settings[0]?.financialYearStart || new Date().toISOString().slice(0, 10);
+  const finYear = finYearStr.slice(0, 4);
+
+  let kacchaItems = [];
+  let pakkaItems = [];
+
+  if (enableDualLedger && data.items?.length) {
+    kacchaItems = data.items.filter((i: any) => i.isTaxLiability === false);
+    pakkaItems = data.items.filter((i: any) => i.isTaxLiability !== false);
+  } else {
+    pakkaItems = data.items || [];
+  }
+
+  // Credit limit check
+  const totalBalanceDue = Number(data.balanceDue || 0) + Number(data.kacchaBalanceDue || 0);
+  if (data.partyId && totalBalanceDue > 0) {
+    const limitError = await checkCreditLimit(Number(data.partyId), totalBalanceDue);
     if (limitError) return res.status(400).json({ error: limitError, code: "CREDIT_LIMIT_REACHED" });
   }
 
-  const settings = await db.select().from(companySettingsTable).limit(1);
-  const prefix = settings[0]?.invoicePrefix || "INV";
-  const invoiceNumber = await makeInvoiceNumber(prefix);
+  async function createInvoicePart(itemsToSave: any[], isKaccha: boolean, paymentsToSave: any[], partAmountPaid: number, partBalanceDue: number, partGrandTotal: number) {
+    const invNum = isKaccha ? await makeKacchaInvoiceNumber(kacchaPrefix, finYear) : await makeInvoiceNumber(prefix);
+    const sub = itemsToSave.reduce((s, i) => s + Number(i.quantity) * Number(i.rate), 0);
+    const disc = itemsToSave.reduce((s, i) => s + (Number(i.discountPct || 0) / 100) * Number(i.quantity) * Number(i.rate), 0);
+    const base = itemsToSave.reduce((s, i) => s + Number(i.taxableAmount), 0);
+    const cgst = itemsToSave.reduce((s, i) => s + Number(i.cgst || 0), 0);
+    const sgst = itemsToSave.reduce((s, i) => s + Number(i.sgst || 0), 0);
+    const igst = itemsToSave.reduce((s, i) => s + Number(i.igst || 0), 0);
+    const totGst = cgst + sgst + igst;
+    
+    let otherChargesParsed = 0;
+    if (!isKaccha && data.otherCharges) {
+      try {
+        const charges = JSON.parse(data.otherCharges);
+        otherChargesParsed = charges.reduce((s: number, c: any) => s + ((c.type ?? "add") === "deduct" ? -Number(c.amount) : Number(c.amount)), 0);
+      } catch (e) {}
+    }
+    const gTotal = partGrandTotal ?? (base + totGst + otherChargesParsed);
 
-  const [invoice] = await db.insert(saleInvoicesTable).values({
-    invoiceNumber,
-    date: data.date,
-    partyId: data.partyId,
-    partyName: data.partyName,
-    partyGstin: data.partyGstin,
-    billingAddress: data.billingAddress,
-    isGst: data.isGst ?? true,
-    isInterstate: data.isInterstate ?? false,
-    subtotal: String(data.subtotal || 0),
-    totalDiscount: String(data.totalDiscount || 0),
-    totalTaxable: String(data.totalTaxable || 0),
-    totalCgst: String(data.totalCgst || 0),
-    totalSgst: String(data.totalSgst || 0),
-    totalIgst: String(data.totalIgst || 0),
-    totalGst: String(data.totalGst || 0),
-    grandTotal: String(data.grandTotal || 0),
-    amountPaid: String(data.amountPaid || 0),
-    balanceDue: String(data.balanceDue || 0),
-    notes: data.notes,
-    otherCharges: data.otherCharges || null,
-    status: data.amountPaid >= data.grandTotal ? "paid" : (data.amountPaid > 0 ? "partial" : "confirmed"),
-  }).returning();
+    const [inv] = await db.insert(saleInvoicesTable).values({
+      invoiceNumber: invNum,
+      date: data.date,
+      partyId: data.partyId,
+      partyName: data.partyName,
+      partyGstin: data.partyGstin,
+      billingAddress: data.billingAddress,
+      isGst: isKaccha ? false : (data.isGst ?? true),
+      isInterstate: data.isInterstate ?? false,
+      isKaccha: isKaccha,
+      subtotal: String(sub),
+      totalDiscount: String(disc),
+      totalTaxable: String(base),
+      totalCgst: String(cgst),
+      totalSgst: String(sgst),
+      totalIgst: String(igst),
+      totalGst: String(totGst),
+      grandTotal: String(gTotal),
+      amountPaid: String(partAmountPaid || 0),
+      balanceDue: String(partBalanceDue || 0),
+      notes: data.notes,
+      otherCharges: isKaccha ? null : (data.otherCharges || null),
+      status: partAmountPaid >= gTotal ? "paid" : (partAmountPaid > 0 ? "partial" : "confirmed"),
+    }).returning();
 
-  if (data.items?.length) {
-    for (const item of data.items) {
+    for (const item of itemsToSave) {
       await db.insert(saleInvoiceItemsTable).values({
-        invoiceId: invoice.id,
+        invoiceId: inv.id,
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
@@ -115,11 +148,11 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
         unit: item.unit,
         rate: String(item.rate),
         discountPct: String(item.discountPct || 0),
-        gstPct: String(item.gstPct || 0),
+        gstPct: String(isKaccha ? 0 : (item.gstPct || 0)),
         taxableAmount: String(item.taxableAmount),
-        cgst: String(item.cgst || 0),
-        sgst: String(item.sgst || 0),
-        igst: String(item.igst || 0),
+        cgst: String(isKaccha ? 0 : (item.cgst || 0)),
+        sgst: String(isKaccha ? 0 : (item.sgst || 0)),
+        igst: String(isKaccha ? 0 : (item.igst || 0)),
         total: String(item.total),
         batchId: item.batchId || null,
         description: item.description || null,
@@ -136,31 +169,46 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
           type: "sale",
           quantity: String(item.quantity),
           balanceAfter: String(newBalance),
-          reference: invoiceNumber,
+          reference: invNum,
+          isKaccha: isKaccha,
+        } as any);
+      }
+    }
+
+    if (paymentsToSave?.length) {
+      for (const payment of paymentsToSave) {
+        await db.insert(saleInvoicePaymentsTable).values({
+          invoiceId: inv.id,
+          mode: payment.mode,
+          amount: String(payment.amount),
+          reference: payment.reference || "",
         });
       }
     }
+
+    return { ...inv, invoiceNumber: invNum };
   }
 
-  if (data.payments?.length) {
-    for (const payment of data.payments) {
-      await db.insert(saleInvoicePaymentsTable).values({
-        invoiceId: invoice.id,
-        mode: payment.mode,
-        amount: String(payment.amount),
-        reference: payment.reference || "",
-      });
-    }
+  let finalInvoice = null;
+
+  if (kacchaItems.length > 0) {
+    const kacchaGrandTotalCalc = data.kacchaGrandTotal ?? kacchaItems.reduce((s: number, i: any) => s + Number(i.total), 0);
+    const kInv = await createInvoicePart(kacchaItems, true, data.kacchaPayments || [], data.kacchaAmountPaid, data.kacchaBalanceDue, kacchaGrandTotalCalc);
+    if (!finalInvoice) finalInvoice = kInv;
+  }
+  
+  if (pakkaItems.length > 0) {
+    const pInv = await createInvoicePart(pakkaItems, false, data.payments || [], data.amountPaid, data.balanceDue, data.grandTotal);
+    finalInvoice = pInv;
   }
 
-  // If created from an order, mark the order as confirmed and link the invoice
-  if (data.fromOrderId) {
+  if (data.fromOrderId && finalInvoice) {
     await db.update(ordersTable)
-      .set({ status: "confirmed", convertedInvoiceId: invoice.id })
+      .set({ status: "confirmed", convertedInvoiceId: finalInvoice.id })
       .where(eq(ordersTable.id, Number(data.fromOrderId)));
   }
 
-  res.status(201).json({ ...invoice, invoiceNumber });
+  res.status(201).json(finalInvoice || {});
 });
 
 router.get("/sale-invoices/:id", authMiddleware, async (req, res) => {
@@ -269,7 +317,8 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
           quantity: String(item.quantity),
           balanceAfter: String(newBalance),
           reference: invoice.invoiceNumber,
-        });
+          isKaccha: invoice.isKaccha,
+        } as any);
       }
     }
   }

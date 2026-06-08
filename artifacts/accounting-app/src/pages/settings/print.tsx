@@ -510,8 +510,13 @@ export default function PrintSettings() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ name: string; desc: string; Preview: React.ComponentType } | null>(null);
 
-  const set = <K extends keyof PrintSettings>(k: K, v: PrintSettings[K]) =>
-    setSettings(prev => ({ ...prev, [k]: v }));
+  const set = <K extends keyof PrintSettings>(k: K, v: PrintSettings[K]) => {
+    setSettings(prev => {
+      const updated = { ...prev, [k]: v };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const handleSave = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));

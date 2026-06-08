@@ -28,6 +28,10 @@ export const companySettingsTable = pgTable("company_settings", {
   upiId: text("upi_id"),
   billFooter: text("bill_footer"),
   defaultPrintFormat: text("default_print_format").notNull().default("a4"),
+  enableDualLedger: boolean("enable_dual_ledger").notNull().default(false),
+  dualLedgerPassword: text("dual_ledger_password"),
+  kacchaInvoiceName: text("kaccha_invoice_name").notNull().default("Estimate"),
+  kacchaInvoicePrefix: text("kaccha_invoice_prefix"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

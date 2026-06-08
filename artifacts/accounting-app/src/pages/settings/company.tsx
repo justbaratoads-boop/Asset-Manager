@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { INDIAN_STATES } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, X, Image } from "lucide-react";
+import { Upload, X, Image, Lock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
 export default function CompanySettings() {
   const { data: settings } = useGetCompanySettings();
@@ -23,8 +24,12 @@ export default function CompanySettings() {
     currency: "INR", financialYearStart: "04",
     invoicePrefix: "INV", poPrefix: "PO",
     billFooter: "", logoUrl: "", enableDiscount: false,
+    enableDualLedger: false, dualLedgerPassword: "", kacchaInvoiceName: "Estimate", kacchaInvoicePrefix: "EST"
   });
-  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+  const [dualPasswordDialog, setDualPasswordDialog] = useState(false);
+  const [pendingDualLedgerState, setPendingDualLedgerState] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
     if (settings) setForm(f => ({ ...f, ...(settings as any) }));
@@ -145,7 +150,70 @@ export default function CompanySettings() {
         </CardContent>
       </Card>
 
+      <Card className="border-red-200 shadow-sm">
+        <CardHeader className="bg-red-50/50 rounded-t-xl border-b border-red-100 pb-3">
+          <CardTitle className="text-base text-red-800 flex items-center gap-2"><Lock className="h-4 w-4" /> Dual Split Ledger (Compliance Mode)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border rounded-md p-3 bg-red-50/30 border-red-100">
+            <div className="space-y-0.5">
+              <Label className="text-red-900">Enable Dual Ledger (Kaccha/Pakka)</Label>
+              <p className="text-xs text-red-700/80">Manage shadow inventory and unofficial sales parallel to official data. Password required to toggle.</p>
+            </div>
+            <Switch
+              checked={form.enableDualLedger as boolean}
+              onCheckedChange={(c) => {
+                setPendingDualLedgerState(c);
+                setPasswordInput("");
+                setDualPasswordDialog(true);
+              }}
+              className="mt-2 sm:mt-0 data-[state=checked]:bg-red-600"
+            />
+          </div>
+          
+          {form.enableDualLedger && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="space-y-1"><Label>Kaccha Invoice Title</Label><Input value={form.kacchaInvoiceName as string} onChange={e => set("kacchaInvoiceName", e.target.value)} placeholder="e.g. Estimate / Chalan" /></div>
+              <div className="space-y-1"><Label>Kaccha Prefix</Label><Input value={form.kacchaInvoicePrefix as string} onChange={e => set("kacchaInvoicePrefix", e.target.value)} placeholder="e.g. EST" /></div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Toggle Password</Label>
+                <Input type="text" value={form.dualLedgerPassword as string} onChange={e => set("dualLedgerPassword", e.target.value)} placeholder="Set password to protect this toggle" />
+                <p className="text-xs text-muted-foreground mt-1">This password will be required next time you try to enable or disable Dual Ledger.</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? "Saving..." : "Save Settings"}</Button>
+
+      <Dialog open={dualPasswordDialog} onOpenChange={setDualPasswordDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Authentication Required</DialogTitle>
+            <DialogDescription>
+              {form.dualLedgerPassword ? "Please enter the Dual Ledger password to change this setting." : "You are about to change a sensitive setting. Since no password is set yet, click Confirm to proceed."}
+            </DialogDescription>
+          </DialogHeader>
+          {form.dualLedgerPassword && (
+            <div className="py-4">
+              <Label>Password</Label>
+              <Input type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} autoFocus />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDualPasswordDialog(false)}>Cancel</Button>
+            <Button onClick={() => {
+              if (form.dualLedgerPassword && passwordInput !== form.dualLedgerPassword) {
+                toast({ title: "Incorrect password", variant: "destructive" });
+                return;
+              }
+              set("enableDualLedger", pendingDualLedgerState);
+              setDualPasswordDialog(false);
+            }}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

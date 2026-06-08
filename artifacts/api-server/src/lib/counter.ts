@@ -31,3 +31,14 @@ export async function makeVoucherNumber(type: string): Promise<string> {
   const n = await nextCounter(`voucher_${type}`);
   return `${type.toUpperCase()}${String(n).padStart(5, "0")}`;
 }
+
+export async function makeKacchaInvoiceNumber(prefix: string, finYear: string): Promise<string> {
+  const counterName = `kaccha_invoice_${finYear}`;
+  let n = await nextCounter(counterName);
+  if (n > 1000) {
+    // Reset logic if it exceeds 1000
+    await db.update(countersTable).set({ value: 1 }).where(eq(countersTable.name, counterName));
+    n = 1;
+  }
+  return `${prefix}${n}`;
+}

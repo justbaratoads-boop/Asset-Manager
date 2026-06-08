@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   permissions: text("permissions"),
   phone: text("phone"),
   isActive: boolean("is_active").notNull().default(true),
+  canAccessKaccha: boolean("can_access_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

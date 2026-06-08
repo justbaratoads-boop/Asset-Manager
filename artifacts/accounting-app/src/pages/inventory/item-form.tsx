@@ -40,7 +40,7 @@ export default function ItemForm() {
   const [form, setForm] = useState({
     name: "", categoryId: "", hsnCode: "", unit: "pcs",
     purchaseRate: "", saleRate: "", minStockLevel: "", physicalStock: "", barcode: "",
-    gstApplicable: false, gstRate: "",
+    gstApplicable: false, gstRate: "", isTaxLiability: true,
   });
   const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
@@ -73,6 +73,7 @@ export default function ItemForm() {
       barcode: e.barcode || "",
       gstApplicable,
       gstRate,
+      isTaxLiability: e.isTaxLiability ?? true,
     });
   }, [existing]);
 
@@ -95,6 +96,7 @@ export default function ItemForm() {
     barcode: form.barcode,
     gstApplicable: String(form.gstApplicable),
     gstRate: Number(form.gstRate) || 0,
+    isTaxLiability: form.isTaxLiability,
     ...(gstRateChanged ? { gstEffectiveFrom } : {}),
   });
 
@@ -188,10 +190,12 @@ export default function ItemForm() {
                 <SelectContent>{(categories as any[]).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label>HSN Code</Label>
-              <Input value={form.hsnCode} onChange={e => set("hsnCode", e.target.value)} placeholder="e.g. 8471" />
-            </div>
+            {form.isTaxLiability && (
+              <div className="space-y-1">
+                <Label>HSN Code</Label>
+                <Input value={form.hsnCode} onChange={e => set("hsnCode", e.target.value)} placeholder="e.g. 8471" />
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Unit</Label>
               <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" />
@@ -199,6 +203,17 @@ export default function ItemForm() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader><CardTitle className="text-base">Compliance & Tax Liability</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <Switch checked={form.isTaxLiability} onCheckedChange={v => set("isTaxLiability", v)} />
+              <Label className="cursor-pointer">Tax Liability in Stock</Label>
+            </div>
+          </CardContent>
+        </Card>
+
+        {form.isTaxLiability && (
         <Card>
           <CardHeader><CardTitle className="text-base">GST Settings</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -252,6 +267,7 @@ export default function ItemForm() {
             )}
           </CardContent>
         </Card>
+        )}
 
         <Card>
           <CardHeader><CardTitle className="text-base">Pricing & Stock</CardTitle></CardHeader>
