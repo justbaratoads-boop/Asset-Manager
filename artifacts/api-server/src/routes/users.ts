@@ -103,7 +103,7 @@ router.put("/company-settings", authMiddleware, async (req, res) => {
     return res.json(s);
   }
   const [s] = await db.update(companySettingsTable).set({
-    companyName: data.companyName,
+    companyName: data.name || data.companyName,
     address: data.address,
     city: data.city,
     state: data.state,
@@ -114,6 +114,7 @@ router.put("/company-settings", authMiddleware, async (req, res) => {
     phone: data.phone,
     email: data.email,
     website: data.website,
+    logoUrl: data.logoUrl,
     bankName: data.bankName,
     bankAccount: data.bankAccount,
     bankIfsc: data.bankIfsc,
@@ -121,8 +122,13 @@ router.put("/company-settings", authMiddleware, async (req, res) => {
     billFooter: data.billFooter,
     invoicePrefix: data.invoicePrefix,
     enableGst: data.enableGst,
+    enableDiscount: data.enableDiscount,
     defaultPrintFormat: data.defaultPrintFormat,
-    financialYearStart: data.financialYearStart,
+    financialYearStart: data.financialYearStart ? Number(data.financialYearStart) : 4,
+    enableDualLedger: data.enableDualLedger,
+    dualLedgerPassword: data.dualLedgerPassword,
+    kacchaInvoiceName: data.kacchaInvoiceName,
+    kacchaInvoicePrefix: data.kacchaInvoicePrefix,
   }).where(eq(companySettingsTable.id, existing[0].id)).returning();
   res.json(s);
 });
@@ -146,7 +152,7 @@ router.put("/settings/company", authMiddleware, async (req, res) => {
   }
 
   const [s] = await db.update(companySettingsTable).set({
-    companyName: data.companyName,
+    companyName: data.name || data.companyName,
     address: data.address,
     city: data.city,
     state: data.state,
@@ -157,6 +163,7 @@ router.put("/settings/company", authMiddleware, async (req, res) => {
     phone: data.phone,
     email: data.email,
     website: data.website,
+    logoUrl: data.logoUrl,
     bankName: data.bankName,
     bankAccount: data.bankAccount,
     bankIfsc: data.bankIfsc,
@@ -164,8 +171,13 @@ router.put("/settings/company", authMiddleware, async (req, res) => {
     billFooter: data.billFooter,
     invoicePrefix: data.invoicePrefix,
     enableGst: data.enableGst,
+    enableDiscount: data.enableDiscount,
     defaultPrintFormat: data.defaultPrintFormat,
-    financialYearStart: data.financialYearStart,
+    financialYearStart: data.financialYearStart ? Number(data.financialYearStart) : 4,
+    enableDualLedger: data.enableDualLedger,
+    dualLedgerPassword: data.dualLedgerPassword,
+    kacchaInvoiceName: data.kacchaInvoiceName,
+    kacchaInvoicePrefix: data.kacchaInvoicePrefix,
   }).where(eq(companySettingsTable.id, existing[0].id)).returning();
   res.json(s);
 });

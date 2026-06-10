@@ -80,8 +80,8 @@ export function ItemSearchCombobox({
     };
   }, [open, updateDropdownPosition]);
 
-  const filtered = stockItems
-    .filter(s => s.name.toLowerCase().includes(query.toLowerCase()))
+  const filtered = (stockItems || [])
+    .filter(s => s.name?.toLowerCase().includes((query || "").toLowerCase()))
     .slice(0, 30);
 
   if (stockItemId) {
@@ -194,11 +194,11 @@ export function ItemMultiSearch({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const unselected = stockItems.filter(
-    s => !selectedIds.includes(s.id) && s.name.toLowerCase().includes(query.toLowerCase())
+  const unselected = (stockItems || []).filter(
+    s => !selectedIds.includes(s.id) && s.name?.toLowerCase().includes((query || "").toLowerCase())
   ).slice(0, 30);
 
-  const selectedItems = stockItems.filter(s => selectedIds.includes(s.id));
+  const selectedItems = (stockItems || []).filter(s => selectedIds.includes(s.id));
 
   return (
     <div className="space-y-2">
