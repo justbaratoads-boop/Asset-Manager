@@ -95,7 +95,7 @@ router.get("/company-settings", authMiddleware, async (_req, res) => {
   res.json(settings[0]);
 });
 
-router.put("/company-settings", authMiddleware, async (req, res) => {
+router.patch("/company-settings", authMiddleware, async (req, res) => {
   const data = req.body;
   const existing = await db.select().from(companySettingsTable).limit(1);
   if (existing.length === 0) {
@@ -142,7 +142,7 @@ router.get("/settings/company", authMiddleware, async (_req, res) => {
   res.json(settings[0]);
 });
 
-router.put("/settings/company", authMiddleware, async (req, res) => {
+router.patch("/settings/company", authMiddleware, async (req, res) => {
   const data = req.body;
   const existing = await db.select().from(companySettingsTable).limit(1);
 
