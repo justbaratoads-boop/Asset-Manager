@@ -307,6 +307,7 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
     physicalStock: String(d.physicalStock || 0),
     gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
     gstRate: String(d.gstRate || 0),
+    isTaxLiability: d.isTaxLiability !== undefined ? Boolean(d.isTaxLiability) : true,
   }).returning();
   res.status(201).json({ ...item, physicalStock: Number(item.physicalStock) });
 });
@@ -386,6 +387,7 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
     physicalStock: d.physicalStock !== undefined ? String(Number(d.physicalStock) || 0) : current.physicalStock,
     gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
     gstRate: newGstRate,
+    isTaxLiability: d.isTaxLiability !== undefined ? Boolean(d.isTaxLiability) : current.isTaxLiability,
   }).where(eq(stockItemsTable.id, id)).returning();
 
   if (gstChanged) {

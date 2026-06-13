@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useListStockItems, useDeleteStockItem, getListStockItemsQueryKey } from "@workspace/api-client-react";
+import { useListStockItems, useDeleteStockItem, getListStockItemsQueryKey, useGetCompanySettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ export default function StockItemList() {
   const deleteMutation = useDeleteStockItem();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: companySettings } = useGetCompanySettings();
+  const enableDualLedger = (companySettings as any)?.[0]?.enableDualLedger ?? false;
 
   useEffect(() => { setPage(1); }, [search]);
 
@@ -76,6 +78,11 @@ export default function StockItemList() {
                       <p className="font-bold text-base truncate">{item.name}</p>
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {enableDualLedger && (
+                        <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", item.isTaxLiability ? "border-green-300 text-green-700 bg-green-50" : "border-red-300 text-red-700 bg-red-50")}>
+                          {item.isTaxLiability ? "Pakka" : "Kaccha"}
+                        </Badge>
+                      )}
                       {item.hsnCode && <span className="text-xs font-mono text-muted-foreground">HSN: {item.hsnCode}</span>}
                       <span className="text-xs text-muted-foreground">{item.unit}</span>
                     </div>
@@ -142,6 +149,11 @@ export default function StockItemList() {
                       <div className="flex items-center gap-2">
                         {isLow && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                         {item.name}
+                        {enableDualLedger && (
+                          <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5 ml-1", item.isTaxLiability ? "border-green-300 text-green-700 bg-green-50" : "border-red-300 text-red-700 bg-red-50")}>
+                            {item.isTaxLiability ? "Pakka" : "Kaccha"}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-mono">{item.hsnCode || "-"}</TableCell>

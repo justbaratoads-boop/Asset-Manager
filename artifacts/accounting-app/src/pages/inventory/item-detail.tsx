@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
-import { useGetStockItem, useGetStockItemTransactions, useAdjustStock, getGetStockItemQueryKey, customFetch } from "@workspace/api-client-react";
+import { useGetStockItem, useGetStockItemTransactions, useAdjustStock, getGetStockItemQueryKey, customFetch, useGetCompanySettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,8 @@ export default function ItemDetail() {
   const adjustMutation = useAdjustStock();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: companySettings } = useGetCompanySettings();
+  const enableDualLedger = (companySettings as any)?.[0]?.enableDualLedger ?? false;
   const [adjOpen, setAdjOpen] = useState(false);
   const [adjQty, setAdjQty] = useState("");
   const [adjReason, setAdjReason] = useState("");
@@ -88,9 +90,16 @@ export default function ItemDetail() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <Link href="/inventory/items"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button></Link>
+          <Link href="/inventory/items"><Button variant="ghost" size="icon" className="h-8 w-8"><ArrowLeft className="h-4 w-4" /></Button></Link>
           <div>
-            <h1 className="text-xl font-bold">{it.name}</h1>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              {it.name}
+              {enableDualLedger && (
+                <Badge variant="outline" className={cn("text-xs align-middle", it.isTaxLiability ? "border-green-300 text-green-700 bg-green-50" : "border-red-300 text-red-700 bg-red-50")}>
+                  {it.isTaxLiability ? "Pakka" : "Kaccha"}
+                </Badge>
+              )}
+            </h1>
             <p className="text-sm text-muted-foreground">
               {it.hsnCode && `HSN: ${it.hsnCode} · `}{it.unit} · GST: {currentGst}
             </p>
