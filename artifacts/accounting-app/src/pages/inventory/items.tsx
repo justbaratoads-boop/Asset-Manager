@@ -25,7 +25,7 @@ export default function StockItemList() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: companySettings } = useGetCompanySettings();
-  const enableDualLedger = (companySettings as any)?.[0]?.enableDualLedger ?? false;
+  const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
 
   useEffect(() => { setPage(1); }, [search]);
 

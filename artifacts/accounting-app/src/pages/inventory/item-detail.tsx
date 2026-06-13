@@ -60,7 +60,7 @@ export default function ItemDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: companySettings } = useGetCompanySettings();
-  const enableDualLedger = (companySettings as any)?.[0]?.enableDualLedger ?? false;
+  const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
   const [adjOpen, setAdjOpen] = useState(false);
   const [adjQty, setAdjQty] = useState("");
   const [adjReason, setAdjReason] = useState("");
