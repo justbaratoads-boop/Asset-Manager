@@ -63,17 +63,17 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
+        quantity: String(item.quantity || 0),
         unit: item.unit,
-        rate: String(item.rate),
+        rate: String(item.rate || 0),
         discountPct: String(item.discountPct || 0),
         gstPct: String(item.gstPct || 0),
-        taxableAmount: String(item.taxableAmount),
+        taxableAmount: String(item.taxableAmount || 0),
         cgst: String(item.cgst || 0),
         sgst: String(item.sgst || 0),
         igst: String(item.igst || 0),
         batchId: item.batchId || null,
-        total: String(item.total),
+        total: String(item.total || 0),
       });
 
       if (item.stockItemId) {

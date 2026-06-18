@@ -74,8 +74,10 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
   const enableDualLedger = settings[0]?.enableDualLedger === "true" || settings[0]?.enableDualLedger === true;
   const prefix = settings[0]?.invoicePrefix || "INV";
   const kacchaPrefix = settings[0]?.kacchaInvoicePrefix || "KCH";
-  const finYearStr = settings[0]?.financialYearStart || new Date().toISOString().slice(0, 10);
-  const finYear = finYearStr.slice(0, 4);
+  const reqDate = new Date(data.date || Date.now());
+  const finStartMonth = settings[0]?.financialYearStart || 4;
+  const finYearNum = (reqDate.getMonth() + 1) >= finStartMonth ? reqDate.getFullYear() : reqDate.getFullYear() - 1;
+  const finYear = String(finYearNum);
 
   let kacchaItems = [];
   let pakkaItems = [];
@@ -144,16 +146,16 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
+        quantity: String(item.quantity || 0),
         unit: item.unit,
-        rate: String(item.rate),
+        rate: String(item.rate || 0),
         discountPct: String(item.discountPct || 0),
         gstPct: String(isKaccha ? 0 : (item.gstPct || 0)),
-        taxableAmount: String(item.taxableAmount),
+        taxableAmount: String(item.taxableAmount || 0),
         cgst: String(isKaccha ? 0 : (item.cgst || 0)),
         sgst: String(isKaccha ? 0 : (item.sgst || 0)),
         igst: String(isKaccha ? 0 : (item.igst || 0)),
-        total: String(item.total),
+        total: String(item.total || 0),
         batchId: item.batchId || null,
         description: item.description || null,
       });
