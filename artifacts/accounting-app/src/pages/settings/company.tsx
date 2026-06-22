@@ -18,7 +18,7 @@ export default function CompanySettings() {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
-    name: "", address: "", city: "", state: "", pincode: "", country: "India",
+    companyName: "", address: "", city: "", state: "", pincode: "", country: "India",
     gstin: "", pan: "", phone: "", email: "", website: "",
     bankName: "", bankAccount: "", bankIfsc: "", bankBranch: "",
     currency: "INR", financialYearStart: "04",
@@ -85,7 +85,7 @@ export default function CompanySettings() {
       <Card>
         <CardHeader><CardTitle className="text-base">Basic Information</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1 sm:col-span-2"><Label>Company Name *</Label><Input required value={form.name} onChange={e => set("name", e.target.value)} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Company Name *</Label><Input required value={form.companyName} onChange={e => set("companyName", e.target.value)} /></div>
           <div className="space-y-1"><Label>GSTIN</Label><Input value={form.gstin} onChange={e => set("gstin", e.target.value.toUpperCase())} placeholder="27AADCS0472N1Z1" /></div>
           <div className="space-y-1"><Label>PAN</Label><Input value={form.pan} onChange={e => set("pan", e.target.value.toUpperCase())} /></div>
           <div className="space-y-1"><Label>Phone</Label><Input value={form.phone} onChange={e => set("phone", e.target.value)} /></div>
