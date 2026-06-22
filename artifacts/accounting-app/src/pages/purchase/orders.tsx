@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useListPurchaseOrders, useDeletePurchaseOrder, getListPurchaseOrdersQueryKey, getListPurchaseInvoicesQueryKey, customFetch } from "@workspace/api-client-react";
+import { useListPurchaseOrders, useDeletePurchaseOrder, getListPurchaseOrdersQueryKey, getListPurchaseInvoicesQueryKey, customFetch, useListSettings } from "@workspace/api-client-react";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -379,6 +379,10 @@ export default function PurchaseOrderList() {
   const [viewId, setViewId] = useState<number | null>(null);
   const [receiveId, setReceiveId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
+  const [ledgerFilter, setLedgerFilter] = useState("all");
+
+  const { data: settings } = useListSettings();
+  const enableDualLedger = settings?.[0]?.enableDualLedger ?? false;
 
   const { data: orders = [], isLoading } = useListPurchaseOrders({});
   const deleteMutation = useDeletePurchaseOrder();
@@ -423,14 +427,19 @@ export default function PurchaseOrderList() {
     });
   };
 
-  const hasFilters = dateFrom || dateTo || statusFilter !== "all";
-  const clearFilters = () => { setDateFrom(""); setDateTo(""); setStatusFilter("all"); };
+  const hasFilters = dateFrom || dateTo || statusFilter !== "all" || ledgerFilter !== "all";
+  const clearFilters = () => { setDateFrom(""); setDateTo(""); setStatusFilter("all"); setLedgerFilter("all"); };
 
   const list = (orders as any[]).filter(o => {
     if (search && !o.partyName.toLowerCase().includes(search.toLowerCase())) return false;
     if (dateFrom && o.date < dateFrom) return false;
     if (dateTo && o.date > dateTo) return false;
     if (statusFilter !== "all" && o.status !== statusFilter) return false;
+
+    if (!enableDualLedger && o.isKaccha) return false;
+    if (enableDualLedger && ledgerFilter === "pakka" && o.isKaccha) return false;
+    if (enableDualLedger && ledgerFilter === "kaccha" && !o.isKaccha) return false;
+
     return true;
   });
   const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -471,6 +480,21 @@ export default function PurchaseOrderList() {
             </button>
           ))}
         </div>
+
+        {enableDualLedger && (
+          <div className="flex gap-1 ml-auto bg-muted/30 p-1 rounded-lg border">
+            {["all", "pakka", "kaccha"].map(s => (
+              <button
+                key={s}
+                onClick={() => setLedgerFilter(s)}
+                className={`px-3 py-1 text-xs font-medium rounded-md capitalize transition-colors ${ledgerFilter === s ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-muted/50"}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         {hasFilters && (
           <button type="button" onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted">
             <X className="h-3.5 w-3.5" />Clear

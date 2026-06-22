@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListSaleInvoices, useDeleteSaleInvoice, getListSaleInvoicesQueryKey } from "@workspace/api-client-react";
+import { useListSaleInvoices, useDeleteSaleInvoice, getListSaleInvoicesQueryKey, useListSettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -40,12 +40,15 @@ export default function SaleInvoiceList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
+  const [ledgerFilter, setLedgerFilter] = useState("all");
+  const { data: settings } = useListSettings();
+  const enableDualLedger = settings?.[0]?.enableDualLedger ?? false;
   const { data: invoices = [], isLoading } = useListSaleInvoices({ search: search || undefined });
   const deleteMutation = useDeleteSaleInvoice();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo, statusFilter]);
+  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo, statusFilter, ledgerFilter]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -55,13 +58,18 @@ export default function SaleInvoiceList() {
     setDeleteId(null);
   };
 
-  const hasFilters = dateFrom || dateTo || statusFilter !== "all";
-  const clearFilters = () => { setDateFrom(""); setDateTo(""); setStatusFilter("all"); };
+  const hasFilters = dateFrom || dateTo || statusFilter !== "all" || ledgerFilter !== "all";
+  const clearFilters = () => { setDateFrom(""); setDateTo(""); setStatusFilter("all"); setLedgerFilter("all"); };
 
   const list = (invoices as any[]).filter(inv => {
     if (dateFrom && inv.date < dateFrom) return false;
     if (dateTo && inv.date > dateTo) return false;
     if (statusFilter !== "all" && inv.status !== statusFilter) return false;
+    
+    if (!enableDualLedger && inv.isKaccha) return false;
+    if (enableDualLedger && ledgerFilter === "pakka" && inv.isKaccha) return false;
+    if (enableDualLedger && ledgerFilter === "kaccha" && !inv.isKaccha) return false;
+    
     return true;
   });
   const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -104,6 +112,21 @@ export default function SaleInvoiceList() {
             </button>
           ))}
         </div>
+
+        {enableDualLedger && (
+          <div className="flex gap-1 ml-auto bg-muted/30 p-1 rounded-lg border">
+            {["all", "pakka", "kaccha"].map(s => (
+              <button
+                key={s}
+                onClick={() => setLedgerFilter(s)}
+                className={`px-3 py-1 text-xs font-medium rounded-md capitalize transition-colors ${ledgerFilter === s ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-muted/50"}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         {hasFilters && (
           <button type="button" onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">
             <X className="h-3.5 w-3.5" />Clear
