@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useListPurchaseInvoices, useDeletePurchaseInvoice, getListPurchaseInvoicesQueryKey, customFetch, useListSettings } from "@workspace/api-client-react";
+import { useListPurchaseInvoices, useDeletePurchaseInvoice, getListPurchaseInvoicesQueryKey, customFetch, useGetCompanySettings } from "@workspace/api-client-react";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -358,8 +358,8 @@ export default function PurchaseInvoiceList() {
   const [viewId, setViewId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [ledgerFilter, setLedgerFilter] = useState("all");
-  const { data: settings } = useListSettings();
-  const enableDualLedger = settings?.[0]?.enableDualLedger ?? false;
+  const { data: companySettings } = useGetCompanySettings();
+  const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
 
   const { data: invoices = [], isLoading } = useListPurchaseInvoices(({ search: search || undefined } as any));
   const deleteMutation = useDeletePurchaseInvoice();

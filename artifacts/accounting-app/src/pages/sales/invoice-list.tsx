@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListSaleInvoices, useDeleteSaleInvoice, getListSaleInvoicesQueryKey, useListSettings } from "@workspace/api-client-react";
+import { useListSaleInvoices, useDeleteSaleInvoice, getListSaleInvoicesQueryKey, useGetCompanySettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -41,8 +41,8 @@ export default function SaleInvoiceList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [ledgerFilter, setLedgerFilter] = useState("all");
-  const { data: settings } = useListSettings();
-  const enableDualLedger = settings?.[0]?.enableDualLedger ?? false;
+  const { data: companySettings } = useGetCompanySettings();
+  const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
   const { data: invoices = [], isLoading } = useListSaleInvoices({ search: search || undefined });
   const deleteMutation = useDeleteSaleInvoice();
   const queryClient = useQueryClient();

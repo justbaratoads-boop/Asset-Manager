@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useListOrders, useDeleteOrder, getListOrdersQueryKey, customFetch, useListSettings } from "@workspace/api-client-react";
+import { useListOrders, useDeleteOrder, getListOrdersQueryKey, customFetch, useGetCompanySettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,8 +41,8 @@ export default function OrderList() {
   const [page, setPage] = useState(1);
   const [ledgerFilter, setLedgerFilter] = useState("all");
   const [, setLocation] = useLocation();
-  const { data: settings } = useListSettings();
-  const enableDualLedger = settings?.[0]?.enableDualLedger ?? false;
+  const { data: companySettings } = useGetCompanySettings();
+  const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
   const { data: orders = [], isLoading } = useListOrders({ search: search || undefined });
   const deleteMutation = useDeleteOrder();
   const queryClient = useQueryClient();
