@@ -231,7 +231,11 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   // Helper: map a payment mode string to a ledger ID.
   // "cash" → Cash; named bank accounts → find by ledger name; fallback → Cash.
   const modeToLedgerId = (mode: string): number => {
-    if (!mode || mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") {
+    if (!mode) return LEDGER.cash;
+    if (mode.startsWith("bank_")) return Number(mode.replace("bank_", ""));
+    if (mode.startsWith("ledger_")) return Number(mode.replace("ledger_", ""));
+    if (!isNaN(Number(mode))) return Number(mode);
+    if (mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") {
       return LEDGER.cash;
     }
     return byName(mode) ?? LEDGER.cash;
@@ -508,7 +512,11 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
 
   // 8. Inline sale-invoice payments: Dr Cash/Bank, Cr AR
   const modeToLedgerId = (mode: string): number => {
-    if (!mode || mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") {
+    if (!mode) return LEDGER.cash;
+    if (mode.startsWith("bank_")) return Number(mode.replace("bank_", ""));
+    if (mode.startsWith("ledger_")) return Number(mode.replace("ledger_", ""));
+    if (!isNaN(Number(mode))) return Number(mode);
+    if (mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") {
       return LEDGER.cash;
     }
     return byName(mode) ?? LEDGER.cash;
@@ -979,10 +987,14 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
     addTx(LEDGER.purchase, "cr", Number(dn.amount), baseTx);
   }
 
-  const modeToLedgerId = (mode: string): number => {
-    if (!mode || mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") return LEDGER.cash;
-    return byName(mode) ?? LEDGER.cash;
-  };
+    const modeToLedgerId = (mode: string): number => {
+      if (!mode) return LEDGER.cash;
+      if (mode.startsWith("bank_")) return Number(mode.replace("bank_", ""));
+      if (mode.startsWith("ledger_")) return Number(mode.replace("ledger_", ""));
+      if (!isNaN(Number(mode))) return Number(mode);
+      if (mode.toLowerCase() === "cash" || mode.toLowerCase() === "upi" || mode.toLowerCase() === "cheque") return LEDGER.cash;
+      return byName(mode) ?? LEDGER.cash;
+    };
 
   for (const p of saleInvoicePayments) {
     const baseTx = { id: null, date: p.date, type: "Receipt", number: p.ref, narration: `Collection for ${p.ref}` };
