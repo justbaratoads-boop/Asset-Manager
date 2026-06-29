@@ -180,4 +180,158 @@ router.get("/dashboard/low-stock-alerts", authMiddleware, async (_req, res) => {
   }
 });
 
+router.get("/dashboard/details", authMiddleware, async (req, res) => {
+  try {
+    const { type, from, to } = req.query as { type?: string; from?: string; to?: string };
+    const today = todayStr();
+    const periodFrom = from || monthStart();
+    const periodTo = to || today;
+
+    if (!type) return res.status(400).json({ error: "Missing type parameter" });
+
+    let data: any[] = [];
+
+    switch (type) {
+      case "todaySales":
+        data = await db
+          .select({
+            id: saleInvoicesTable.id,
+            date: saleInvoicesTable.date,
+            description: sql<string>`'Sale Invoice ' || invoice_number || ' - ' || party_name`,
+            amount: saleInvoicesTable.grandTotal,
+            status: saleInvoicesTable.status,
+          })
+          .from(saleInvoicesTable)
+          .where(and(eq(saleInvoicesTable.date, today), eq(saleInvoicesTable.isDeleted, "false")))
+          .orderBy(sql`created_at DESC`)
+          .limit(50);
+        break;
+
+      case "periodSales":
+        data = await db
+          .select({
+            id: saleInvoicesTable.id,
+            date: saleInvoicesTable.date,
+            description: sql<string>`'Sale Invoice ' || invoice_number || ' - ' || party_name`,
+            amount: saleInvoicesTable.grandTotal,
+            status: saleInvoicesTable.status,
+          })
+          .from(saleInvoicesTable)
+          .where(and(
+            gte(saleInvoicesTable.date, periodFrom),
+            lte(saleInvoicesTable.date, periodTo),
+            eq(saleInvoicesTable.isDeleted, "false")
+          ))
+          .orderBy(sql`created_at DESC`)
+          .limit(50);
+        break;
+
+      case "periodPurchases":
+        data = await db
+          .select({
+            id: purchaseInvoicesTable.id,
+            date: purchaseInvoicesTable.date,
+            description: sql<string>`'Purchase Invoice ' || invoice_number || ' - ' || party_name`,
+            amount: purchaseInvoicesTable.grandTotal,
+            status: purchaseInvoicesTable.status,
+          })
+          .from(purchaseInvoicesTable)
+          .where(and(
+            gte(purchaseInvoicesTable.date, periodFrom),
+            lte(purchaseInvoicesTable.date, periodTo),
+            eq(purchaseInvoicesTable.isDeleted, "false")
+          ))
+          .orderBy(sql`created_at DESC`)
+          .limit(50);
+        break;
+
+      case "todayCollections":
+        data = await db
+          .select({
+            id: receiptsTable.id,
+            date: receiptsTable.date,
+            description: sql<string>`'Receipt ' || voucher_number || CASE WHEN party_name IS NOT NULL THEN ' - ' || party_name ELSE '' END`,
+            amount: receiptsTable.amount,
+          })
+          .from(receiptsTable)
+          .where(and(eq(receiptsTable.date, today), eq(receiptsTable.isDeleted, "false")))
+          .orderBy(sql`created_at DESC`)
+          .limit(50);
+        break;
+
+      case "periodCollections":
+        data = await db
+          .select({
+            id: receiptsTable.id,
+            date: receiptsTable.date,
+            description: sql<string>`'Receipt ' || voucher_number || CASE WHEN party_name IS NOT NULL THEN ' - ' || party_name ELSE '' END`,
+            amount: receiptsTable.amount,
+          })
+          .from(receiptsTable)
+          .where(and(
+            gte(receiptsTable.date, periodFrom),
+            lte(receiptsTable.date, periodTo),
+            eq(receiptsTable.isDeleted, "false")
+          ))
+          .orderBy(sql`created_at DESC`)
+          .limit(50);
+        break;
+
+      case "openOrders":
+        data = await db
+          .select({
+            id: ordersTable.id,
+            date: ordersTable.date,
+            description: sql<string>`'Order ' || order_number || ' - ' || party_name`,
+            amount: ordersTable.grandTotal,
+            status: ordersTable.status,
+          })
+          .from(ordersTable)
+          .where(and(eq(ordersTable.status, "pending"), eq(ordersTable.isDeleted, "false")))
+          .orderBy(sql`created_at DESC`)
+          .limit(50);
+        break;
+
+      case "duePayables":
+        data = await db
+          .select({
+            id: purchaseInvoicesTable.id,
+            date: purchaseInvoicesTable.date,
+            description: sql<string>`'Purchase Invoice ' || invoice_number || ' - ' || party_name`,
+            amount: purchaseInvoicesTable.balanceDue,
+            status: purchaseInvoicesTable.status,
+          })
+          .from(purchaseInvoicesTable)
+          .where(and(eq(purchaseInvoicesTable.isDeleted, "false"), sql`balance_due::numeric > 0`))
+          .orderBy(sql`created_at DESC`)
+          .limit(50);
+        break;
+
+      case "lowStock":
+        data = await db
+          .select({
+            id: stockItemsTable.id,
+            date: sql<string>`CURRENT_DATE::text`,
+            description: sql<string>`name || ' (Stock: ' || physical_stock || ' ' || unit || ')'`,
+            amount: sql<number>`0`,
+          })
+          .from(stockItemsTable)
+          .where(and(
+            eq(stockItemsTable.isDeleted, "false"),
+            sql`physical_stock::numeric <= min_stock_level::numeric`
+          ))
+          .limit(50);
+        break;
+
+      default:
+        return res.status(400).json({ error: "Invalid type parameter" });
+    }
+
+    res.json(data.map(d => ({ ...d, amount: Number(d.amount) })));
+  } catch (err) {
+    req.log?.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

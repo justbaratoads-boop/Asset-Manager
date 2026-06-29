@@ -8,6 +8,8 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { TrendingUp, TrendingDown, Package, ShoppingCart, Receipt, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function monthStart(): string {
   const d = new Date();
@@ -18,9 +20,9 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function KpiCard({ title, value, icon: Icon, variant = "default" }: { title: string; value: string; icon: any; variant?: string }) {
+function KpiCard({ title, value, icon: Icon, variant = "default", onClick }: { title: string; value: string; icon: any; variant?: string; onClick?: () => void }) {
   return (
-    <Card>
+    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -44,6 +46,14 @@ export default function Dashboard() {
     queryKey: ["dashboard-summary", periodFrom, periodTo],
     queryFn: () => customFetch<any>(`/api/dashboard/summary?from=${periodFrom}&to=${periodTo}`),
     staleTime: 60_000,
+  });
+
+  const [selectedKpi, setSelectedKpi] = useState<{ type: string; title: string } | null>(null);
+
+  const { data: kpiDetails, isLoading: loadingDetails } = useQuery({
+    queryKey: ["dashboard-details", selectedKpi?.type, periodFrom, periodTo],
+    queryFn: () => customFetch<any[]>(`/api/dashboard/details?type=${selectedKpi?.type}&from=${periodFrom}&to=${periodTo}`),
+    enabled: !!selectedKpi,
   });
 
   const { data: activity = [], isLoading: loadingAct } = useGetRecentActivity();
@@ -79,14 +89,14 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Today's Sales" value={loadingSum ? "..." : formatCurrency(summary?.todaySales)} icon={TrendingUp} variant="green" />
-        <KpiCard title="Today's Collections" value={loadingSum ? "..." : formatCurrency(summary?.todayCollections)} icon={Receipt} variant="green" />
-        <KpiCard title="Open Orders" value={loadingSum ? "..." : String(summary?.openOrdersCount || 0)} icon={ShoppingCart} variant="amber" />
-        <KpiCard title="Due Payables" value={loadingSum ? "..." : formatCurrency(summary?.duePayables)} icon={TrendingDown} variant="red" />
-        <KpiCard title="Low Stock Items" value={loadingSum ? "..." : String(summary?.lowStockCount || 0)} icon={Package} variant="amber" />
-        <KpiCard title="Period Sales" value={loadingSum ? "..." : formatCurrency(summary?.periodSales)} icon={TrendingUp} variant="green" />
-        <KpiCard title="Period Purchases" value={loadingSum ? "..." : formatCurrency(summary?.periodPurchases)} icon={TrendingDown} />
-        <KpiCard title="Period Collections" value={loadingSum ? "..." : formatCurrency(summary?.periodCollections)} icon={Receipt} variant="green" />
+        <KpiCard title="Today's Sales" value={loadingSum ? "..." : formatCurrency(summary?.todaySales)} icon={TrendingUp} variant="green" onClick={() => setSelectedKpi({ type: "todaySales", title: "Today's Sales" })} />
+        <KpiCard title="Today's Collections" value={loadingSum ? "..." : formatCurrency(summary?.todayCollections)} icon={Receipt} variant="green" onClick={() => setSelectedKpi({ type: "todayCollections", title: "Today's Collections" })} />
+        <KpiCard title="Open Orders" value={loadingSum ? "..." : String(summary?.openOrdersCount || 0)} icon={ShoppingCart} variant="amber" onClick={() => setSelectedKpi({ type: "openOrders", title: "Open Orders" })} />
+        <KpiCard title="Due Payables" value={loadingSum ? "..." : formatCurrency(summary?.duePayables)} icon={TrendingDown} variant="red" onClick={() => setSelectedKpi({ type: "duePayables", title: "Due Payables" })} />
+        <KpiCard title="Low Stock Items" value={loadingSum ? "..." : String(summary?.lowStockCount || 0)} icon={Package} variant="amber" onClick={() => setSelectedKpi({ type: "lowStock", title: "Low Stock Items" })} />
+        <KpiCard title="Period Sales" value={loadingSum ? "..." : formatCurrency(summary?.periodSales)} icon={TrendingUp} variant="green" onClick={() => setSelectedKpi({ type: "periodSales", title: "Period Sales" })} />
+        <KpiCard title="Period Purchases" value={loadingSum ? "..." : formatCurrency(summary?.periodPurchases)} icon={TrendingDown} onClick={() => setSelectedKpi({ type: "periodPurchases", title: "Period Purchases" })} />
+        <KpiCard title="Period Collections" value={loadingSum ? "..." : formatCurrency(summary?.periodCollections)} icon={Receipt} variant="green" onClick={() => setSelectedKpi({ type: "periodCollections", title: "Period Collections" })} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -186,6 +196,43 @@ export default function Dashboard() {
           </Card>
         </Link>
       </div>
+      <Dialog open={!!selectedKpi} onOpenChange={(open) => !open && setSelectedKpi(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{selectedKpi?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto mt-4">
+            {loadingDetails ? (
+              <p className="text-muted-foreground text-sm">Loading details...</p>
+            ) : kpiDetails && kpiDetails.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {kpiDetails.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{formatDate(row.date)}</TableCell>
+                      <TableCell>{row.description}</TableCell>
+                      <TableCell>
+                        {row.status ? <Badge variant="outline">{row.status}</Badge> : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">{row.amount > 0 ? formatCurrency(row.amount) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-muted-foreground text-sm">No entries found.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
