@@ -11,13 +11,15 @@ export interface OtherCharge {
   ledgerName: string;
   amount: number;
   type?: "add" | "deduct";
+  gstCalculationMethod?: string;
+  gstRate?: number;
 }
 
-export interface ChargeLedger { id: number; name: string; group: string; }
+export interface ChargeLedger { id: number; name: string; group: string; gstCalculationMethod?: string; gstRate?: string | null; }
 
 function LedgerSelect({ value, onChange, ledgers }: {
   value: { ledgerId: number; ledgerName: string };
-  onChange: (ledgerId: number, ledgerName: string) => void;
+  onChange: (ledgerId: number, ledgerName: string, ledger: ChargeLedger) => void;
   ledgers: ChargeLedger[];
 }) {
   const [open, setOpen] = useState(false);
@@ -104,7 +106,7 @@ function LedgerSelect({ value, onChange, ledgers }: {
                   ${value.ledgerId === l.id ? "bg-accent font-medium" : ""}`}
                 onMouseDown={e => {
                   e.preventDefault();
-                  onChange(l.id, l.name);
+                  onChange(l.id, l.name, l);
                   setOpen(false);
                   setSearch("");
                 }}

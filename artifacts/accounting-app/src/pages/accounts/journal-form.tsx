@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, today } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useFetch } from "@/hooks/use-fetch";
 
 interface JLine {
   ledgerId: number;
@@ -35,7 +36,11 @@ function LedgerCombobox({ ledgerId, partyId, onChange, accounts }: {
   const selected = partyId != null
     ? accounts.find(a => a.kind === "party" && a.id === partyId)
     : accounts.find(a => a.kind === "ledger" && a.id === ledgerId);
-  const filtered = accounts.filter(a =>
+  const url = selected?.kind === "party" ? `/api/reports/party-statement?partyId=${selected.id}` : selected?.kind === "ledger" ? `/api/reports/ledger-statement?ledgerId=${selected.id}` : "";
+    const { data: stmt } = useFetch<any>(url, !!url);
+    const closingBalance = stmt?.closingBalance;
+
+    const filtered = accounts.filter(a =>
     !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.group.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -54,7 +59,18 @@ function LedgerCombobox({ ledgerId, partyId, onChange, accounts }: {
         onClick={() => { setOpen(o => !o); setSearch(""); }}
         className="w-full h-8 flex items-center justify-between rounded border border-input bg-background px-2.5 text-xs text-left hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-ring"
       >
-        <span className={selected ? "" : "text-muted-foreground"}>{selected ? selected.name : "Select ledger..."}</span>
+        <span className={selected ? "flex justify-between w-full pr-2 items-center" : "text-muted-foreground"}>
+          {selected ? (
+            <>
+              <span className="truncate">{selected.name}</span>
+              {closingBalance !== undefined && (
+                <span className={Number(closingBalance) < 0 ? "text-red-600 text-[10px]" : "text-green-600 text-[10px]"}>
+                  {formatCurrency(Math.abs(Number(closingBalance)))} {Number(closingBalance) < 0 ? 'Cr' : 'Dr'}
+                </span>
+              )}
+            </>
+          ) : "Select ledger..."}
+        </span>
         <Search className="h-3 w-3 text-muted-foreground ml-1 shrink-0" />
       </button>
       {open && (
@@ -311,7 +327,7 @@ export default function JournalForm() {
 
           {/* Narration */}
           <div className="space-y-1">
-            <Label>Narration</Label>
+            <Label>Narration *</Label>
             <Input
               value={narration}
               onChange={e => setNarration(e.target.value)}

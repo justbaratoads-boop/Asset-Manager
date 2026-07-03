@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Send, Save, Lock, AlertTriangle } from "lucide-react";
+import { getGstRateForDate } from "../../lib/gst";
+
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
@@ -30,11 +32,11 @@ interface InvoiceItem {
   itemName: string;
   description?: string;
   hsnCode: string;
-  quantity: number;
+  quantity: number | string;
   unit: string;
-  rate: number;
-  discountPct: number;
-  gstPct: number;
+  rate: number | string;
+  discountPct: number | string;
+  gstPct: number | string;
   gstLocked: boolean;
   gstInclusive: boolean;
   discountAmount: number;
@@ -72,10 +74,10 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
     itemName: item.itemName || "",
     description: item.description || "",
     hsnCode: item.hsnCode || "",
-    quantity: qty,
+    quantity: typeof item.quantity === 'string' && item.quantity.endsWith('.') ? item.quantity : qty,
     unit: item.unit || "pcs",
-    rate,
-    discountPct: discPct,
+    rate: typeof item.rate === 'string' && item.rate.endsWith('.') ? item.rate : rate,
+    discountPct: typeof item.discountPct === 'string' && item.discountPct.endsWith('.') ? item.discountPct : discPct,
     gstPct,
     gstLocked: item.gstLocked ?? false,
     gstInclusive,
@@ -116,7 +118,7 @@ export default function SaleInvoiceForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateSaleInvoice();
-  const { data: parties = [] } = useListParties({ type: "customer" });
+  const { data: parties = [] } = useListParties();
   const { data: stockItems } = useListStockItems();
   const { data: companySettings } = useGetCompanySettings();
   const enableDiscount = (companySettings as any)?.enableDiscount ?? false;
@@ -166,16 +168,8 @@ export default function SaleInvoiceForm() {
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
 
-  const totals = items.reduce((acc, item) => ({
-    subtotal: acc.subtotal + item.quantity * item.rate,
-    discount: acc.discount + item.discountAmount,
-    taxable: acc.taxable + item.taxableAmount,
-    gst: acc.gst + item.gstAmount,
-    cgst: acc.cgst + item.cgst,
-    sgst: acc.sgst + item.sgst,
-    igst: acc.igst + item.igst,
-    grand: acc.grand + item.total,
-  }), { subtotal: 0, discount: 0, taxable: 0, gst: 0, cgst: 0, sgst: 0, igst: 0, grand: 0 });
+  const { items: computedItems, totals: cTotals } = computeInvoice(items, charges, isInterstate, enableDualLedger ? !items.some(i => i.isTaxLiability) : false);
+  const totals = { ...cTotals, grand: cTotals.grand - cTotals.chargesTotal };
 
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
@@ -268,7 +262,7 @@ export default function SaleInvoiceForm() {
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = calcItem({ ...updated[index], [field]: value }, isInterstate);
+      updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
   };
@@ -276,10 +270,10 @@ export default function SaleInvoiceForm() {
   const selectStockItem = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
-      const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
+      const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = calcItem({ ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true }, isInterstate);
+        updated[index] = { ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true };
         return updated;
       });
     }
@@ -288,7 +282,7 @@ export default function SaleInvoiceForm() {
   const clearItem = (index: number) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = calcItem({ ...updated[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false, isTaxLiability: true }, isInterstate);
+      updated[index] = { ...updated[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false, isTaxLiability: true };
       return updated;
     });
   };
@@ -296,7 +290,7 @@ export default function SaleInvoiceForm() {
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
-      const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
+      const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
       setItems(prev => {
         const updated = [...prev];
         updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : updated[quickAddForIndex].quantity, gstLocked: true }, isInterstate);
@@ -442,7 +436,7 @@ export default function SaleInvoiceForm() {
 
             {/* Mobile card layout */}
             <div className="md:hidden space-y-3">
-              {items.map((item, index) => (
+              {computedItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-3 space-y-3 bg-card shadow-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-muted-foreground">Item {index + 1}</span>
@@ -599,7 +593,7 @@ export default function SaleInvoiceForm() {
                   )}
                 </div>
               ))}
-              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }, isInterstate)])}>
+              <Button type="button" variant="outline" className="w-full h-10" onClick={() => setItems(prev => [...prev, { itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }])}>
                 <Plus className="h-4 w-4 mr-2" />Add Item
               </Button>
             </div>
@@ -620,7 +614,7 @@ export default function SaleInvoiceForm() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item, index) => (
+                  {computedItems.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>
                         <ItemSearchCombobox
@@ -738,7 +732,7 @@ export default function SaleInvoiceForm() {
                   ))}
                 </TableBody>
               </Table>
-              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }, isInterstate)])}>
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setItems(prev => [...prev, { itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstInclusive: false }])}>
                 <Plus className="h-3.5 w-3.5 mr-1" />Add Item
               </Button>
             </div>
@@ -774,11 +768,12 @@ export default function SaleInvoiceForm() {
                 <div className="flex items-center gap-2">
                   {grandTotal % 1 !== 0 && grandTotal > 0 && (
                     <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0" onClick={() => {
-                      const diff = Math.ceil(grandTotal) - grandTotal;
-                      if (diff > 0) {
-                        setCharges(prev => [...prev, { name: "Round Off", amount: String(diff.toFixed(2)), type: "add" }]);
+                      const rounded = Math.round(grandTotal);
+                      const diff = rounded - grandTotal;
+                      if (diff !== 0) {
+                        setCharges(prev => [...prev, { name: "Round Off", amount: String(Math.abs(diff).toFixed(2)), type: diff > 0 ? "add" : "deduct" }]);
                       }
-                    }}>↑ Round Up</Button>
+                    }}>Auto Round Off</Button>
                   )}
                   <span>{formatCurrency(grandTotal)}</span>
                 </div>

@@ -27,6 +27,7 @@ export const ledgersTable = pgTable("ledgers", {
   ifscCode: text("ifsc_code"),
   upiId: text("upi_id"),
   isGstApplicable: boolean("is_gst_applicable").notNull().default(false),
+    gstCalculationMethod: text("gst_calculation_method").notNull().default("none"),
   gstRate: numeric("gst_rate", { precision: 5, scale: 2 }),
   hsnSac: text("hsn_sac"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

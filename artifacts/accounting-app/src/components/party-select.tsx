@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
+import { useFetch } from "@/hooks/use-fetch";
 
 export interface PartyOption { id: number; name: string; closingBalance?: number | string; }
 
@@ -27,6 +28,9 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
   }, []);
 
   const selected = parties.find(p => p.id === value);
+  const shouldFetch = !!(value && selected && selected.closingBalance === undefined);
+  const { data: stmt } = useFetch<any>(shouldFetch ? `/api/reports/party-statement?partyId=${value}` : "", shouldFetch);
+  const closingBalance = selected?.closingBalance ?? stmt?.closingBalance;
   const filtered = parties.filter(p =>
     !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -45,9 +49,9 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
           {selected ? (
             <>
               <span>{selected.name}</span>
-              {selected.closingBalance !== undefined && (
-                <span className={cn("text-xs font-normal ml-2", Number(selected.closingBalance) < 0 ? "text-red-600" : "text-green-600")}>
-                  {formatCurrency(Math.abs(Number(selected.closingBalance)))} {Number(selected.closingBalance) < 0 ? 'Cr' : 'Dr'}
+              {closingBalance !== undefined && (
+                <span className={cn("text-xs font-normal ml-2", Number(closingBalance) < 0 ? "text-red-600" : "text-green-600")}>
+                  {formatCurrency(Math.abs(Number(closingBalance)))} {Number(closingBalance) < 0 ? 'Cr' : 'Dr'}
                 </span>
               )}
             </>

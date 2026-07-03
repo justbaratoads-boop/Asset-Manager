@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   ledgersTable, journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable,
   saleInvoicesTable, purchaseInvoicesTable, saleInvoicePaymentsTable, purchaseInvoicePaymentsTable,
+  partiesTable,
 } from "@workspace/db/schema";
 import { eq, and, ilike, gte, lte, isNotNull, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -19,7 +20,31 @@ router.get("/ledgers", authMiddleware, async (req, res) => {
     .where(and(...conditions))
     .orderBy(ledgersTable.name);
 
-  res.json(ledgers.map(l => ({ ...l, openingBalance: Number(l.openingBalance) })));
+  // Inject parties as ledgers for the Chart of Accounts tree
+  const partyConds: any[] = [eq(partiesTable.isDeleted, "false")];
+  if (search) partyConds.push(ilike(partiesTable.name, `%${search}%`));
+  
+  const parties = await db.select().from(partiesTable).where(and(...partyConds));
+  
+  const partyLedgers = parties.map(p => {
+    let pGroup = p.accountGroup || (p.type === "supplier" ? "Sundry Creditors" : "Sundry Debtors");
+    return {
+      id: 1000000 + p.id,
+      name: p.name,
+      group: pGroup,
+      nature: p.type === "supplier" ? "cr" : "dr",
+      openingBalance: p.openingBalance,
+      isSystem: "true", // Prevent editing from COA
+      gstCalculationMethod: "none",
+      isDeleted: p.isDeleted,
+      createdAt: p.createdAt
+    };
+  });
+
+  const combined = [...ledgers, ...partyLedgers];
+  const filteredCombined = group ? combined.filter(l => l.group === group) : combined;
+
+  res.json(filteredCombined.map((l: any) => ({ ...l, openingBalance: Number(l.openingBalance) })));
 });
 
 router.post("/ledgers", authMiddleware, async (req, res) => {
@@ -40,6 +65,7 @@ router.post("/ledgers", authMiddleware, async (req, res) => {
       openingBalance: String(data.openingBalance || 0),
       isDeleted: "false",
       isGstApplicable: data.isGstApplicable || false,
+      gstCalculationMethod: data.gstCalculationMethod || "none",
       gstRate: data.gstRate || null,
       hsnSac: data.hsnSac || null,
     }).where(eq(ledgersTable.id, softDeleted.id)).returning();
@@ -57,7 +83,8 @@ router.post("/ledgers", authMiddleware, async (req, res) => {
     ifscCode: data.ifscCode || null,
     upiId: data.upiId || null,
     isGstApplicable: data.isGstApplicable || false,
-    gstRate: data.gstRate || null,
+      gstCalculationMethod: data.gstCalculationMethod || "none",
+      gstRate: data.gstRate || null,
     hsnSac: data.hsnSac || null,
   }).returning();
   res.status(201).json({ ...ledger, openingBalance: Number(ledger.openingBalance) });
@@ -96,7 +123,8 @@ router.put("/ledgers/:id", authMiddleware, async (req, res) => {
     ifscCode: data.ifscCode ?? null,
     upiId: data.upiId ?? null,
     isGstApplicable: data.isGstApplicable ?? false,
-    gstRate: data.gstRate ?? null,
+      gstCalculationMethod: data.gstCalculationMethod ?? "none",
+      gstRate: data.gstRate ?? null,
     hsnSac: data.hsnSac ?? null,
   }).where(eq(ledgersTable.id, Number(id))).returning();
   if (!ledger) return res.status(404).json({ error: "Ledger not found" });

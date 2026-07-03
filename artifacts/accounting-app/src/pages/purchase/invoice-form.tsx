@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save, AlertTriangle } from "lucide-react";
+import { getGstRateForDate } from "../../lib/gst";
+
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { QuickAddItemDialog } from "@/components/quick-add-item-dialog";
@@ -88,7 +90,7 @@ export default function PurchaseInvoiceForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreatePurchaseInvoice();
-  const { data: parties = [] } = useListParties({ type: "all" });
+  const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
   const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
@@ -186,7 +188,7 @@ export default function PurchaseInvoiceForm() {
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
-      const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
+      const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
       setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }, isInterstate); return u; });
     }
   };
@@ -198,7 +200,7 @@ export default function PurchaseInvoiceForm() {
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
-      const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
+      const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
       setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true }, isInterstate); return u; });
     }
   };
@@ -499,11 +501,12 @@ export default function PurchaseInvoiceForm() {
                 <div className="flex items-center gap-2">
                   {grandTotal % 1 !== 0 && grandTotal > 0 && (
                     <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0" onClick={() => {
-                      const diff = Math.ceil(grandTotal) - grandTotal;
-                      if (diff > 0) {
-                        setCharges(prev => [...prev, { name: "Round Off", amount: String(diff.toFixed(2)), type: "add" }]);
+                      const rounded = Math.round(grandTotal);
+                      const diff = rounded - grandTotal;
+                      if (diff !== 0) {
+                        setCharges(prev => [...prev, { name: "Round Off", amount: String(Math.abs(diff).toFixed(2)), type: diff > 0 ? "add" : "deduct" }]);
                       }
-                    }}>↑ Round Up</Button>
+                    }}>Auto Round Off</Button>
                   )}
                   <span>{formatCurrency(grandTotal)}</span>
                 </div>

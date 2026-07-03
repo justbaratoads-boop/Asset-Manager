@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGetCompanySettings, useUpdateCompanySettings } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,8 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
 export default function CompanySettings() {
-  const { data: settings } = useGetCompanySettings();
+  const queryClient = useQueryClient();
+  const { data: settings, isLoading } = useGetCompanySettings();
   const updateMutation = useUpdateCompanySettings();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -47,6 +49,8 @@ export default function CompanySettings() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateMutation.mutateAsync({ data: form as any });
+    await queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
+    await queryClient.invalidateQueries({ queryKey: ["/api/settings/company"] });
     toast({ title: "Company settings saved" });
   };
 

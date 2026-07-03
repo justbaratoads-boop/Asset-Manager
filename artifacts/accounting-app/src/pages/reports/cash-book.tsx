@@ -22,7 +22,10 @@ const ALL_COLUMNS = [
 ];
 
 export default function CashBook() {
-  const { fy, globalFrom: from, globalTo: to } = useFY();
+  const { fy, globalFrom, globalTo } = useFY();
+  const [from, setFrom] = useState(globalFrom);
+  const [to, setTo] = useState(globalTo);
+  const [ledgerId, setLedgerId] = useState<string>("all");
   
   
   const [, setLocation] = useLocation();
@@ -38,6 +41,12 @@ export default function CashBook() {
         <div className="flex flex-wrap items-center gap-2">
           
           
+          <div className="flex items-center gap-2">
+            <Label className="text-xs">From</Label>
+            <Input type="date" value={from || ""} onChange={e => setFrom(e.target.value)} className="h-8 w-36 text-xs" />
+            <Label className="text-xs">To</Label>
+            <Input type="date" value={to || ""} onChange={e => setTo(e.target.value)} className="h-8 w-36 text-xs" />
+          </div>
           <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
           <ExportButtons data={entries} columns={visibleColumns} filename={`cash-book-${from}-${to}`} title="Cash Book" />
         </div>

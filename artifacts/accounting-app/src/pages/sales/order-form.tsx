@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, AlertTriangle } from "lucide-react";
+import { getGstRateForDate } from "../../lib/gst";
+
 import { UnitSelect } from "@/components/unit-select";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
 import { QuickAddItemDialog } from "@/components/quick-add-item-dialog";
@@ -28,11 +30,11 @@ interface OrderItem {
   itemName: string;
   description?: string;
   hsnCode: string;
-  quantity: number;
+  quantity: number | string;
   unit: string;
-  rate: number;
-  discountPct: number;
-  gstPct: number;
+  rate: number | string;
+  discountPct: number | string;
+  gstPct: number | string;
   gstLocked: boolean;
   gstInclusive: boolean;
   taxableAmount: number;
@@ -57,8 +59,8 @@ function calcItem(item: Partial<OrderItem>): OrderItem {
     itemName: item.itemName || "",
     description: item.description || "",
     hsnCode: item.hsnCode || "",
-    quantity: qty, unit: item.unit || "pcs", rate,
-    discountPct: discPct, gstPct,
+    quantity: typeof item.quantity === 'string' && item.quantity.endsWith('.') ? item.quantity : qty, unit: item.unit || "pcs", rate: typeof item.rate === 'string' && item.rate.endsWith('.') ? item.rate : rate,
+    discountPct: typeof item.discountPct === 'string' && item.discountPct.endsWith('.') ? item.discountPct : discPct, gstPct,
     gstLocked: item.gstLocked ?? false,
     gstInclusive,
     taxableAmount: taxable,
@@ -92,7 +94,7 @@ export default function OrderForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateOrder();
-  const { data: parties = [] } = useListParties({ type: "customer" });
+  const { data: parties = [] } = useListParties();
   const { data: stockItems = [] } = useListStockItems({});
   const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
@@ -167,7 +169,7 @@ export default function OrderForm() {
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
-      const gstPct = si.gstApplicable === "true" ? Number(si.gstRate) || 0 : 0;
+      const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
       setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }); return u; });
     }
   };
@@ -179,7 +181,7 @@ export default function OrderForm() {
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
-      const gstPct = newItem.gstApplicable === "true" ? Number(newItem.gstRate) || 0 : 0;
+      const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
       setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calcItem({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true }); return u; });
     }
   };

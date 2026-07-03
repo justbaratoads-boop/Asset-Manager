@@ -15,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Lock, AlertTriangle } from "lucide-react";
+import { getGstRateForDate } from "../../lib/gst";
+
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
 import { OtherChargesSection, type OtherCharge } from "@/components/other-charges-section";
@@ -23,13 +25,16 @@ interface NoteItem {
   stockItemId?: number;
   itemName: string;
   hsnCode: string;
-  quantity: number;
+  quantity: number | string;
   unit: string;
-  rate: number;
-  discountPct: number;
-  gstPct: number;
+  rate: number | string;
+  discountPct: number | string;
+  gstPct: number | string;
   gstLocked: boolean;
+  gstInclusive: boolean;
+  discountAmount: number;
   taxableAmount: number;
+  gstAmount: number;
   cgst: number;
   sgst: number;
   igst: number;
@@ -41,21 +46,54 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
   const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const gstPct = Number(item.gstPct) || 0;
-  const taxable = qty * rate * (1 - discPct / 100);
-  const gst = taxable * (gstPct / 100);
+  const gstInclusive = item.gstInclusive ?? false;
+  
+  const subtotal = qty * rate;
+  const discountAmount = subtotal * (discPct / 100);
+  const grossAmount = subtotal - discountAmount;
+  
+  const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
+  const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
+  
+  const cgst = isInterstate ? 0 : gstAmount / 2;
+  const sgst = isInterstate ? 0 : gstAmount / 2;
+  const igst = isInterstate ? gstAmount : 0;
+  const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
+
   return {
     stockItemId: item.stockItemId,
     itemName: item.itemName || "",
     hsnCode: item.hsnCode || "",
-    quantity: qty, unit: item.unit || "pcs", rate,
-    discountPct: discPct, gstPct,
+    quantity: typeof item.quantity === 'string' && item.quantity.endsWith('.') ? item.quantity : qty,
+    unit: item.unit || "pcs",
+    rate: typeof item.rate === 'string' && item.rate.endsWith('.') ? item.rate : rate,
+    discountPct: typeof item.discountPct === 'string' && item.discountPct.endsWith('.') ? item.discountPct : discPct,
+    gstPct,
     gstLocked: item.gstLocked || false,
+    gstInclusive,
+    discountAmount,
     taxableAmount: taxable,
-    cgst: isInterstate ? 0 : gst / 2,
-    sgst: isInterstate ? 0 : gst / 2,
-    igst: isInterstate ? gst : 0,
-    total: taxable + gst,
+    gstAmount,
+    cgst,
+    sgst,
+    igst,
+    total,
   };
+}
+
+function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex rounded overflow-hidden border text-xs font-medium">
+      <button type="button" onClick={() => onChange(false)}
+        className={`px-1.5 py-0.5 transition-colors ${!value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        Ex
+      </button>
+      <button type="button" onClick={() => onChange(true)}
+        className={`px-1.5 py-0.5 border-l transition-colors ${value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        In
+      </button>
+    </div>
+  );
 }
 
 export default function DebitNoteForm() {
@@ -78,7 +116,7 @@ export default function DebitNoteForm() {
   const [date, setDate] = useState(today());
   const [reason, setReason] = useState("");
   const [isInterstate, setIsInterstate] = useState(false);
-  const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstLocked: false }, false)]);
+  const [items, setItems] = useState<NoteItem[]>([calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstLocked: false, gstInclusive: false }, false)]);
   const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -129,8 +167,7 @@ export default function DebitNoteForm() {
         rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0,
         gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId,
-      }, interstate)));
+        gstLocked: !!i.stockItemId, gstInclusive: false, }, interstate)));
     }
     if (n.otherCharges) {
       try { setCharges(JSON.parse(n.otherCharges)); } catch { setCharges([]); }
@@ -165,7 +202,7 @@ export default function DebitNoteForm() {
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
-      const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? Number(si.gstRate) || 0 : 0;
+      const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? getGstRateForDate(si, date) : 0;
       setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }, isInterstate); return u; });
     }
   };
@@ -226,7 +263,20 @@ export default function DebitNoteForm() {
     });
   };
 
-  const blankItem = () => calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstLocked: false }, isInterstate);
+  const blankItem = () => calcItem({ itemName: "", unit: "pcs", quantity: 0, rate: 0, gstPct: 0, gstLocked: false, gstInclusive: false }, isInterstate);
+
+  // Re-calculate GST rates if invoice date changes
+  useEffect(() => {
+    if (items.some(it => it.stockItemId)) {
+      setItems(prev => prev.map(it => {
+        if (!it.stockItemId) return it;
+        const si = (stockItems as any[] || []).find(s => s.id === it.stockItemId);
+        if (!si) return it;
+        const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? getGstRateForDate(si, date) : 0;
+        return calcItem({ ...it, gstPct }, isInterstate);
+      }));
+    }
+  }, [date, stockItems, isInterstate]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -291,7 +341,7 @@ export default function DebitNoteForm() {
                     </p>
                   )}
                   {item.stockItemId && (() => {
-                    const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                    const b = Array.isArray(batches) ? batches.find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId)) : undefined;
                     if (!b) return null;
                     const avail = Number(b.physicalStock) - Number(b.reservedStock);
                     const warn = item.quantity > 0 && item.quantity > avail;
@@ -370,7 +420,7 @@ export default function DebitNoteForm() {
                           </p>
                         )}
                         {item.stockItemId && (() => {
-                          const b = (batches as any[]).find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId));
+                          const b = Array.isArray(batches) ? batches.find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId)) : undefined;
                           if (!b) return null;
                           const avail = Number(b.physicalStock) - Number(b.reservedStock);
                           const warn = item.quantity > 0 && item.quantity > avail;
@@ -384,7 +434,7 @@ export default function DebitNoteForm() {
                         })()}
                       </TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                      <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" disabled={true} /></TableCell>
+                      <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" disabled={!!item.stockItemId && item.unit !== "n/a"} /></TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -423,11 +473,12 @@ export default function DebitNoteForm() {
               <div className="flex items-center gap-2">
                 {grandTotal % 1 !== 0 && grandTotal > 0 && (
                   <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0" onClick={() => {
-                    const diff = Math.ceil(grandTotal) - grandTotal;
-                    if (diff > 0) {
-                      setCharges(prev => [...prev, { name: "Round Off", amount: String(diff.toFixed(2)), type: "add" }]);
-                    }
-                  }}>↑ Round Up</Button>
+                    const rounded = Math.round(grandTotal);
+                      const diff = rounded - grandTotal;
+                      if (diff !== 0) {
+                        setCharges(prev => [...prev, { name: "Round Off", amount: String(Math.abs(diff).toFixed(2)), type: diff > 0 ? "add" : "deduct" }]);
+                      }
+                    }}>Auto Round Off</Button>
                 )}
                 <span className="text-red-600">{formatCurrency(grandTotal)}</span>
               </div>

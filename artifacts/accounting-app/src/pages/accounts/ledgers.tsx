@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatCurrency, INDIAN_STATES } from "@/lib/format";
 import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye, Lock, Info } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -602,16 +603,31 @@ export default function LedgerAccounts() {
 
                 {["Indirect Expenses", "Indirect Incomes", "Direct Expenses", "Direct Incomes", "Fixed Assets", "Purchase Accounts", "Sales Accounts"].includes(ledgerForm.group) && (
                   <div className="border-t pt-3 space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">GST Settings</p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Switch
-                        checked={(ledgerForm as any).isGstApplicable}
-                        onCheckedChange={c => setLedgerForm(p => ({ ...p, isGstApplicable: c }))}
-                      />
-                      <Label>Is GST Applicable?</Label>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Statutory Details</p>
+                    <div className="space-y-2">
+                      <Label>GST Calculation Method</Label>
+                      <RadioGroup
+                        value={(ledgerForm as any).gstCalculationMethod || "none"}
+                        onValueChange={(val) => setLedgerForm((p: any) => ({ ...p, gstCalculationMethod: val }))}
+                        className="flex flex-col gap-2 mt-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="none" id="r-none" />
+                          <Label htmlFor="r-none" className="font-normal cursor-pointer">Not Applicable</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="assessable_value" id="r-assessable" />
+                          <Label htmlFor="r-assessable" className="font-normal cursor-pointer">GST applicable on assessable value (calculate on invoice value)</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="flat_rate" id="r-flat" />
+                          <Label htmlFor="r-flat" className="font-normal cursor-pointer">GST applicable on flat rate</Label>
+                        </div>
+                      </RadioGroup>
                     </div>
-                    {(ledgerForm as any).isGstApplicable && (
-                      <div className="grid grid-cols-2 gap-2">
+
+                    {((ledgerForm as any).gstCalculationMethod === "flat_rate" || (ledgerForm as any).isGstApplicable) && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
                         <div className="space-y-1">
                           <Label>GST Rate (%)</Label>
                           <Input

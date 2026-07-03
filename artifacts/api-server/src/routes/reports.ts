@@ -7,7 +7,7 @@ import {
   ledgersTable, stockItemsTable, stockBatchesTable, ordersTable,
   creditNotesTable, debitNotesTable, creditNoteItemsTable, debitNoteItemsTable
 , partiesTable } from "@workspace/db/schema";
-import { eq, and, gte, lte, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, sql, inArray, isNull, ilike } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();
@@ -523,7 +523,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
   };
   for (const p of saleInvoicePayments) {
     add(modeToLedgerId(p.mode), "dr", Number(p.amount));
-    add(LEDGER.ar, "cr", Number(p.amount));
+    add(p.partyId ? 1000000 + p.partyId : LEDGER.ar, "cr", Number(p.amount));
   }
 
   // 9. Inline purchase-invoice payments: Dr AP, Cr Cash/Bank
@@ -647,11 +647,11 @@ router.get("/reports/purchase-register", authMiddleware, async (req, res) => {
 
 router.get("/reports/cash-book", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
-  const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.group, "Cash-in-Hand"));
+  const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(ilike(ledgersTable.group, "%cash%"));
   const cashLedgerIds = cashLedgers.map(l => l.id);
 
-  const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), eq(paymentsTable.paymentMode, "cash")];
-  const rctCond: any[] = [eq(receiptsTable.isDeleted, "false"), eq(receiptsTable.paymentMode, "cash")];
+  const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), inArray(paymentsTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
+  const rctCond: any[] = [eq(receiptsTable.isDeleted, "false"), inArray(receiptsTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
   const saleInvPmtCond: any[] = [eq(saleInvoicePaymentsTable.mode, "cash"), eq(saleInvoicesTable.isDeleted, "false")];
   const purInvPmtCond: any[] = [eq(purchaseInvoicePaymentsTable.mode, "cash"), eq(purchaseInvoicesTable.isDeleted, "false")];
   const jeCond: any[] = [eq(journalEntriesTable.isDeleted, "false"), inArray(journalLinesTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
@@ -726,7 +726,7 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
 router.get("/reports/bank-book", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
   
-  const bankLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(eq(ledgersTable.group, "Bank Accounts"));
+  const bankLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(ilike(ledgersTable.group, "%bank%"));
   const bankLedgerIds = bankLedgers.map(l => l.id);
   
   if (bankLedgerIds.length === 0) {
@@ -999,7 +999,7 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
   for (const p of saleInvoicePayments) {
     const baseTx = { id: null, date: p.date, type: "Receipt", number: p.ref, narration: `Collection for ${p.ref}` };
     addTx(modeToLedgerId(p.mode), "dr", Number(p.amount), baseTx);
-    addTx(LEDGER.ar, "cr", Number(p.amount), baseTx);
+    addTx(p.partyId ? 1000000 + p.partyId : LEDGER.ar, "cr", Number(p.amount), baseTx);
   }
 
   for (const p of purchaseInvoicePayments) {

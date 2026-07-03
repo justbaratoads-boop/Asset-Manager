@@ -318,14 +318,16 @@ export default function ChartOfAccounts() {
                               </TableCell>
                               <TableCell onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-end gap-1">
-                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditGroup(g)}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
                                   {g.isSystem !== "true" && (
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteGroupId(g.id)}>
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
+      <>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditGroup(g)}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteGroupId(g.id)}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </>
+    )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -364,8 +366,12 @@ export default function ChartOfAccounts() {
                                               <td className="px-3 py-2.5 text-right text-muted-foreground">{formatCurrency(l.openingBalance)}</td>
                                               <td className="px-3 py-2.5">
                                                 <div className="flex justify-end gap-1">
-                                                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditAccount(l)}><Pencil className="h-3 w-3" /></Button>
-                                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => setDeleteAccountId(l.id)}><Trash2 className="h-3 w-3" /></Button>
+                                                  {l.isSystem !== "true" && (
+      <>
+        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditAccount(l)}><Pencil className="h-3 w-3" /></Button>
+        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => setDeleteAccountId(l.id)}><Trash2 className="h-3 w-3" /></Button>
+      </>
+    )}
                                                 </div>
                                               </td>
                                             </tr>

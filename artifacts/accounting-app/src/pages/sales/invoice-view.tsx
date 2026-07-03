@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useGetSaleInvoice, useGetCompanySettings, getGetSaleInvoiceQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useFetch } from "@/hooks/use-fetch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,7 +79,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
   const itemRows = items.map((item: any, i: number) => `
     <tr>
       <td>${i + 1}</td>
-      <td>${item.itemName || ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
+      <td>${item.itemName || ""}${item.batchId ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${getBatchName(item.batchId, batches)}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
       ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
       <td class="tr">${fmtN(itemBaseRate(item))}</td>
@@ -97,7 +98,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
       ? `<div class="tot-row"><span>SGST</span><span>${fmtN(inv?.totalSgst)}</span></div>` : "",
     Number(inv?.totalIgst) > 0
       ? `<div class="tot-row"><span>IGST</span><span>${fmtN(inv?.totalIgst)}</span></div>` : "",
-    ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || "Other"}</span><span>${fmtN(c.amount)}</span></div>`),
+    ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
     `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
     `<div class="tot-row paid"><span>Paid</span><span>${fmtN(inv?.amountPaid)}</span></div>`,
     Number(inv?.balanceDue) > 0
@@ -117,7 +118,8 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
       <div class="sig-blk"><div class="sig-line"></div><div class="sig-lbl">For ${coName}<br>Authorised Signatory</div></div>
     </div>` : "";
 
-  const termsHtml = terms ? `<div class="terms"><div class="sec-label">Terms &amp; Conditions</div><div>${terms}</div></div>` : "";
+  const notesHtml = inv?.notes ? `<div class="terms"><div class="sec-label">Notes / Additional Details</div><div style="white-space: pre-wrap;">${inv.notes}</div></div>` : "";
+  const termsHtml = terms ? `<div class="terms"><div class="sec-label">Terms &amp; Conditions</div><div style="white-space: pre-wrap;">${terms}</div></div>` : "";
   const footerHtml = showFooter && co?.billFooter ? `<div class="bill-ftr">${co.billFooter}</div>` : "";
 
   return `<div class="invoice">
@@ -140,7 +142,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
     <tbody>${itemRows}</tbody>
   </table>
   <div class="inv-footer">${bankHtml}<div class="totals">${totalsHtml}</div></div>
-  ${termsHtml}${sigHtml}${footerHtml}
+  ${notesHtml}${termsHtml}${sigHtml}${footerHtml}
 </div>`;
 }
 
@@ -406,7 +408,8 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
                 <td className="py-2 pl-4 sm:pl-0">{i + 1}</td>
                 <td className="py-2">
                   <div>{item.itemName}</div>
-                  {item.description && <div className="text-xs text-gray-500 italic mt-0.5">{item.description}</div>}
+                    {item.batchId && <div className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</div>}
+                    {item.description && <div className="text-xs text-gray-500 italic mt-0.5">{item.description}</div>}
                 </td>
                 {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
                 <td className="py-2 text-right">{item.quantity} {item.unit}</td>
@@ -440,7 +443,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
             let parsedCharges: {name: string; amount: number}[] = [];
             try { parsedCharges = JSON.parse(invoice.otherCharges || "[]"); } catch {}
             return parsedCharges.map((c: any, i: number) => (
-              <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || "Other Charges"}</span><span>{formatCurrency(Number(c.amount))}</span></div>
+              <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || "Other Charges"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
             ));
           })()}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
@@ -484,7 +487,15 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
         </div>
       )}
 
-      {/* Terms */}
+      {/* Notes */}
+        {invoice?.notes && (
+          <div className="mt-4 pt-3 border-t">
+            <p className="text-xs font-semibold text-gray-500 mb-1">Notes / Additional Details</p>
+            <p className="text-xs text-gray-500 whitespace-pre-line">{invoice.notes}</p>
+          </div>
+        )}
+
+        {/* Terms */}
       {termsAndConditions && (
         <div className="mt-4 pt-3 border-t">
           <p className="text-xs font-semibold text-gray-500 mb-1">Terms & Conditions</p>
@@ -630,13 +641,14 @@ export default function SaleInvoiceView() {
   const { toast } = useToast();
   const { data: invoice, isLoading } = useGetSaleInvoice(id, { query: { enabled: !!id } });
   const { data: company } = useGetCompanySettings();
+  const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
 
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [copies, setCopies] = useState("1");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const ps = loadPrintSettings();
+  const [ps, setPs] = useState(loadPrintSettings());
   const defaultCopies = ps.invoiceCopies || "1";
   const copyLabelsStr = ps.copyLabels || "Original, Duplicate, Triplicate";
   const copyLabels = copyLabelsStr.split(",").map((s: string) => s.trim());
@@ -746,6 +758,12 @@ export default function SaleInvoiceView() {
       URL.revokeObjectURL(previewBlobUrl);
       setPreviewBlobUrl(null);
     }
+  };
+
+  const handleUpdatePs = (key: string, value: string) => {
+    const updated = { ...ps, [key]: value };
+    setPs(updated);
+    localStorage.setItem(PRINT_SETTINGS_KEY, JSON.stringify(updated));
   };
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>;

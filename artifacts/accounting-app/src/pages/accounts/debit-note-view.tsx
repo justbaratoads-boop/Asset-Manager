@@ -116,9 +116,16 @@ export default function DebitNoteView() {
             {(() => {
               let parsedCharges: any[] = [];
               try { parsedCharges = JSON.parse(n.otherCharges || "[]"); } catch {}
-              return parsedCharges.map((c, i) => (
-                <div key={i} className="flex justify-between"><span className="text-gray-600">{c.ledgerName || c.name || "Other Charges"}</span><span>{formatCurrency(Number(c.amount))}</span></div>
-              ));
+              return parsedCharges.map((c, i) => {
+                  const amt = Number(c.amount) || 0;
+                  const isDeduct = c.type === "deduct";
+                  return (
+                    <div key={i} className="flex justify-between">
+                      <span className="text-gray-600">{c.ledgerName || c.name || "Other Charges"}</span>
+                      <span className={isDeduct ? "text-red-600" : ""}>{isDeduct ? "- " : "+ "}{formatCurrency(amt)}</span>
+                    </div>
+                  );
+                });
             })()}
             <div className="flex justify-between font-bold text-base border-t pt-2">
               <span>Debit Amount</span>

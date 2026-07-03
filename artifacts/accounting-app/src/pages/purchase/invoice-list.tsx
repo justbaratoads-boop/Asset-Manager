@@ -42,7 +42,7 @@ const STATUSES = ["all", "confirmed", "partial", "paid", "cancelled"];
 function getBatchName(batchId: number | null | undefined, batches: any[]): string {
   if (!batchId) return "";
   const b = (batches || []).find((b: any) => b.id === Number(batchId));
-  return b ? b.batchCode + (b.expiryDate ? ` · exp ${b.expiryDate}` : "") : `#${batchId}`;
+  return b ? b.name + (b.expiryDate ? ` · exp ${b.expiryDate}` : "") : `#${batchId}`;
 }
 
 function isEdited(createdAt: string | null, updatedAt: string | null) {
