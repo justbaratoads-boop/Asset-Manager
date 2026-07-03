@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Lock, AlertTriangle } from "lucide-react";
-import { getGstRateForDate } from "../../lib/gst";
+import { getGstRateForDate, computeInvoice } from "../../lib/gst";
 
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";

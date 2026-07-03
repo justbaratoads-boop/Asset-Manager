@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Send, Save, Lock, AlertTriangle } from "lucide-react";
-import { getGstRateForDate } from "../../lib/gst";
+import { getGstRateForDate, computeInvoice } from "../../lib/gst";
 
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { UnitSelect } from "@/components/unit-select";

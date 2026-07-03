@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save, AlertTriangle } from "lucide-react";
-import { getGstRateForDate } from "../../lib/gst";
+import { getGstRateForDate, computeInvoice } from "../../lib/gst";
 
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
@@ -127,15 +127,8 @@ export default function PurchaseInvoiceForm() {
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
   const isInterstate = selectedParty?.isOutOfState === "true" || selectedParty?.isOutOfState === true;
 
-  const totals = {
-    subtotal: items.reduce((s, i) => s + i.quantity * i.rate, 0),
-    discount: items.reduce((s, i) => s + i.discountAmount, 0),
-    taxable: items.reduce((s, i) => s + i.taxableAmount, 0),
-    cgst: items.reduce((s, i) => s + i.cgst, 0),
-    sgst: items.reduce((s, i) => s + i.sgst, 0),
-    igst: items.reduce((s, i) => s + i.igst, 0),
-    grand: items.reduce((s, i) => s + i.total, 0),
-  };
+  const { items: computedItems, totals: cTotals } = computeInvoice(items, charges, isInterstate, enableDualLedger ? !items.some(i => i.isTaxLiability) : false);
+  const totals = { ...cTotals, grand: cTotals.grand - cTotals.chargesTotal };
 
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
