@@ -155,7 +155,7 @@ export default function LedgerAccounts() {
   useEffect(() => { setPage(1); }, [search, groupFilter, sourceFilter]);
 
   const unified: UnifiedAccount[] = [
-    ...(ledgers as any[]).map((l: any): UnifiedAccount => ({
+    ...(ledgers as any[]).filter((l: any) => l.id < 1000000).map((l: any): UnifiedAccount => ({
       kind: "ledger", id: l.id, name: l.name, group: l.group, nature: l.nature,
       openingBalance: Number(l.openingBalance), isSystem: l.isSystem === "true", raw: l,
     })),
