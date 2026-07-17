@@ -57,6 +57,7 @@ export const stockTransactionsTable = pgTable("stock_transactions", {
   balanceAfter: numeric("balance_after", { precision: 15, scale: 2 }).notNull(),
   reference: text("reference"),
   reason: text("reason"),
+  isKaccha: boolean("is_kaccha").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
