@@ -1,0 +1,13 @@
+const { Pool } = require('pg'); 
+const pool = new Pool({ connectionString: 'postgresql://postgres.gkezrzbxcsgpguqsfhkq:Starlord_098@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres' }); 
+async function run() { 
+  try { 
+    await pool.query('TRUNCATE TABLE parties, stock_batches, stock_categories, stock_items, stock_transactions, stock_item_gst_history CASCADE;'); 
+    await pool.query("DELETE FROM ledgers WHERE is_system = 'false'"); 
+    console.log('Master data cleared successfully!'); 
+  } catch(err) { 
+    console.error(err); 
+  } 
+  process.exit(0); 
+} 
+run();

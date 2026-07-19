@@ -1,10 +1,11 @@
 import { ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { MobileNav } from "./mobile-nav";
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen flex w-full bg-muted/40">
+    <div className="min-h-screen flex w-full bg-muted/40 pb-16 md:pb-0">
       <div className="hidden md:flex flex-shrink-0">
         <Sidebar />
       </div>
@@ -14,6 +15,7 @@ export function Layout({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+      <MobileNav />
     </div>
   );
 }
