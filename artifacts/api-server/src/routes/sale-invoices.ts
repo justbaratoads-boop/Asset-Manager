@@ -200,7 +200,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
   }
   
   if (pakkaItems.length > 0) {
-    const pInv = await createInvoicePart(pakkaItems, false, data.payments || [], data.amountPaid, data.balanceDue, data.grandTotal);
+    const pInv = await createInvoicePart(pakkaItems, false, data.payments || [], data.amountPaid, data.balanceDue, data.pakkaGrandTotal ?? data.grandTotal);
     finalInvoice = pInv;
   }
 
