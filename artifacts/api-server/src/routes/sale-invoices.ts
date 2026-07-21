@@ -240,7 +240,24 @@ router.get("/sale-invoices/:id", authMiddleware, async (req, res) => {
 
 router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
+  
   const data = req.body;
+  
+  const [existingInvoice] = await db.select().from(saleInvoicesTable).where(eq(saleInvoicesTable.id, Number(req.params.id))).limit(1);
+  if (!existingInvoice) return res.status(404).json({ error: "Not found" });
+
+  const settings = await db.select().from(companySettingsTable).limit(1);
+  const enableDualLedger = settings[0]?.enableDualLedger === "true" || settings[0]?.enableDualLedger === true;
+
+  if (enableDualLedger && data.items?.length) {
+    const isKacchaInvoice = existingInvoice.isKaccha;
+    const hasInvalidItems = data.items.some((i: any) => isKacchaInvoice ? i.isTaxLiability !== false : i.isTaxLiability === false);
+    
+    if (hasInvalidItems) {
+      return res.status(400).json({ error: isKacchaInvoice ? "Cannot add Pakka (taxable) items to a Kaccha bill." : "Cannot add Kaccha (non-taxable) items to a Pakka bill." });
+    }
+  }
+
 
   // Credit limit check — exclude this invoice's own existing balance when recalculating
   if (data.partyId && Number(data.balanceDue) > 0) {

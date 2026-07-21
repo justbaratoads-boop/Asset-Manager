@@ -44,6 +44,7 @@ interface Item {
   sgst: number;
   igst: number;
   total: number;
+  isTaxLiability?: boolean;
 }
 
 const PAYMENT_MODES = [
@@ -63,7 +64,7 @@ function calc(item: Partial<Item>, isInterstate: boolean): Item {
   const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
   const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
-  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, discountAmount, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, gstAmount, cgst: isInterstate ? 0 : gstAmount / 2, sgst: isInterstate ? 0 : gstAmount / 2, igst: isInterstate ? gstAmount : 0, total, stockItemId: item.stockItemId, batchId: item.batchId };
+  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, discountAmount, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, gstAmount, cgst: isInterstate ? 0 : gstAmount / 2, sgst: isInterstate ? 0 : gstAmount / 2, igst: isInterstate ? gstAmount : 0, total, stockItemId: item.stockItemId, batchId: item.batchId, isTaxLiability: item.isTaxLiability };
 }
 
 function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
@@ -184,19 +185,19 @@ export default function PurchaseInvoiceForm() {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true }, isInterstate); return u; });
     }
   };
 
   const clearItem = (index: number) => {
-    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false }, isInterstate); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false, isTaxLiability: true }, isInterstate); return u; });
   };
 
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
       const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calc({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true, isTaxLiability: newItem.isTaxLiability ?? true }, isInterstate); return u; });
     }
   };
 
