@@ -233,7 +233,7 @@ router.get("/sale-invoices/:id", authMiddleware, async (req, res) => {
     totalSgst: Number(invoice.totalSgst),
     totalIgst: Number(invoice.totalIgst),
     totalGst: Number(invoice.totalGst),
-    items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), cgst: Number(i.cgst), sgst: Number(i.sgst), igst: Number(i.igst) })),
+    items: items.map(i => ({ ...i, quantity: (isNaN(Number(i.quantity)) ? 0 : Number(i.quantity)), rate: (isNaN(Number(i.rate)) ? 0 : Number(i.rate)), discountPct: (isNaN(Number(i.discountPct)) ? 0 : Number(i.discountPct)), gstPct: (isNaN(Number(i.gstPct)) ? 0 : Number(i.gstPct)), taxableAmount: (isNaN(Number(i.taxableAmount)) ? 0 : Number(i.taxableAmount)), total: (isNaN(Number(i.total)) ? 0 : Number(i.total)), cgst: (isNaN(Number(i.cgst)) ? 0 : Number(i.cgst)), sgst: (isNaN(Number(i.sgst)) ? 0 : Number(i.sgst)), igst: (isNaN(Number(i.igst)) ? 0 : Number(i.igst)) })),
     payments: payments.map(p => ({ ...p, amount: Number(p.amount) })),
   });
 });
