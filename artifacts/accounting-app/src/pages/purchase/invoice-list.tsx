@@ -470,7 +470,7 @@ export default function PurchaseInvoiceList() {
       </div>
 
       {/* Mobile card list */}
-      <div className="space-y-3">
+      <div className="md:hidden space-y-3">
         {isLoading ? (
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
@@ -523,12 +523,81 @@ export default function PurchaseInvoiceList() {
           </Card>
         ))}
       </div>
-      <div className="mt-4">
+      <div className="md:hidden">
         <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
 
       {/* Desktop table */}
-      
+      <Card className="hidden md:block">
+        <CardContent className="p-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Invoice#</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Supplier Inv#</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              ) : list.length === 0 ? (
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No purchase invoices</TableCell></TableRow>
+              ) : paginated.map((inv: any) => (
+                <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setViewId(inv.id)}>
+                  <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
+                  <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>
+                  <TableCell className="font-medium">{inv.partyName}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{inv.supplierInvoiceNumber || "-"}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>
+                  <TableCell className="text-right text-green-600">{formatCurrency(inv.amountPaid)}</TableCell>
+                  <TableCell className="text-right text-red-600">{formatCurrency(inv.balanceDue)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <StatusBadge status={inv.status} />
+                      {isEdited(inv.createdAt, inv.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
+                    </div>
+                  </TableCell>
+                  <TableCell onClick={e => e.stopPropagation()}>
+                    <div className="flex gap-1 justify-end">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewId(inv.id)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Link href={`/purchase/invoices/${inv.id}/edit`}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                      </Link>
+                      {Number(inv.balanceDue) > 0 && inv.status !== "cancelled" && (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" title="Record Payment" onClick={() => setPayInvoice(inv)}>
+                          <IndianRupee className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {inv.status === "cancelled" ? (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Restore invoice" onClick={() => handleUncancel(inv.id)}>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-orange-600" title="Cancel invoice" onClick={() => setCancelId(inv.id)}>
+                          <Ban className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(inv.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        </CardContent>
+      </Card>
 
       {payInvoice && (
         <PayDialog
