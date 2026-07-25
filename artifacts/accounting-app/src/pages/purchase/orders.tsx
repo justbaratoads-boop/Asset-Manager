@@ -503,7 +503,7 @@ export default function PurchaseOrderList() {
       </div>
 
       {/* Mobile card list */}
-      <div className="md:hidden space-y-3">
+      <div className="space-y-3">
         {isLoading ? (
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
@@ -553,77 +553,12 @@ export default function PurchaseOrderList() {
           </Card>
         ))}
       </div>
-      <div className="md:hidden">
+      <div className="mt-4">
         <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
 
       {/* Desktop table */}
-      <Card className="hidden md:block">
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>PO#</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-              ) : list.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No purchase orders</TableCell></TableRow>
-              ) : paginated.map((o: any) => (
-                <TableRow key={o.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setViewId(o.id)}>
-                  <TableCell className="font-mono text-sm">{o.poNumber}</TableCell>
-                  <TableCell className="text-sm">{formatDate(o.date)}</TableCell>
-                  <TableCell className="font-medium">{o.partyName}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(o.grandTotal)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <Badge variant="outline" className={`capitalize text-xs ${statusStyles[o.status] || ""}`}>
-                        {statusLabels[o.status] || o.status}
-                      </Badge>
-                      {isEdited(o.createdAt, o.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell onClick={e => e.stopPropagation()}>
-                    <div className="flex gap-1 justify-end">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewId(o.id)}>
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Link href={`/purchase/orders/${o.id}/edit`}>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
-                      </Link>
-                      {canReceive(o.status) && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" title="Receive Goods" onClick={() => setReceiveId(o.id)}>
-                          <PackageCheck className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {o.status === "cancelled" ? (
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Restore order" onClick={() => handleUncancel(o.id)}>
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : (
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-orange-600" title="Cancel order" onClick={() => setCancelId(o.id)}>
-                          <Ban className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(o.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
-        </CardContent>
-      </Card>
+      
 
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
       <ConfirmDialog open={!!cancelId} onOpenChange={o => !o && setCancelId(null)} onConfirm={handleCancel} title="Cancel purchase order?" description="This will mark the order as cancelled. You can restore it later." confirmLabel="Cancel Order" />

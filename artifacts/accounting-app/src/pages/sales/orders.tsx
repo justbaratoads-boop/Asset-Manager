@@ -154,7 +154,7 @@ export default function OrderList() {
       </div>
 
       {/* Mobile card list */}
-      <div className="md:hidden space-y-3">
+      <div className="space-y-3">
         {isLoading ? (
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
@@ -199,68 +199,12 @@ export default function OrderList() {
           </Card>
         ))}
       </div>
-      <div className="md:hidden">
+      <div className="mt-4">
         <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
 
       {/* Desktop table */}
-      <Card className="hidden md:block">
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order#</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Party</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-              ) : list.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No orders found</TableCell></TableRow>
-              ) : paginated.map((order: any) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-mono text-sm">{order.orderNumber}</TableCell>
-                  <TableCell className="text-sm">{formatDate(order.date)}</TableCell>
-                  <TableCell className="font-medium">{order.partyName}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(order.grandTotal)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="outline" className={`capitalize ${statusColors[order.status] || ""}`}>{order.status}</Badge>
-                      {isEdited(order.createdAt, order.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Link href={`/sales/orders/${order.id}`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
-                      {order.status === "pending" && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-600" title="Create Invoice" onClick={() => setLocation(`/sales/invoices/new?fromOrder=${order.id}`)}>
-                          <FileText className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {order.status === "cancelled" ? (
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Restore order" onClick={() => handleUncancel(order.id)}>
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : (
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-orange-600" title="Cancel order" onClick={() => setCancelId(order.id)}>
-                          <Ban className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(order.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
-        </CardContent>
-      </Card>
+      
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
       <ConfirmDialog open={!!cancelId} onOpenChange={o => !o && setCancelId(null)} onConfirm={handleCancel} title="Cancel order?" description="This will mark the order as cancelled. You can restore it later." confirmLabel="Cancel Order" />
     </div>

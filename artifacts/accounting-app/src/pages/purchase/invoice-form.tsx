@@ -225,7 +225,9 @@ export default function PurchaseInvoiceForm() {
       subtotal: totals.subtotal, totalTaxable: totals.taxable,
       totalCgst: totals.cgst, totalSgst: totals.sgst, totalIgst: totals.igst,
       grandTotal, amountPaid, balanceDue,
-      notes, items, payments,
+      notes,
+        items: computedItems,
+        payments,
       otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
     };
   };

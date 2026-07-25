@@ -135,7 +135,7 @@ export default function SaleInvoiceList() {
       </div>
 
       {/* Mobile card list */}
-      <div className="md:hidden space-y-3">
+      <div className="space-y-3">
         {isLoading ? (
           <div className="text-center text-muted-foreground py-10">Loading...</div>
         ) : list.length === 0 ? (
@@ -182,59 +182,12 @@ export default function SaleInvoiceList() {
           </Card>
         ))}
       </div>
-      <div className="md:hidden">
+      <div className="mt-4">
         <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
 
       {/* Desktop table */}
-      <Card className="hidden md:block">
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice#</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Party</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-24"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-              ) : list.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No invoices found</TableCell></TableRow>
-              ) : paginated.map((inv: any) => (
-                <TableRow key={inv.id}>
-                  <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
-                  <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>
-                  <TableCell className="font-medium">{inv.partyName}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>
-                  <TableCell className="text-right text-green-600">{formatCurrency(inv.amountPaid)}</TableCell>
-                  <TableCell className="text-right text-red-600">{formatCurrency(inv.balanceDue)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <StatusBadge status={inv.status} />
-                      {isEdited(inv.createdAt, inv.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">Edited</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Link href={`/sales/invoices/${inv.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
-                      <Link href={`/sales/invoices/${inv.id}`}><Button size="icon" variant="ghost" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button></Link>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(inv.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
-        </CardContent>
-      </Card>
+      
 
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} title="Delete Invoice?" description="This will permanently delete the invoice." onConfirm={handleDelete} loading={deleteMutation.isPending} />
     </div>
