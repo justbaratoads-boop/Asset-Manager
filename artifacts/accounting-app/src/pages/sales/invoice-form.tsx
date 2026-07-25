@@ -174,8 +174,8 @@ export default function SaleInvoiceForm() {
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
 
-  const pakkaGrandTotal = items.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0) + chargesTotal;
-  const kacchaGrandTotal = items.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
+  const pakkaGrandTotal = computedItems.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0) + chargesTotal;
+  const kacchaGrandTotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
 
   const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const kacchaAmountPaid = kacchaPayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
