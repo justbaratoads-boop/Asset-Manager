@@ -39,6 +39,21 @@ app.use((req, res, next) => {
   next();
 });
 
+import { tenantContext } from "@workspace/db";
+app.use((req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  let businessId: number | null = null;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const jwt = require("jsonwebtoken");
+      const JWT_SECRET = process.env["SESSION_SECRET"] || "dev-secret-fallback";
+      const payload = jwt.verify(authHeader.slice(7), JWT_SECRET);
+      businessId = payload.businessId || null;
+    } catch (e) {}
+  }
+  tenantContext.run(businessId, next);
+});
+
 app.use("/api", router);
 
 // Serve built React frontend in production

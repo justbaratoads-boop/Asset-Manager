@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BookOpen, Package, BarChart2, TrendingUp,
   Truck, Percent, Building2, Layers, Wrench, UserCog, Printer,
   Lock, CreditCard, HelpCircle, Settings, LogOut, ChevronDown,
-  ClipboardList,
+  ClipboardList, Shield,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "./ui/button";
@@ -21,6 +21,9 @@ type NavItem   = NavGroup | NavLink | NavSep;
 const navigation: NavItem[] = [
   // ── Dashboard ──────────────────────────────────────────────
   { kind: "link", name: "Dashboard", href: "/", icon: LayoutDashboard, perm: "dashboard" },
+
+  // ── Superadmin ─────────────────────────────────────────────
+  { kind: "link", name: "Superadmin", href: "/superadmin", icon: Shield, perm: "superadmin" },
 
   // ── Vouchers ───────────────────────────────────────────────
   {
@@ -172,11 +175,12 @@ const ROLE_DEFAULT_PERMS: Record<string, string[]> = {
   ],
   sales_staff: ["dashboard","sales_invoices","sales_orders","accounts_parties","inventory_items","inventory_stock"],
   view_only: ["dashboard","reports","gst_reports"],
+  superadmin: ["superadmin"],
 };
 
 function getUserPerms(user: any): string[] | null {
   if (!user) return null;
-  if (user.role === "admin") return null;
+  if (user.role === "admin" || user.role === "superadmin") return null;
   try {
     const parsed = user.permissions ? JSON.parse(user.permissions) : null;
     if (parsed && typeof parsed === "object") {
@@ -294,12 +298,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
         <div className="space-y-1">
           {navigation.map((item, idx) => {
             if (item.kind === "sep") {
+              if (user?.role === "superadmin") return null;
               return <SidebarSep key={idx} label={item.label} />;
             }
             if (item.kind === "group") {
+              if (user?.role === "superadmin") return null;
               return <SidebarGroup key={item.name} item={item} user={user} onNavigate={onNavigate} />;
             }
             if (!canView(user, item.perm)) return null;
+            if (user?.role === "superadmin" && item.perm !== "superadmin") return null;
+            if (user?.role !== "superadmin" && item.perm === "superadmin") return null;
             return <SidebarLink key={item.name} item={item} onNavigate={onNavigate} />;
           })}
         </div>

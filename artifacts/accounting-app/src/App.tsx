@@ -13,6 +13,7 @@ import { FYProvider } from "./lib/financial-year";
 // Eagerly loaded
 import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
+import SuperAdminDashboard from "./pages/superadmin/dashboard";
 import NotFound from "@/pages/not-found";
 import GSTR1 from "@/pages/gst/gstr1";
 
@@ -139,6 +140,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+
+      <PR path="/superadmin" component={SuperAdminDashboard} />
 
       <PR path="/" component={Dashboard} />
 

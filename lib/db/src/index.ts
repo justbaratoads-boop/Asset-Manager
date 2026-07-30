@@ -18,11 +18,43 @@ const isLocal =
   connectionString.includes("localhost") ||
   connectionString.includes("127.0.0.1");
 
+import { AsyncLocalStorage } from "async_hooks";
+
 export const pool = new Pool({
   connectionString,
   ssl: isLocal ? undefined : { rejectUnauthorized: false },
 });
 
-export const db = drizzle(pool, { schema });
+export const baseDb = drizzle(pool, { schema });
+
+export const tenantContext = new AsyncLocalStorage<number | null>();
+const tenantPools = new Map<number, pg.Pool>();
+const tenantDbs = new Map<number, ReturnType<typeof drizzle>>();
+
+export function getTenantDb(companyId: number) {
+  if (!tenantDbs.has(companyId)) {
+    const tenantPool = new Pool({
+      connectionString,
+      ssl: isLocal ? undefined : { rejectUnauthorized: false },
+    });
+    tenantPool.on('connect', (client) => {
+      client.query(`SET search_path TO business_${companyId}, public`);
+    });
+    tenantPools.set(companyId, tenantPool);
+    tenantDbs.set(companyId, drizzle(tenantPool, { schema }));
+  }
+  return tenantDbs.get(companyId)!;
+}
+
+export const db = new Proxy({} as any, {
+  get(target, prop: string | symbol) {
+    const companyId = tenantContext.getStore();
+    if (companyId) {
+      const tdb = getTenantDb(companyId) as any;
+      return tdb[prop];
+    }
+    return (baseDb as any)[prop];
+  }
+});
 
 export * from "./schema";

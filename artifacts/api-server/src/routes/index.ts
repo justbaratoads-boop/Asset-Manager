@@ -16,6 +16,7 @@ import usersRouter from "./users";
 import accountGroupsRouter from "./account-groups";
 import recycleBinRouter from "./recycle-bin";
 import interestRouter from "./interest";
+import superadminRouter from "./superadmin";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(usersRouter);
 router.use(accountGroupsRouter);
 router.use(recycleBinRouter);
 router.use(interestRouter);
+router.use(superadminRouter);
 
 export default router;

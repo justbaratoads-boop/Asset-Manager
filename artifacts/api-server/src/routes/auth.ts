@@ -32,13 +32,15 @@ router.post("/auth/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const token = signToken({ userId: user.id, email: user.email, role: user.role });
-  return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  const token = signToken({ userId: user.id, email: user.email, role: user.role, businessId: user.businessId ?? undefined });
+  return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId } });
 });
 
 router.get("/auth/me", authMiddleware, async (req, res) => {
   const userId = (req as any).user.userId;
-  const users = await db
+  // Read users from baseDb directly to avoid searching tenant schema when checking auth
+  const { baseDb } = require("@workspace/db");
+  const users = await (baseDb || db)
     .select()
     .from(usersTable)
     .where(eq(usersTable.id, userId))
@@ -49,7 +51,7 @@ router.get("/auth/me", authMiddleware, async (req, res) => {
   }
 
   const u = users[0];
-  return res.json({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, isActive: u.isActive, permissions: u.permissions ?? null });
+  return res.json({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, isActive: u.isActive, permissions: u.permissions ?? null, businessId: u.businessId });
 });
 
 router.post("/auth/logout", (_req, res) => {
