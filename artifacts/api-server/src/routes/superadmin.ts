@@ -7,10 +7,11 @@ import { requireRole, authMiddleware } from "../lib/auth";
 const router = Router();
 
 router.post("/superadmin/businesses", authMiddleware, requireRole("superadmin"), async (req, res) => {
-  const { name, adminEmail, adminPassword } = req.body;
+  let { name, adminEmail, adminPassword } = req.body;
   if (!name || !adminEmail || !adminPassword) {
     return res.status(400).json({ error: "Missing required fields" });
   }
+  adminEmail = adminEmail.toLowerCase().trim();
 
   try {
     const [business] = await baseDb.insert(businessesTable).values({

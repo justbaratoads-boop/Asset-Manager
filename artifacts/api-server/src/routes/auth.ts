@@ -8,10 +8,11 @@ import { signToken, authMiddleware } from "../lib/auth";
 const router = Router();
 
 router.post("/auth/login", async (req, res) => {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password required" });
   }
+  email = email.toLowerCase().trim();
   const users = await db
     .select()
     .from(usersTable)
