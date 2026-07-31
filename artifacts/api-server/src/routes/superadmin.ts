@@ -2,11 +2,11 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { baseDb, db } from "@workspace/db";
 import { usersTable, businessesTable } from "@workspace/db/schema";
-import { requireRole } from "../lib/auth";
+import { requireRole, authMiddleware } from "../lib/auth";
 
 const router = Router();
 
-router.post("/superadmin/businesses", requireRole("superadmin"), async (req, res) => {
+router.post("/superadmin/businesses", authMiddleware, requireRole("superadmin"), async (req, res) => {
   const { name, adminEmail, adminPassword } = req.body;
   if (!name || !adminEmail || !adminPassword) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -50,7 +50,7 @@ router.post("/superadmin/businesses", requireRole("superadmin"), async (req, res
   }
 });
 
-router.get("/superadmin/businesses", requireRole("superadmin"), async (req, res) => {
+router.get("/superadmin/businesses", authMiddleware, requireRole("superadmin"), async (req, res) => {
   const businesses = await baseDb.select().from(businessesTable);
   res.json(businesses);
 });
