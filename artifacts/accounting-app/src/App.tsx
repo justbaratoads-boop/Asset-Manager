@@ -142,6 +142,7 @@ function Router() {
       <Route path="/login" component={Login} />
 
       <PR path="/superadmin" component={SuperAdminDashboard} />
+      <PR path="/superadmin/" component={SuperAdminDashboard} />
 
       <PR path="/" component={Dashboard} />
 
