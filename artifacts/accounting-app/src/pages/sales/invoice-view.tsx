@@ -141,7 +141,8 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
     </tr></thead>
     <tbody>${itemRows}</tbody>
   </table>
-  <div class="inv-footer">${bankHtml}<div class="totals">${totalsHtml}</div></div>
+  <div class="inv-footer"><div class="totals" style="width: 100%; max-width: 300px; margin-left: auto;">${totalsHtml}</div></div>
+  ${bankHtml}
   ${notesHtml}${termsHtml}${sigHtml}${footerHtml}
 </div>`;
 }
@@ -160,10 +161,10 @@ const BASE_CSS = `
   .bt-name{font-weight:700;font-size:1.05em}
   .bt-gstin,.bt-addr{font-size:.85em;color:#555;margin-top:2px}
   .items-tbl{width:100%;border-collapse:collapse;margin-bottom:14px}
-  .inv-footer{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
-  .bank{font-size:.83em;color:#444;max-width:240px}
+  .inv-footer{display:flex;justify-content:flex-end;margin-bottom:14px}
+  .bank{font-size:.83em;color:#444;margin-bottom:12px;padding-top:12px;border-top:1px solid #e5e7eb}
   .sec-label{font-weight:600;font-size:.75em;text-transform:uppercase;color:#6b7280;margin-bottom:4px;letter-spacing:.04em}
-  .totals{min-width:210px}
+  .totals{width:100%}
   .tot-row{display:flex;justify-content:space-between;padding:2px 0;font-size:.9em}
   .tot-row.grand{font-weight:700;font-size:1.05em;border-top:1px solid #9ca3af;padding-top:4px;margin-top:3px}
   .tot-row.paid{color:#16a34a}

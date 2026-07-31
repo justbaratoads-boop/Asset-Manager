@@ -115,23 +115,32 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
       apportionedChargeAmount: apportioned
     }, isInterstate);
 
-    subtotal += computed.subtotal;
-    discount += computed.discountAmount;
-    totalTaxable += computed.taxableAmount;
-    cgst += computed.cgst;
-    sgst += computed.sgst;
-    igst += computed.igst;
+    const rSub = Number(computed.subtotal.toFixed(2));
+    const rDisc = Number(computed.discountAmount.toFixed(2));
+    const rTaxable = Number(computed.taxableAmount.toFixed(2));
+    const rCgst = Number(computed.cgst.toFixed(2));
+    const rSgst = Number(computed.sgst.toFixed(2));
+    const rIgst = Number(computed.igst.toFixed(2));
+    const rTotalGst = Number(computed.totalGst.toFixed(2));
+    const rTotal = Number(computed.total.toFixed(2));
+
+    subtotal += rSub;
+    discount += rDisc;
+    totalTaxable += rTaxable;
+    cgst += rCgst;
+    sgst += rSgst;
+    igst += rIgst;
 
     return {
       ...item,
-      subtotal: computed.subtotal,
-      totalDiscount: computed.discountAmount,
-      taxableAmount: computed.taxableAmount,
-      totalGst: computed.totalGst,
-      cgst: computed.cgst,
-      sgst: computed.sgst,
-      igst: computed.igst,
-      total: computed.total
+      subtotal: rSub,
+      totalDiscount: rDisc,
+      taxableAmount: rTaxable,
+      totalGst: rTotalGst,
+      cgst: rCgst,
+      sgst: rSgst,
+      igst: rIgst,
+      total: rTotal
     };
   });
 
@@ -158,27 +167,27 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
     }
   }
 
-  const grand = totalTaxable + cgst + sgst + igst + chargesTotal - totalAssessableAmount; 
-  // wait, the assessable amount was added to totalTaxable. 
-  // totalTaxable = Base Items Value + totalAssessableAmount
-  // So grand = Base Items Value + totalAssessableAmount + GST + Flat Charges + Non-taxable charges.
-  // Actually, chargesTotal already contains totalAssessableAmount.
-  // Base Items Value = totalTaxable - totalAssessableAmount.
-  // So Grand = (totalTaxable - totalAssessableAmount) + chargesTotal + GST.
-  // Which matches: grand = totalTaxable + cgst + sgst + igst + chargesTotal - totalAssessableAmount
+  const tCgst = Number(cgst.toFixed(2));
+  const tSgst = Number(sgst.toFixed(2));
+  const tIgst = Number(igst.toFixed(2));
+  const tTaxable = Number(totalTaxable.toFixed(2));
+  const tCharges = Number(chargesTotal.toFixed(2));
+  const tAssessable = Number(totalAssessableAmount.toFixed(2));
+
+  const grand = Number((tTaxable + tCgst + tSgst + tIgst + tCharges - tAssessable).toFixed(2));
 
   return {
     items: finalItems,
     totals: {
-      subtotal,
-      discount,
-      taxable: totalTaxable,
-      gst: cgst + sgst + igst,
-      cgst,
-      sgst,
-      igst,
+      subtotal: Number(subtotal.toFixed(2)),
+      discount: Number(discount.toFixed(2)),
+      taxable: tTaxable,
+      gst: Number((tCgst + tSgst + tIgst).toFixed(2)),
+      cgst: tCgst,
+      sgst: tSgst,
+      igst: tIgst,
       grand,
-      chargesTotal
+      chargesTotal: tCharges
     }
   };
 }
