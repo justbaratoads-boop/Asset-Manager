@@ -57,8 +57,7 @@ app.use((req, res, next) => {
 app.use("/api", router);
 
 // Serve built React frontend in production
-// Serve built React frontend
-const frontendDist = path.join(process.cwd(), "artifacts/accounting-app/dist/public");
+const frontendDist = path.resolve(__dirname, "../../accounting-app/dist/public");
 app.use(express.static(frontendDist));
 
 // SPA fallback — serve index.html for any non-API route
