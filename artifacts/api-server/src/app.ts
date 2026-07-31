@@ -57,14 +57,13 @@ app.use((req, res, next) => {
 app.use("/api", router);
 
 // Serve built React frontend in production
-if (process.env.NODE_ENV === "production") {
-  const frontendDist = path.join(process.cwd(), "artifacts/accounting-app/dist/public");
-  app.use(express.static(frontendDist));
+// Serve built React frontend
+const frontendDist = path.join(process.cwd(), "artifacts/accounting-app/dist/public");
+app.use(express.static(frontendDist));
 
-  // SPA fallback — serve index.html for any non-API route
-  app.use((_req, res) => {
-    res.sendFile(path.join(frontendDist, "index.html"));
-  });
-}
+// SPA fallback — serve index.html for any non-API route
+app.use((_req, res) => {
+  res.sendFile(path.join(frontendDist, "index.html"));
+});
 
 export default app;
