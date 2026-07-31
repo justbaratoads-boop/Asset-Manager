@@ -27,7 +27,11 @@ export default function Login() {
         title: "Welcome back",
         description: `Logged in as ${result.user.name}`,
       });
-      setLocation("/");
+      if (result.user.role === "superadmin") {
+        setLocation("/superadmin");
+      } else {
+        setLocation("/");
+      }
     } catch (error: any) {
       toast({
         title: "Login failed",

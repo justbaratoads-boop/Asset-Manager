@@ -38,7 +38,18 @@ function KpiCard({ title, value, icon: Icon, variant = "default", onClick }: { t
   );
 }
 
+import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
+
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+
+  if (user?.role === "superadmin") {
+    setLocation("/superadmin");
+    return null;
+  }
+
   const [periodFrom, setPeriodFrom] = useState(monthStart);
   const [periodTo, setPeriodTo] = useState(todayStr);
 
