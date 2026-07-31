@@ -85,7 +85,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
       <td class="tr">${fmtN(itemBaseRate(item))}</td>
       ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
       <td class="tr">${item.gstPct || 0}%</td>
-      <td class="tr"><strong>${fmtN(item.total)}</strong></td>
+      <td class="tr"><strong>${fmtN(item.taxableAmount)}</strong></td>
     </tr>`).join("");
 
   const totalsHtml = [
@@ -416,7 +416,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
                 <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
                 {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
                 <td className="py-2 text-right">{item.gstPct}%</td>
-                <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.total)}</td>
+                <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.taxableAmount)}</td>
               </tr>
             ))}
           </tbody>
@@ -577,7 +577,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
               <td className="py-1.5">{item.itemName}</td>
               <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
               <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item))}</td>
-              <td className="py-1.5 text-right font-medium">{formatCurrency(item.total)}</td>
+              <td className="py-1.5 text-right font-medium">{formatCurrency(item.taxableAmount)}</td>
             </tr>
           ))}
         </tbody>
