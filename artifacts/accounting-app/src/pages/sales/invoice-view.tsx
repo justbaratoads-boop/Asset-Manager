@@ -60,7 +60,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
   const showLogo = ps.showLogo !== false;
   const showFooter = ps.showFooter !== false;
   const showGstInfo = !isKaccha;
-  const billTitle = isKaccha ? (co?.kacchaInvoiceName || "ESTIMATE") : (ps.billTitle || "TAX INVOICE");
+  const billTitle = isKaccha ? (company?.kacchaInvoiceName || "ESTIMATE") : (ps.billTitle || "TAX INVOICE");
   const terms = ps.termsAndConditions || "";
 
   const co = company as any;
