@@ -149,8 +149,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     <tbody>${itemRows}</tbody>
   </table>
   <div class="inv-footer"><div class="totals" style="width: 100%; max-width: 300px; margin-left: auto;">${totalsHtml}</div></div>
-  ${bankHtml}
-  ${notesHtml}${termsHtml}${sigHtml}${footerHtml}
+  ${notesHtml}${termsHtml}${bankHtml}${sigHtml}${footerHtml}
 </div>`;
 }
 
@@ -486,6 +485,22 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
         </div>
       )}
 
+      {/* Notes */}
+        {invoice?.notes && (
+          <div className="mt-4 pt-3 border-t">
+            <p className="text-xs font-semibold text-gray-500 mb-1">Notes / Additional Details</p>
+            <p className="text-xs text-gray-500 whitespace-pre-line">{invoice.notes}</p>
+          </div>
+        )}
+
+      {/* Terms */}
+      {termsAndConditions && (
+        <div className="mt-4 pt-3 border-t">
+          <p className="text-xs font-semibold text-gray-500 mb-1">Terms & Conditions</p>
+          <p className="text-xs text-gray-500 whitespace-pre-line">{termsAndConditions}</p>
+        </div>
+      )}
+
       {/* Bank details */}
       {showBankDetails && company?.bankAccount && (
         <div className="mt-4 pt-4 border-t">
@@ -497,21 +512,6 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
         </div>
       )}
 
-      {/* Notes */}
-        {invoice?.notes && (
-          <div className="mt-4 pt-3 border-t">
-            <p className="text-xs font-semibold text-gray-500 mb-1">Notes / Additional Details</p>
-            <p className="text-xs text-gray-500 whitespace-pre-line">{invoice.notes}</p>
-          </div>
-        )}
-
-        {/* Terms */}
-      {termsAndConditions && (
-        <div className="mt-4 pt-3 border-t">
-          <p className="text-xs font-semibold text-gray-500 mb-1">Terms & Conditions</p>
-          <p className="text-xs text-gray-500 whitespace-pre-line">{termsAndConditions}</p>
-        </div>
-      )}
 
       {/* Signature */}
       {showSignatureLine && (

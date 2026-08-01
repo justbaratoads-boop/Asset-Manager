@@ -691,35 +691,7 @@ export default function SaleInvoiceForm() {
                       </TableCell>
                       <TableCell className="text-right">
                         {item.quantity > 0 && item.rate > 0 ? (
-                          item.gstInclusive && item.gstPct > 0 ? (
-                            <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs space-y-0.5 text-left min-w-[130px]">
-                              <div className="flex justify-between text-green-800 font-medium">
-                                <span>Base</span>
-                                <span>{formatCurrency(item.taxableAmount)}</span>
-                              </div>
-                              <div className="flex justify-between text-blue-800 font-medium">
-                                <span>GST {item.gstPct}%</span>
-                                <span>+{formatCurrency(item.gstAmount)}</span>
-                              </div>
-                              {item.discountAmount > 0 && (
-                                <div className="flex justify-between text-red-700">
-                                  <span>Disc.</span>
-                                  <span>−{formatCurrency(item.discountAmount)}</span>
-                                </div>
-                              )}
-                              <div className="flex justify-between font-bold border-t border-amber-200 pt-0.5 text-amber-900 text-sm">
-                                <span>Total</span>
-                                <span>{formatCurrency(item.total)}</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-0.5 text-xs leading-tight">
-                              <div className="text-muted-foreground">{formatCurrency(item.taxableAmount)} base</div>
-                              {item.gstPct > 0 && <div className="text-muted-foreground">+{formatCurrency(item.gstAmount)} GST</div>}
-                              {item.discountAmount > 0 && <div className="text-red-600">−{formatCurrency(item.discountAmount)} disc.</div>}
-                              <div className="font-bold text-sm text-foreground border-t pt-0.5">{formatCurrency(item.total)}</div>
-                            </div>
-                          )
+                          <span className="font-medium text-foreground">{formatCurrency(item.taxableAmount)}</span>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
                         )}

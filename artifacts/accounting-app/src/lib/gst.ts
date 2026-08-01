@@ -121,8 +121,8 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
     const rCgst = Number(computed.cgst.toFixed(2));
     const rSgst = Number(computed.sgst.toFixed(2));
     const rIgst = Number(computed.igst.toFixed(2));
-    const rTotalGst = Number(computed.totalGst.toFixed(2));
-    const rTotal = Number(computed.total.toFixed(2));
+    const rTotalGst = Number((rCgst + rSgst + rIgst).toFixed(2));
+    const rTotal = Number((rTaxable + rTotalGst).toFixed(2));
 
     subtotal += rSub;
     discount += rDisc;
