@@ -22,6 +22,13 @@ export default function SuperAdminDashboard() {
 
   const { data: businesses, isLoading } = useQuery({
     queryKey: ["/api/superadmin/businesses"],
+    queryFn: async () => {
+      const res = await fetch("/api/superadmin/businesses", {
+        headers: { "Authorization": "Bearer " + localStorage.getItem("auth_token") }
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
   });
 
   const [name, setName] = useState("");

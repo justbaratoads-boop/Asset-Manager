@@ -50,15 +50,17 @@ function fmtN(n: number) {
 }
 
 function buildInvoiceHtml(inv: any, company: any, ps: any): string {
-  const showHsn = ps.showHsnCode !== false;
-  const showBank = ps.showBankDetails !== false;
+  const isKaccha = inv?.isKaccha === true || inv?.isKaccha === "true";
+  const showHsn = !isKaccha && ps.showHsnCode !== false;
+  const showBank = !isKaccha && ps.showBankDetails !== false;
   const showSig = ps.showSignatureLine !== false;
   const showAddr = ps.showAddress !== false;
-  const showGstin = ps.showGstin !== false;
-  const showPartyGstin = ps.showPartyGstin !== false;
+  const showGstin = !isKaccha && ps.showGstin !== false;
+  const showPartyGstin = !isKaccha && ps.showPartyGstin !== false;
   const showLogo = ps.showLogo !== false;
   const showFooter = ps.showFooter !== false;
-  const billTitle = ps.billTitle || "TAX INVOICE";
+  const showGstInfo = !isKaccha;
+  const billTitle = isKaccha ? (co?.kacchaInvoiceName || "ESTIMATE") : (ps.billTitle || "TAX INVOICE");
   const terms = ps.termsAndConditions || "";
 
   const co = company as any;
@@ -84,7 +86,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
       <td class="tr">${fmtN(itemBaseRate(item))}</td>
       ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
-      <td class="tr">${item.gstPct || 0}%</td>
+      ${showGstInfo ? `<td class="tr">${item.gstPct || 0}%</td>` : ""}
       <td class="tr"><strong>${fmtN(item.taxableAmount)}</strong></td>
     </tr>`).join("");
 
@@ -92,11 +94,11 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
     `<div class="tot-row"><span>Subtotal</span><span>${fmtN(inv?.subtotal)}</span></div>`,
     Number(inv?.totalDiscount) > 0
       ? `<div class="tot-row disc"><span>Discount</span><span>−${fmtN(inv?.totalDiscount)}</span></div>` : "",
-    Number(inv?.totalCgst) > 0
+    Number(inv?.totalCgst) > 0 && showGstInfo
       ? `<div class="tot-row"><span>CGST</span><span>${fmtN(inv?.totalCgst)}</span></div>` : "",
-    Number(inv?.totalSgst) > 0
+    Number(inv?.totalSgst) > 0 && showGstInfo
       ? `<div class="tot-row"><span>SGST</span><span>${fmtN(inv?.totalSgst)}</span></div>` : "",
-    Number(inv?.totalIgst) > 0
+    Number(inv?.totalIgst) > 0 && showGstInfo
       ? `<div class="tot-row"><span>IGST</span><span>${fmtN(inv?.totalIgst)}</span></div>` : "",
     ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
     `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
@@ -137,7 +139,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any): string {
     <thead><tr>
       <th>#</th><th>Item</th>
       ${showHsn ? "<th>HSN</th>" : ""}
-      <th class="tr">Qty</th><th class="tr">Rate</th>${hasDiscount ? '<th class="tr">Disc%</th>' : ""}<th class="tr">GST%</th><th class="tr">Amount</th>
+      <th class="tr">Qty</th><th class="tr">Rate</th>${hasDiscount ? '<th class="tr">Disc%</th>' : ""}${showGstInfo ? '<th class="tr">GST%</th>' : ""}<th class="tr">Amount</th>
     </tr></thead>
     <tbody>${itemRows}</tbody>
   </table>
@@ -336,15 +338,17 @@ const PRINT_CSS: Record<string, string> = {
 
 function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; company: any; copyLabel?: string }) {
   const ps = loadPrintSettings();
-  const billTitle = ps.billTitle || "TAX INVOICE";
+  const isKaccha = invoice?.isKaccha === true || invoice?.isKaccha === "true";
   const showLogo = ps.showLogo !== false;
-  const showGstin = ps.showGstin !== false;
-  const showPartyGstin = ps.showPartyGstin !== false;
-  const showHsnCode = ps.showHsnCode !== false;
-  const showBankDetails = ps.showBankDetails !== false;
+  const showGstin = !isKaccha && ps.showGstin !== false;
+  const showPartyGstin = !isKaccha && ps.showPartyGstin !== false;
+  const showHsnCode = !isKaccha && ps.showHsnCode !== false;
+  const showBankDetails = !isKaccha && ps.showBankDetails !== false;
   const showSignatureLine = ps.showSignatureLine !== false;
   const showFooter = ps.showFooter !== false;
   const showAddress = ps.showAddress !== false;
+  const showGstInfo = !isKaccha;
+  const billTitle = isKaccha ? (company?.kacchaInvoiceName || "ESTIMATE") : (ps.billTitle || "TAX INVOICE");
   const termsAndConditions = ps.termsAndConditions || "";
   
   const hasDiscount = (invoice?.items || []).some((item: any) => Number(item.discountPct) > 0) || Number(invoice?.totalDiscount) > 0;
@@ -399,7 +403,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
               <th className="text-right py-2 font-semibold">Qty</th>
               <th className="text-right py-2 font-semibold">Rate</th>
               {hasDiscount && <th className="text-right py-2 font-semibold">Disc%</th>}
-              <th className="text-right py-2 font-semibold">GST%</th>
+              {showGstInfo && <th className="text-right py-2 font-semibold">GST%</th>}
               <th className="text-right py-2 pr-4 sm:pr-0 font-semibold">Total</th>
             </tr>
           </thead>
@@ -416,7 +420,7 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
                 <td className="py-2 text-right">{item.quantity} {item.unit}</td>
                 <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
                 {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
-                <td className="py-2 text-right">{item.gstPct}%</td>
+                {showGstInfo && <td className="py-2 text-right">{item.gstPct}%</td>}
                 <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.taxableAmount)}</td>
               </tr>
             ))}
@@ -431,13 +435,13 @@ function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; compan
           {Number(invoice.totalDiscount) > 0 && (
             <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>
           )}
-          {Number(invoice.totalCgst) > 0 && (
+          {Number(invoice.totalCgst) > 0 && showGstInfo && (
             <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>
           )}
-          {Number(invoice.totalSgst) > 0 && (
+          {Number(invoice.totalSgst) > 0 && showGstInfo && (
             <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>
           )}
-          {Number(invoice.totalIgst) > 0 && (
+          {Number(invoice.totalIgst) > 0 && showGstInfo && (
             <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>
           )}
           {(() => {
