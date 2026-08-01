@@ -30,6 +30,13 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   try {
     const payload = verifyToken(token);
     (req as any).user = payload;
+
+    // Prevent users without businessId (like superadmin) from accessing business routes
+    if (!payload.businessId && !req.path.startsWith("/superadmin") && !req.path.startsWith("/auth/")) {
+      res.status(403).json({ error: "Operation requires an active business context" });
+      return;
+    }
+
     tenantContext.run(payload.businessId || null, () => {
       next();
     });
