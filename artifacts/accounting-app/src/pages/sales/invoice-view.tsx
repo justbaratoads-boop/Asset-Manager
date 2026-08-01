@@ -31,6 +31,11 @@ function loadPrintSettings() {
   catch { return {}; }
 }
 
+function getBatchName(batchId: number, batches: any[]) {
+  const b = batches.find((x: any) => x.id === batchId);
+  return b ? b.batchNumber : `Batch #${batchId}`;
+}
+
 const BASE_PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
 ];
@@ -49,7 +54,7 @@ function fmtN(n: number) {
   return "₹" + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
 }
 
-function buildInvoiceHtml(inv: any, company: any, ps: any): string {
+function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []): string {
   const isKaccha = inv?.isKaccha === true || inv?.isKaccha === "true";
   const showHsn = !isKaccha && ps.showHsnCode !== false;
   const showBank = !isKaccha && ps.showBankDetails !== false;
@@ -336,7 +341,7 @@ const PRINT_CSS: Record<string, string> = {
     @page{size:80mm auto;margin:0}`
 };
 
-function InvoiceDocument({ invoice, company, copyLabel }: { invoice: any; company: any; copyLabel?: string }) {
+function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoice: any; company: any; copyLabel?: string; batches?: any[] }) {
   const ps = loadPrintSettings();
   const isKaccha = invoice?.isKaccha === true || invoice?.isKaccha === "true";
   const showLogo = ps.showLogo !== false;
@@ -731,7 +736,7 @@ export default function SaleInvoiceView() {
     const layoutStyle = ps.layoutStyle || "1";
     const cssKey = `${printerType}_${layoutStyle}`;
     const css = PRINT_CSS[cssKey] || PRINT_CSS["a4_1"];
-    const invoiceBody = buildInvoiceHtml(inv, company, ps);
+    const invoiceBody = buildInvoiceHtml(inv, company, ps, batches);
     const elements: string[] = [];
     for (let i = 0; i < numCopies; i++) {
       const pageBreak = i > 0 ? `<div style="page-break-before:always"></div>` : "";
@@ -820,7 +825,7 @@ export default function SaleInvoiceView() {
       {/* Render the actual selected template on-screen and for Ctrl+P */}
       <div className="bg-white border print:border-0 rounded-xl overflow-hidden max-w-4xl mx-auto shadow-sm print:shadow-none" id="invoice-print">
         <style dangerouslySetInnerHTML={{ __html: (PRINT_CSS[`${ps.printerType || "a4"}_${ps.layoutStyle || "1"}`] || PRINT_CSS["a4_1"]).replace(/body\s*\{/g, ".inv-template-wrapper{").replace(/@media print\s*\{\s*@page\s*\{[^}]*\}\s*\}/g, "") }} />
-        <div className="inv-template-wrapper" dangerouslySetInnerHTML={{ __html: buildInvoiceHtml(inv, company, ps) }} />
+        <div className="inv-template-wrapper" dangerouslySetInnerHTML={{ __html: buildInvoiceHtml(inv, company, ps, batches) }} />
       </div>
 
       {/* Hidden acknowledgment document — rendered offscreen for print */}
