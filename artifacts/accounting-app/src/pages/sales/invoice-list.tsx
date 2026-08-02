@@ -149,7 +149,7 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
                         </td>
                         <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
                         <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(Number(item.total))}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(Number(item.taxableAmount))}</td>
                       </tr>
                     ))}
                   </tbody>
