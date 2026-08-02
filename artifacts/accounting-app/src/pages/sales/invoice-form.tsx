@@ -512,16 +512,16 @@ export default function SaleInvoiceForm() {
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">Disc%</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></div>
                     )}
                     {/* GST Type + Rate */}
-                    <div className="space-y-1">
+                    <div className="col-span-2 space-y-1">
                       <Label className="text-xs text-muted-foreground">GST Type</Label>
                       <div className="flex rounded-md overflow-hidden border text-sm font-medium h-10">
                         <button type="button" onClick={() => updateItem(index, "gstInclusive", false)}
                           className={`flex-1 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
-                          Excl.
+                          Exclusive
                         </button>
                         <button type="button" onClick={() => updateItem(index, "gstInclusive", true)}
                           className={`flex-1 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
-                          Incl.
+                          Inclusive
                         </button>
                       </div>
                     </div>
@@ -530,6 +530,7 @@ export default function SaleInvoiceForm() {
                         <Lock className="h-3 w-3 shrink-0" />{item.gstPct}%
                       </div>
                     </div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div></div>
                   </div>
 
                   {/* Inclusive GST breakdown — always visible when inclusive and has values */}
