@@ -192,6 +192,16 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
                   <span>+ {formatCurrency(Number(data.totalIgst))}</span>
                 </div>
               )}
+              {(() => {
+                let parsedCharges: any[] = [];
+                try { parsedCharges = JSON.parse(data?.otherCharges || "[]"); } catch {}
+                return parsedCharges.map((c: any, i: number) => (
+                  <div key={i} className="flex justify-between px-4 py-2">
+                    <span className="text-muted-foreground">{c.name || c.ledgerName || "Other Charges"}</span>
+                    <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
+                  </div>
+                ));
+              })()}
               <div className="flex justify-between px-4 py-2.5 font-bold text-base">
                 <span>Grand Total</span>
                 <span>{formatCurrency(Number(data.grandTotal))}</span>

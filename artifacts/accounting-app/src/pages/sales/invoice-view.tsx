@@ -77,7 +77,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   const coGstin = showGstin && co?.gstin ? `GSTIN: ${co.gstin}` : "";
 
   const items: any[] = inv?.items || [];
-  const otherCharges: { name: string; amount: number }[] = (() => {
+  const otherCharges: { name?: string; ledgerName?: string; amount: number; type?: string }[] = (() => {
     try { return JSON.parse(inv?.otherCharges || "[]"); } catch { return []; }
   })();
 
@@ -105,7 +105,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
       ? `<div class="tot-row"><span>SGST</span><span>${fmtN(inv?.totalSgst)}</span></div>` : "",
     Number(inv?.totalIgst) > 0 && showGstInfo
       ? `<div class="tot-row"><span>IGST</span><span>${fmtN(inv?.totalIgst)}</span></div>` : "",
-    ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
+    ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || c.ledgerName || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
     `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
     `<div class="tot-row paid"><span>Paid</span><span>${fmtN(inv?.amountPaid)}</span></div>`,
     Number(inv?.balanceDue) > 0
@@ -449,10 +449,10 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
             <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>
           )}
           {(() => {
-            let parsedCharges: {name: string; amount: number}[] = [];
+            let parsedCharges: {name?: string; ledgerName?: string; amount: number; type?: string}[] = [];
             try { parsedCharges = JSON.parse(invoice.otherCharges || "[]"); } catch {}
             return parsedCharges.map((c: any, i: number) => (
-              <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || "Other Charges"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
+              <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || c.ledgerName || "Other Charges"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
             ));
           })()}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
