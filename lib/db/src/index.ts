@@ -33,13 +33,19 @@ const tenantDbs = new Map<number, ReturnType<typeof drizzle>>();
 
 export function getTenantDb(companyId: number) {
   if (!tenantDbs.has(companyId)) {
+    const hasQuery = connectionString.includes("?");
+    const tenantConnectionString = `${connectionString}${hasQuery ? "&" : "?"}options=-c%20search_path=business_${companyId},public`;
+    
     const tenantPool = new Pool({
-      connectionString,
+      connectionString: tenantConnectionString,
       ssl: isLocal ? undefined : { rejectUnauthorized: false },
     });
+    
+    // Fallback/redundant check just in case, but options in connection string is sync
     tenantPool.on('connect', (client) => {
-      client.query(`SET search_path TO business_${companyId}, public`);
+      client.query(`SET search_path TO business_${companyId}, public`).catch(() => {});
     });
+    
     tenantPools.set(companyId, tenantPool);
     tenantDbs.set(companyId, drizzle(tenantPool, { schema }));
   }
