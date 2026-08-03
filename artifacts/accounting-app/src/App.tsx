@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useEffect } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router } from "wouter";
+import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -113,7 +114,7 @@ const queryClient = new QueryClient({
 
 function PR({ component: Component, path }: { component: any; path: string }) {
   const { isAuthenticated, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [, setLocation] = useHashLocation();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -136,7 +137,7 @@ function PR({ component: Component, path }: { component: any; path: string }) {
   );
 }
 
-function Router() {
+function RouterContent() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
@@ -257,13 +258,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="accounting-theme">
         <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <Router hook={useHashLocation}>
             <AuthProvider>
               <FYProvider startMonth={4}>
-                <Router />
+                <RouterContent />
               </FYProvider>
             </AuthProvider>
-          </WouterRouter>
+          </Router>
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>
