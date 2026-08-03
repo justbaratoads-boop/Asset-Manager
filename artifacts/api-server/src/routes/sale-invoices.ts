@@ -107,9 +107,10 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
     const totGst = cgst + sgst + igst;
     
     let otherChargesParsed = 0;
-    if (!isKaccha && data.otherCharges) {
+    const targetCharges = isKaccha ? data.kacchaCharges : data.otherCharges;
+    if (targetCharges) {
       try {
-        const charges = JSON.parse(data.otherCharges);
+        const charges = JSON.parse(targetCharges);
         otherChargesParsed = charges.reduce((s: number, c: any) => s + ((c.type ?? "add") === "deduct" ? -Number(c.amount) : Number(c.amount)), 0);
       } catch (e) {}
     }
@@ -136,7 +137,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
       amountPaid: String(partAmountPaid || 0),
       balanceDue: String(partBalanceDue || 0),
       notes: data.notes,
-      otherCharges: isKaccha ? null : (data.otherCharges || null),
+      otherCharges: targetCharges || null,
       status: partAmountPaid >= gTotal ? "paid" : (partAmountPaid > 0 ? "partial" : "confirmed"),
     }).returning();
 

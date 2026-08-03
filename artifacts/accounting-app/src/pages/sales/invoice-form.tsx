@@ -123,6 +123,7 @@ export default function SaleInvoiceForm() {
   const { data: companySettings } = useGetCompanySettings();
   const enableDiscount = (companySettings as any)?.enableDiscount ?? false;
   const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
+  const autoRoundOff = (companySettings as any)?.autoRoundOff ?? false;
   const filteredStockItems = useMemo(() => {
     if (!stockItems) return [];
     if (enableDualLedger) return stockItems as any[];
@@ -181,7 +182,8 @@ export default function SaleInvoiceForm() {
 
   const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
   const pakkaGrandTotal = computedItems.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0) + (hasPakka ? chargesTotal : 0);
-  const kacchaGrandTotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0) + (!hasPakka ? chargesTotal : 0);
+  const kacchaChargesTotal = kacchaCharges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
+    const kacchaGrandTotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0) + (!hasPakka ? chargesTotal : 0) + kacchaChargesTotal;
 
   const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const kacchaAmountPaid = kacchaPayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
@@ -839,6 +841,7 @@ export default function SaleInvoiceForm() {
                   ))}
                   {errors.kacchaPayment && <p className="text-xs text-destructive">{errors.kacchaPayment}</p>}
                   <div className="border-t pt-2 space-y-1 text-sm">
+                    {kacchaChargesTotal !== 0 && <div className="flex justify-between text-muted-foreground"><span>Kaccha Additional</span><span className={kacchaChargesTotal < 0 ? "text-red-600" : ""}>{kacchaChargesTotal < 0 ? "- " : "+ "}{formatCurrency(Math.abs(kacchaChargesTotal))}</span></div>}
                     <div className="flex justify-between"><span className="text-muted-foreground">Kaccha Due</span><span className="font-semibold text-amber-600">{formatCurrency(kacchaAmountPaid)}</span></div>
                     <div className="flex justify-between font-bold"><span>Kaccha Balance</span><span className={kacchaBalanceDue > 0 ? "text-red-600" : "text-amber-600"}>{formatCurrency(kacchaBalanceDue)}</span></div>
                   </div>

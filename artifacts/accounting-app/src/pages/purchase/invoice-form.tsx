@@ -98,6 +98,7 @@ export default function PurchaseInvoiceForm() {
   const { data: existing } = useGetPurchaseInvoice(editId!, { query: { enabled: isEdit } });
   const { data: companySettings } = useGetCompanySettings();
   const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
+  const autoRoundOff = (companySettings as any)?.autoRoundOff ?? false;
   const filteredStockItems = useMemo(() => {
     if (!stockItems) return [];
     if (enableDualLedger) return stockItems as any[];

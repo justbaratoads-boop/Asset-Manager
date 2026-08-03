@@ -28,6 +28,7 @@ export const companySettingsTable = pgTable("company_settings", {
   upiId: text("upi_id"),
   billFooter: text("bill_footer"),
   defaultPrintFormat: text("default_print_format").notNull().default("a4"),
+  autoRoundOff: boolean("auto_round_off").notNull().default(false),
   enableDualLedger: boolean("enable_dual_ledger").notNull().default(false),
   dualLedgerPassword: text("dual_ledger_password"),
   kacchaInvoiceName: text("kaccha_invoice_name").notNull().default("Estimate"),

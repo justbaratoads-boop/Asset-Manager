@@ -25,7 +25,7 @@ export default function CompanySettings() {
     bankName: "", bankAccount: "", bankIfsc: "", bankBranch: "",
     currency: "INR", financialYearStart: "04",
     invoicePrefix: "INV", poPrefix: "PO",
-    billFooter: "", logoUrl: "", enableDiscount: false,
+    billFooter: "", logoUrl: "", enableDiscount: false, autoRoundOff: false,
     enableDualLedger: false, dualLedgerPassword: "", kacchaInvoiceName: "Estimate", kacchaInvoicePrefix: "EST"
   });
   const [dualPasswordDialog, setDualPasswordDialog] = useState(false);
@@ -136,6 +136,16 @@ export default function CompanySettings() {
             <Switch
               checked={form.enableDiscount as boolean}
               onCheckedChange={(c) => set("enableDiscount", c as unknown as string)}
+            />
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg bg-background">
+            <div className="space-y-0.5">
+              <Label>Auto Round Off</Label>
+              <p className="text-xs text-muted-foreground">Automatically round off grand totals on bills to the nearest whole number.</p>
+            </div>
+            <Switch
+              checked={form.autoRoundOff as boolean}
+              onCheckedChange={(c) => set("autoRoundOff", c as unknown as string)}
             />
           </div>
           <div className="space-y-1"><Label>Financial Year Start</Label>
