@@ -58,7 +58,7 @@ export default function PartyStatement() {
   const closingBalance = (data as any)?.closingBalance || 0;
   
   const allAccounts = [
-    ...(rawLedgers as any[]).map(l => ({ id: `ledger_${l.id}`, name: l.name, group: l.group, kind: "Ledger", phone: null, gstin: null })),
+    ...(rawLedgers as any[]).filter(l => l.id < 1000000).map(l => ({ id: `ledger_${l.id}`, name: l.name, group: l.group, kind: "Ledger", phone: null, gstin: null })),
     ...(rawParties as any[]).map(p => ({ id: `party_${p.id}`, name: p.name, group: "Parties", kind: "Party", phone: p.phone, gstin: p.gstin })),
   ].sort((a, b) => a.name.localeCompare(b.name));
 

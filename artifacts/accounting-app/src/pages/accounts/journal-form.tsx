@@ -126,7 +126,7 @@ export default function JournalForm() {
   const { data: rawLedgers = [] } = useListLedgers({});
   const { data: rawParties = [] } = useListParties();
   const allAccounts: Account[] = [
-    ...(rawLedgers as any[]).map((l: any): Account => ({ id: l.id, name: l.name, group: l.group, kind: "ledger" })),
+    ...(rawLedgers as any[]).filter(l => l.id < 1000000).map((l: any): Account => ({ id: l.id, name: l.name, group: l.group, kind: "ledger" })),
     ...(rawParties as any[]).map((p: any): Account => ({ id: p.id, name: p.name, group: p.accountGroup || "Parties", kind: "party" })),
   ].sort((a, b) => a.name.localeCompare(b.name));
   const { data: existing } = useGetJournal(editId!, { query: { enabled: isEdit } } as any);
