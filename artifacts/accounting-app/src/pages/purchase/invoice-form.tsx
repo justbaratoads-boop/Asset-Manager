@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch, useGetCompanySettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
@@ -98,6 +98,11 @@ export default function PurchaseInvoiceForm() {
   const { data: existing } = useGetPurchaseInvoice(editId!, { query: { enabled: isEdit } });
   const { data: companySettings } = useGetCompanySettings();
   const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
+  const filteredStockItems = useMemo(() => {
+    if (!stockItems) return [];
+    if (enableDualLedger) return stockItems as any[];
+    return (stockItems as any[]).filter(s => s.isTaxLiability !== false && String(s.isTaxLiability) !== "false");
+  }, [stockItems, enableDualLedger]);
 
   const [partyId, setPartyId] = useState<number | undefined>();
   const [date, setDate] = useState(today());
@@ -302,7 +307,7 @@ export default function PurchaseInvoiceForm() {
                       <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                     <ItemSearchCombobox
-                      stockItems={stockItems as any[]}
+                      stockItems={filteredStockItems}
                       itemName={item.itemName}
                       stockItemId={item.stockItemId}
                       onNameChange={v => updateItem(i, "itemName", v)}
@@ -407,7 +412,7 @@ export default function PurchaseInvoiceForm() {
                       <TableRow key={i}>
                         <TableCell>
                           <ItemSearchCombobox
-                            stockItems={stockItems as any[]}
+                            stockItems={filteredStockItems}
                             itemName={item.itemName}
                             stockItemId={item.stockItemId}
                             onNameChange={v => updateItem(i, "itemName", v)}

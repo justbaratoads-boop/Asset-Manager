@@ -12,6 +12,13 @@ import { authMiddleware } from "../lib/auth";
 
 const router = Router();
 
+import { companySettingsTable } from "@workspace/db/schema";
+async function getEnableDualLedger() {
+  const [settings] = await db.select().from(companySettingsTable).limit(1);
+  return settings?.enableDualLedger ?? false;
+}
+
+
 async function getLedgersWithParties() {
   const [dbLedgers, parties] = await Promise.all([
     db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
@@ -29,6 +36,7 @@ async function getLedgersWithParties() {
 
 
 router.get("/reports/day-book", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   const { date } = req.query;
   const d = (date as string) || new Date().toISOString().slice(0, 10);
 
@@ -40,7 +48,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
     dr: saleInvoicesTable.grandTotal,
     cr: sql<string>`'0'`,
     date: saleInvoicesTable.date,
-  }).from(saleInvoicesTable).where(and(eq(saleInvoicesTable.date, d), eq(saleInvoicesTable.isDeleted, "false")));
+  }).from(saleInvoicesTable).where(and(eq(saleInvoicesTable.date, d), and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))));
 
   const purchases = await db.select({
     id: purchaseInvoicesTable.id,
@@ -50,7 +58,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
     dr: sql<string>`'0'`,
     cr: purchaseInvoicesTable.grandTotal,
     date: purchaseInvoicesTable.date,
-  }).from(purchaseInvoicesTable).where(and(eq(purchaseInvoicesTable.date, d), eq(purchaseInvoicesTable.isDeleted, "false")));
+  }).from(purchaseInvoicesTable).where(and(eq(purchaseInvoicesTable.date, d), and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))));
 
   const pmts = await db.select({
     id: paymentsTable.id,
@@ -60,7 +68,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
     dr: paymentsTable.amount,
     cr: sql<string>`'0'`,
     date: paymentsTable.date,
-  }).from(paymentsTable).where(and(eq(paymentsTable.date, d), eq(paymentsTable.isDeleted, "false")));
+  }).from(paymentsTable).where(and(eq(paymentsTable.date, d), and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false))));
 
   const rcts = await db.select({
     id: receiptsTable.id,
@@ -70,7 +78,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
     dr: sql<string>`'0'`,
     cr: receiptsTable.amount,
     date: receiptsTable.date,
-  }).from(receiptsTable).where(and(eq(receiptsTable.date, d), eq(receiptsTable.isDeleted, "false")));
+  }).from(receiptsTable).where(and(eq(receiptsTable.date, d), and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false))));
 
   const all = [...sales, ...purchases, ...pmts, ...rcts].map(r => ({
     ...r,
@@ -82,6 +90,7 @@ router.get("/reports/day-book", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   // Fetch all transaction data in parallel
   const [
     ledgers,
@@ -103,15 +112,15 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
         journalEntriesTable,
         and(
           eq(journalLinesTable.entryId, journalEntriesTable.id),
-          eq(journalEntriesTable.isDeleted, "false"),
+          and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false)),
         ),
       ),
-    db.select().from(saleInvoicesTable).where(eq(saleInvoicesTable.isDeleted, "false")),
-    db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.isDeleted, "false")),
-    db.select().from(receiptsTable).where(eq(receiptsTable.isDeleted, "false")),
-    db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
-    db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
-    db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+    db.select().from(saleInvoicesTable).where(and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))),
+    db.select().from(purchaseInvoicesTable).where(and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))),
+    db.select().from(receiptsTable).where(and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false))),
+    db.select().from(paymentsTable).where(and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false))),
+    db.select().from(creditNotesTable).where(and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false))),
+    db.select().from(debitNotesTable).where(and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false))),
     // Inline payments recorded directly on sale invoices
     db.select({
       mode: saleInvoicePaymentsTable.mode,
@@ -120,7 +129,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     }).from(saleInvoicePaymentsTable)
       .innerJoin(saleInvoicesTable, and(
         eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
-        eq(saleInvoicesTable.isDeleted, "false"),
+        and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)),
       )),
     // Inline payments recorded directly on purchase invoices
     db.select({
@@ -130,7 +139,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
     }).from(purchaseInvoicePaymentsTable)
       .innerJoin(purchaseInvoicesTable, and(
         eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
-        eq(purchaseInvoicesTable.isDeleted, "false"),
+        and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)),
       )),
   ]);
 
@@ -287,25 +296,26 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/profit-loss", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
 
-  const saleCond: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
+  const saleCond: any[] = [and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
   if (from) saleCond.push(gte(saleInvoicesTable.date, from as string));
   if (to) saleCond.push(lte(saleInvoicesTable.date, to as string));
 
-  const purCond: any[] = [eq(purchaseInvoicesTable.isDeleted, "false")];
+  const purCond: any[] = [and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))];
   if (from) purCond.push(gte(purchaseInvoicesTable.date, from as string));
   if (to) purCond.push(lte(purchaseInvoicesTable.date, to as string));
 
-  const cnCond: any[] = [eq(creditNotesTable.isDeleted, "false")];
+  const cnCond: any[] = [and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false))];
   if (from) cnCond.push(gte(creditNotesTable.date, from as string));
   if (to) cnCond.push(lte(creditNotesTable.date, to as string));
 
-  const dnCond: any[] = [eq(debitNotesTable.isDeleted, "false")];
+  const dnCond: any[] = [and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false))];
   if (from) dnCond.push(gte(debitNotesTable.date, from as string));
   if (to) dnCond.push(lte(debitNotesTable.date, to as string));
 
-  const jeCond: any[] = [eq(journalEntriesTable.isDeleted, "false")];
+  const jeCond: any[] = [and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false))];
   if (from) jeCond.push(gte(journalEntriesTable.date, from as string));
   if (to) jeCond.push(lte(journalEntriesTable.date, to as string));
 
@@ -382,6 +392,7 @@ router.get("/reports/profit-loss", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   // Fetch all transaction data in parallel (same sources as trial balance)
   const [
     ledgers,
@@ -403,15 +414,15 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
         journalEntriesTable,
         and(
           eq(journalLinesTable.entryId, journalEntriesTable.id),
-          eq(journalEntriesTable.isDeleted, "false"),
+          and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false)),
         ),
       ),
-    db.select().from(saleInvoicesTable).where(eq(saleInvoicesTable.isDeleted, "false")),
-    db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.isDeleted, "false")),
-    db.select().from(receiptsTable).where(eq(receiptsTable.isDeleted, "false")),
-    db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
-    db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
-    db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+    db.select().from(saleInvoicesTable).where(and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))),
+    db.select().from(purchaseInvoicesTable).where(and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))),
+    db.select().from(receiptsTable).where(and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false))),
+    db.select().from(paymentsTable).where(and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false))),
+    db.select().from(creditNotesTable).where(and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false))),
+    db.select().from(debitNotesTable).where(and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false))),
     db.select({
       mode: saleInvoicePaymentsTable.mode,
       amount: saleInvoicePaymentsTable.amount,
@@ -419,7 +430,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     }).from(saleInvoicePaymentsTable)
       .innerJoin(saleInvoicesTable, and(
         eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
-        eq(saleInvoicesTable.isDeleted, "false"),
+        and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)),
       )),
     db.select({
       mode: purchaseInvoicePaymentsTable.mode,
@@ -428,7 +439,7 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
     }).from(purchaseInvoicePaymentsTable)
       .innerJoin(purchaseInvoicesTable, and(
         eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
-        eq(purchaseInvoicesTable.isDeleted, "false"),
+        and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)),
       )),
   ]);
 
@@ -584,8 +595,9 @@ router.get("/reports/balance-sheet", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/sale-register", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
-  const conditions: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
+  const conditions: any[] = [and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
   if (from) conditions.push(gte(saleInvoicesTable.date, from as string));
   if (to) conditions.push(lte(saleInvoicesTable.date, to as string));
 
@@ -615,8 +627,9 @@ router.get("/reports/sale-register", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/purchase-register", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
-  const conditions: any[] = [eq(purchaseInvoicesTable.isDeleted, "false")];
+  const conditions: any[] = [and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))];
   if (from) conditions.push(gte(purchaseInvoicesTable.date, from as string));
   if (to) conditions.push(lte(purchaseInvoicesTable.date, to as string));
 
@@ -646,15 +659,16 @@ router.get("/reports/purchase-register", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/cash-book", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
   const cashLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(ilike(ledgersTable.group, "%cash%"));
   const cashLedgerIds = cashLedgers.map(l => l.id);
 
-  const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), inArray(paymentsTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
-  const rctCond: any[] = [eq(receiptsTable.isDeleted, "false"), inArray(receiptsTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
-  const saleInvPmtCond: any[] = [eq(saleInvoicePaymentsTable.mode, "cash"), eq(saleInvoicesTable.isDeleted, "false")];
-  const purInvPmtCond: any[] = [eq(purchaseInvoicePaymentsTable.mode, "cash"), eq(purchaseInvoicesTable.isDeleted, "false")];
-  const jeCond: any[] = [eq(journalEntriesTable.isDeleted, "false"), inArray(journalLinesTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
+  const pmtCond: any[] = [and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false)), inArray(paymentsTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
+  const rctCond: any[] = [and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false)), inArray(receiptsTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
+  const saleInvPmtCond: any[] = [eq(saleInvoicePaymentsTable.mode, "cash"), and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
+  const purInvPmtCond: any[] = [eq(purchaseInvoicePaymentsTable.mode, "cash"), and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))];
+  const jeCond: any[] = [and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false)), inArray(journalLinesTable.ledgerId, cashLedgerIds.length ? cashLedgerIds : [0])];
   
   if (from) {
     pmtCond.push(gte(paymentsTable.date, from as string));
@@ -724,6 +738,7 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/bank-book", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
   
   const bankLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(ilike(ledgersTable.group, "%bank%"));
@@ -733,11 +748,11 @@ router.get("/reports/bank-book", authMiddleware, async (req, res) => {
     return res.json({ entries: [], totalOut: 0, totalIn: 0 });
   }
 
-  const pmtCond: any[] = [eq(paymentsTable.isDeleted, "false"), inArray(paymentsTable.ledgerId, bankLedgerIds)];
-  const rctCond: any[] = [eq(receiptsTable.isDeleted, "false"), inArray(receiptsTable.ledgerId, bankLedgerIds)];
-  const saleInvPmtCond: any[] = [sql`${saleInvoicePaymentsTable.mode} != 'cash'`, eq(saleInvoicesTable.isDeleted, "false")];
-  const purInvPmtCond: any[] = [sql`${purchaseInvoicePaymentsTable.mode} != 'cash'`, eq(purchaseInvoicesTable.isDeleted, "false")];
-  const jeCond: any[] = [eq(journalEntriesTable.isDeleted, "false"), inArray(journalLinesTable.ledgerId, bankLedgerIds)];
+  const pmtCond: any[] = [and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false)), inArray(paymentsTable.ledgerId, bankLedgerIds)];
+  const rctCond: any[] = [and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false)), inArray(receiptsTable.ledgerId, bankLedgerIds)];
+  const saleInvPmtCond: any[] = [sql`${saleInvoicePaymentsTable.mode} != 'cash'`, and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
+  const purInvPmtCond: any[] = [sql`${purchaseInvoicePaymentsTable.mode} != 'cash'`, and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))];
+  const jeCond: any[] = [and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false)), inArray(journalLinesTable.ledgerId, bankLedgerIds)];
   
   if (from) {
     pmtCond.push(gte(paymentsTable.date, from as string));
@@ -817,14 +832,14 @@ router.get("/reports/all-transactions", authMiddleware, async (req, res) => {
     return conditions;
   };
 
-  const saleCond = addCond([eq(saleInvoicesTable.isDeleted, "false")], saleInvoicesTable.date);
-  const purCond = addCond([eq(purchaseInvoicesTable.isDeleted, "false")], purchaseInvoicesTable.date);
-  const pmtCond = addCond([eq(paymentsTable.isDeleted, "false")], paymentsTable.date);
-  const rctCond = addCond([eq(receiptsTable.isDeleted, "false")], receiptsTable.date);
-  const jeCond = addCond([eq(journalEntriesTable.isDeleted, "false")], journalEntriesTable.date);
-  const orderCond = addCond([eq(ordersTable.isDeleted, "false")], ordersTable.date);
-  const cnCond = addCond([eq(creditNotesTable.isDeleted, "false")], creditNotesTable.date);
-  const dnCond = addCond([eq(debitNotesTable.isDeleted, "false")], debitNotesTable.date);
+  const saleCond = addCond([and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))], saleInvoicesTable.date);
+  const purCond = addCond([and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))], purchaseInvoicesTable.date);
+  const pmtCond = addCond([and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false))], paymentsTable.date);
+  const rctCond = addCond([and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false))], receiptsTable.date);
+  const jeCond = addCond([and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false))], journalEntriesTable.date);
+  const orderCond = addCond([and(eq(ordersTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(ordersTable.isKaccha, false))], ordersTable.date);
+  const cnCond = addCond([and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false))], creditNotesTable.date);
+  const dnCond = addCond([and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false))], debitNotesTable.date);
 
   const [sales, purchases, payments, receipts, journals, orders, creditNotes, debitNotes] = await Promise.all([
     db.select().from(saleInvoicesTable).where(and(...saleCond)),
@@ -852,6 +867,7 @@ router.get("/reports/all-transactions", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/party-statement", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
   const { partyId, from, to } = req.query;
   if (!partyId) { return res.json({ transactions: [], openingBalance: 0, closingBalance: 0 }); }
 
@@ -886,13 +902,13 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
     db
       .select({ line: journalLinesTable, date: journalEntriesTable.date, ref: journalEntriesTable.voucherNumber, narration: journalEntriesTable.narration })
       .from(journalLinesTable)
-      .innerJoin(journalEntriesTable, and(eq(journalLinesTable.entryId, journalEntriesTable.id), eq(journalEntriesTable.isDeleted, "false"))),
-    db.select().from(saleInvoicesTable).where(eq(saleInvoicesTable.isDeleted, "false")),
-    db.select().from(purchaseInvoicesTable).where(eq(purchaseInvoicesTable.isDeleted, "false")),
-    db.select().from(receiptsTable).where(eq(receiptsTable.isDeleted, "false")),
-    db.select().from(paymentsTable).where(eq(paymentsTable.isDeleted, "false")),
-    db.select().from(creditNotesTable).where(eq(creditNotesTable.isDeleted, "false")),
-    db.select().from(debitNotesTable).where(eq(debitNotesTable.isDeleted, "false")),
+      .innerJoin(journalEntriesTable, and(eq(journalLinesTable.entryId, journalEntriesTable.id), and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false)))),
+    db.select().from(saleInvoicesTable).where(and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))),
+    db.select().from(purchaseInvoicesTable).where(and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))),
+    db.select().from(receiptsTable).where(and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false))),
+    db.select().from(paymentsTable).where(and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false))),
+    db.select().from(creditNotesTable).where(and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false))),
+    db.select().from(debitNotesTable).where(and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false))),
     db.select({
       mode: saleInvoicePaymentsTable.mode,
       amount: saleInvoicePaymentsTable.amount,
@@ -900,7 +916,7 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
       date: saleInvoicesTable.date,
       ref: saleInvoicesTable.invoiceNumber,
     }).from(saleInvoicePaymentsTable)
-      .innerJoin(saleInvoicesTable, and(eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id), eq(saleInvoicesTable.isDeleted, "false"))),
+      .innerJoin(saleInvoicesTable, and(eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id), and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)))),
     db.select({
       mode: purchaseInvoicePaymentsTable.mode,
       amount: purchaseInvoicePaymentsTable.amount,
@@ -908,7 +924,7 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
       date: purchaseInvoicesTable.date,
       ref: purchaseInvoicesTable.invoiceNumber,
     }).from(purchaseInvoicePaymentsTable)
-      .innerJoin(purchaseInvoicesTable, and(eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id), eq(purchaseInvoicesTable.isDeleted, "false"))),
+      .innerJoin(purchaseInvoicesTable, and(eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id), and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)))),
   ]);
 
   const byName = (name: string) => ledgers.find(l => l.name === name)?.id;
@@ -1043,7 +1059,7 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
   }).from(purchaseInvoiceItemsTable)
     .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
     .where(and(
-      eq(purchaseInvoicesTable.isDeleted, "false"),
+      and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)),
       ...(from ? [gte(purchaseInvoicesTable.date, from as string)] : []),
       ...(to ? [lte(purchaseInvoicesTable.date, to as string)] : []),
     ))
@@ -1057,7 +1073,7 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
   }).from(saleInvoiceItemsTable)
     .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
     .where(and(
-      eq(saleInvoicesTable.isDeleted, "false"),
+      and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)),
       ...(from ? [gte(saleInvoicesTable.date, from as string)] : []),
       ...(to ? [lte(saleInvoicesTable.date, to as string)] : []),
     ))
@@ -1071,7 +1087,7 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
   }).from(creditNoteItemsTable)
     .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
     .where(and(
-      eq(creditNotesTable.isDeleted, "false"),
+      and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false)),
       ...(from ? [gte(creditNotesTable.date, from as string)] : []),
       ...(to ? [lte(creditNotesTable.date, to as string)] : []),
     ))
@@ -1085,7 +1101,7 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
   }).from(debitNoteItemsTable)
     .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
     .where(and(
-      eq(debitNotesTable.isDeleted, "false"),
+      and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false)),
       ...(from ? [gte(debitNotesTable.date, from as string)] : []),
       ...(to ? [lte(debitNotesTable.date, to as string)] : []),
     ))
@@ -1185,7 +1201,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
       value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
     }).from(purchaseInvoiceItemsTable)
       .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
-      .where(and(eq(purchaseInvoicesTable.isDeleted, "false"), dateFilter(purchaseInvoicesTable.date)))
+      .where(and(and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)), dateFilter(purchaseInvoicesTable.date)))
       .groupBy(purchaseInvoiceItemsTable.stockItemId, purchaseInvoiceItemsTable.batchId),
 
     // Sales (outward) grouped by itemId + batchId
@@ -1196,7 +1212,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
       value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
     }).from(saleInvoiceItemsTable)
       .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
-      .where(and(eq(saleInvoicesTable.isDeleted, "false"), dateFilter(saleInvoicesTable.date)))
+      .where(and(and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)), dateFilter(saleInvoicesTable.date)))
       .groupBy(saleInvoiceItemsTable.stockItemId, saleInvoiceItemsTable.batchId),
 
     // Credit notes (sale returns → inward, no batch) grouped by itemId
@@ -1206,7 +1222,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
       value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
     }).from(creditNoteItemsTable)
       .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
-      .where(and(eq(creditNotesTable.isDeleted, "false"), dateFilter(creditNotesTable.date)))
+      .where(and(and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false)), dateFilter(creditNotesTable.date)))
       .groupBy(creditNoteItemsTable.stockItemId),
 
     // Debit notes (purchase returns → outward, no batch) grouped by itemId
@@ -1216,7 +1232,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
       value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
     }).from(debitNoteItemsTable)
       .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
-      .where(and(eq(debitNotesTable.isDeleted, "false"), dateFilter(debitNotesTable.date)))
+      .where(and(and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false)), dateFilter(debitNotesTable.date)))
       .groupBy(debitNoteItemsTable.stockItemId),
   ]);
 
@@ -1314,7 +1330,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
 
 router.get("/reports/delivery-report", authMiddleware, async (req, res) => {
   const { from, to } = req.query;
-  const conditions: any[] = [eq(ordersTable.isDeleted, "false")];
+  const conditions: any[] = [and(eq(ordersTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(ordersTable.isKaccha, false))];
   if (from) conditions.push(gte(ordersTable.date, from as string));
   if (to) conditions.push(lte(ordersTable.date, to as string));
 
@@ -1481,7 +1497,7 @@ router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
       .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
       .where(and(
         eq(purchaseInvoiceItemsTable.stockItemId, itemId),
-        eq(purchaseInvoicesTable.isDeleted, "false"),
+        and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)),
         ...addDateCond([], purchaseInvoicesTable.date),
       )),
     db.select({
@@ -1494,7 +1510,7 @@ router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
       .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
       .where(and(
         eq(saleInvoiceItemsTable.stockItemId, itemId),
-        eq(saleInvoicesTable.isDeleted, "false"),
+        and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)),
         ...addDateCond([], saleInvoicesTable.date),
       )),
     db.select({
@@ -1507,7 +1523,7 @@ router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
       .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
       .where(and(
         eq(creditNoteItemsTable.stockItemId, itemId),
-        eq(creditNotesTable.isDeleted, "false"),
+        and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false)),
         ...addDateCond([], creditNotesTable.date),
       )),
     db.select({
@@ -1520,7 +1536,7 @@ router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
       .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
       .where(and(
         eq(debitNoteItemsTable.stockItemId, itemId),
-        eq(debitNotesTable.isDeleted, "false"),
+        and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false)),
         ...addDateCond([], debitNotesTable.date),
       )),
   ]);
@@ -1592,7 +1608,7 @@ router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
       .where(and(
         eq(purchaseInvoiceItemsTable.stockItemId, itemId),
         batchFilter(purchaseInvoiceItemsTable.batchId),
-        eq(purchaseInvoicesTable.isDeleted, "false"),
+        and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)),
         ...addDate([], purchaseInvoicesTable.date),
       )),
 
@@ -1610,7 +1626,7 @@ router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
       .where(and(
         eq(saleInvoiceItemsTable.stockItemId, itemId),
         batchFilter(saleInvoiceItemsTable.batchId),
-        eq(saleInvoicesTable.isDeleted, "false"),
+        and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)),
         ...addDate([], saleInvoicesTable.date),
       )),
 
@@ -1628,7 +1644,7 @@ router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
           .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
           .where(and(
             eq(creditNoteItemsTable.stockItemId, itemId),
-            eq(creditNotesTable.isDeleted, "false"),
+            and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false)),
             ...addDate([], creditNotesTable.date),
           ))
       : Promise.resolve([] as { date:string; number:string; sourceId:number; party:string; qty:string; rate:string; value:string }[]),
@@ -1647,7 +1663,7 @@ router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
           .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
           .where(and(
             eq(debitNoteItemsTable.stockItemId, itemId),
-            eq(debitNotesTable.isDeleted, "false"),
+            and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false)),
             ...addDate([], debitNotesTable.date),
           ))
       : Promise.resolve([] as { date:string; number:string; sourceId:number; party:string; qty:string; rate:string; value:string }[]),

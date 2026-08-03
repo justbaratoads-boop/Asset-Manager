@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useListStockItems, useDeleteStockItem, getListStockItemsQueryKey, useGetCompanySettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,7 +42,11 @@ export default function StockItemList() {
     }
   };
 
-  const list = items as any[];
+  const list = useMemo(() => {
+    const arr = items as any[];
+    if (enableDualLedger) return arr;
+    return arr.filter(item => item.isTaxLiability !== false && String(item.isTaxLiability) !== "false");
+  }, [items, enableDualLedger]);
   const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey, getListStockItemsQueryKey, useGetCompanySettings } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
@@ -123,6 +123,11 @@ export default function SaleInvoiceForm() {
   const { data: companySettings } = useGetCompanySettings();
   const enableDiscount = (companySettings as any)?.enableDiscount ?? false;
   const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
+  const filteredStockItems = useMemo(() => {
+    if (!stockItems) return [];
+    if (enableDualLedger) return stockItems as any[];
+    return (stockItems as any[]).filter(s => s.isTaxLiability !== false && String(s.isTaxLiability) !== "false");
+  }, [stockItems, enableDualLedger]);
   const stockAvail = useStockAvailability();
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
   const { data: existing } = useGetSaleInvoice(editId!, { query: { enabled: isEdit } });
@@ -444,7 +449,7 @@ export default function SaleInvoiceForm() {
                     <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0" onClick={() => setItems(prev => prev.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                   <ItemSearchCombobox
-                    stockItems={stockItems as any[]}
+                    stockItems={filteredStockItems}
                     itemName={item.itemName}
                     stockItemId={item.stockItemId}
                     onNameChange={v => updateItem(index, "itemName", v)}
@@ -620,7 +625,7 @@ export default function SaleInvoiceForm() {
                     <TableRow key={index}>
                       <TableCell>
                         <ItemSearchCombobox
-                          stockItems={stockItems as any[]}
+                          stockItems={filteredStockItems}
                           itemName={item.itemName}
                           stockItemId={item.stockItemId}
                           onNameChange={v => updateItem(index, "itemName", v)}
