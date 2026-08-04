@@ -104,11 +104,11 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
         unit: item.unit,
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
-        gstPct: String(isKaccha ? 0 : (item.gstPct || 0)),
+        gstPct: String(isKaccha ? 0 : (Number(item.gstPct) || 0)),
         taxableAmount: String(Number(item.taxableAmount) || 0),
-        cgst: String(isKaccha ? 0 : (item.cgst || 0)),
-        sgst: String(isKaccha ? 0 : (item.sgst || 0)),
-        igst: String(isKaccha ? 0 : (item.igst || 0)),
+        cgst: String(isKaccha ? 0 : (Number(item.cgst) || 0)),
+        sgst: String(isKaccha ? 0 : (Number(item.sgst) || 0)),
+        igst: String(isKaccha ? 0 : (Number(item.igst) || 0)),
         batchId: item.batchId || null,
         total: String(Number(item.total) || 0),
       });
@@ -119,7 +119,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
           itemId: item.stockItemId,
           batchId: item.batchId || null,
           type: "purchase",
-          quantity: String(item.quantity),
+          quantity: String(Number(item.quantity) || 0),
           balanceAfter: String(newBalance),
           reference: invNum,
           isKaccha: isKaccha,
@@ -132,7 +132,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
         await db.insert(purchaseInvoicePaymentsTable).values({
           invoiceId: inv.id,
           mode: payment.mode,
-          amount: String(payment.amount),
+          amount: String(Number(payment.amount) || 0),
           reference: payment.reference,
         });
       }
@@ -226,17 +226,17 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
+        quantity: String(Number(item.quantity) || 0),
         unit: item.unit,
-        rate: String(item.rate),
+        rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
-        taxableAmount: String(item.taxableAmount),
+        taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
         igst: String(Number(item.igst) || 0),
         batchId: item.batchId || null,
-        total: String(item.total),
+        total: String(Number(item.total) || 0),
       });
       if (item.stockItemId) {
         await adjustStock(item.stockItemId, item.batchId || null, Number(item.quantity));
@@ -250,7 +250,7 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
       await db.insert(purchaseInvoicePaymentsTable).values({
         invoiceId: Number(req.params.id),
         mode: payment.mode,
-        amount: String(payment.amount),
+        amount: String(Number(payment.amount) || 0),
         reference: payment.reference,
       });
     }
@@ -365,7 +365,7 @@ router.post("/purchase-orders", authMiddleware, async (req, res) => {
         itemId: item.stockItemId,
         batchId: item.batchId || null,
         type: "purchase-order",
-        quantity: String(item.quantity),
+        quantity: String(Number(item.quantity) || 0),
         balanceAfter: String(newBalance),
         reference: poNumber,
       });

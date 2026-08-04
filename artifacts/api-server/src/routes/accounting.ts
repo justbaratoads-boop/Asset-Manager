@@ -298,16 +298,16 @@ router.post("/credit-notes", authMiddleware, async (req, res) => {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
+        quantity: String(Number(item.quantity) || 0),
         unit: item.unit,
-        rate: String(item.rate),
+        rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
-        taxableAmount: String(item.taxableAmount),
+        taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
         igst: String(Number(item.igst) || 0),
-        total: String(item.total),
+        total: String(Number(item.total) || 0),
       });
 
       if (item.stockItemId) {
@@ -355,16 +355,16 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
+        quantity: String(Number(item.quantity) || 0),
         unit: item.unit,
-        rate: String(item.rate),
+        rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
-        taxableAmount: String(item.taxableAmount),
+        taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
         igst: String(Number(item.igst) || 0),
-        total: String(item.total),
+        total: String(Number(item.total) || 0),
       });
       if (item.stockItemId) {
         await adjustStock(item.stockItemId, item.batchId || null, Number(item.quantity));
@@ -409,16 +409,16 @@ router.post("/debit-notes", authMiddleware, async (req, res) => {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
+        quantity: String(Number(item.quantity) || 0),
         unit: item.unit,
-        rate: String(item.rate),
+        rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
-        taxableAmount: String(item.taxableAmount),
+        taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
         igst: String(Number(item.igst) || 0),
-        total: String(item.total),
+        total: String(Number(item.total) || 0),
       });
 
       if (item.stockItemId) {
@@ -466,16 +466,16 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
-        quantity: String(item.quantity),
+        quantity: String(Number(item.quantity) || 0),
         unit: item.unit,
-        rate: String(item.rate),
+        rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
-        taxableAmount: String(item.taxableAmount),
+        taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
         igst: String(Number(item.igst) || 0),
-        total: String(item.total),
+        total: String(Number(item.total) || 0),
       });
       if (item.stockItemId) {
         await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
