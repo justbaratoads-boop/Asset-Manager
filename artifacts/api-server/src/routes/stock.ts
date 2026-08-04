@@ -120,7 +120,7 @@ router.put("/stock-batches/:id", authMiddleware, async (req, res) => {
   const itemId = directlyUsed ? existing.stockItemId : incomingItemId;
   const newOpening = openingStock !== undefined ? Number(openingStock) : Number(existing.openingStock || 0);
   const delta = newOpening - Number(existing.openingStock || 0);
-  const newPhysical = Math.max(0, Number(existing.physicalStock || 0) + delta);
+  const newPhysical = Number(existing.physicalStock || 0) + delta;
 
   const [batch] = await db.update(stockBatchesTable).set({
     name, description, expiryDate,

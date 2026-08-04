@@ -21,7 +21,7 @@ export async function adjustStock(
   if (batchId) {
     const [b] = await db.select({ ps: stockBatchesTable.physicalStock })
       .from(stockBatchesTable).where(eq(stockBatchesTable.id, batchId)).limit(1);
-    const newPs = Math.max(0, Number(b?.ps || 0) + delta);
+    const newPs = Number(b?.ps || 0) + delta;
     await db.update(stockBatchesTable)
       .set({ physicalStock: String(newPs) })
       .where(eq(stockBatchesTable.id, batchId));
@@ -29,7 +29,7 @@ export async function adjustStock(
   } else {
     const [item] = await db.select({ ps: stockItemsTable.physicalStock })
       .from(stockItemsTable).where(eq(stockItemsTable.id, itemId)).limit(1);
-    const newPs = Math.max(0, Number(item?.ps || 0) + delta);
+    const newPs = Number(item?.ps || 0) + delta;
     await db.update(stockItemsTable)
       .set({ physicalStock: String(newPs) })
       .where(eq(stockItemsTable.id, itemId));
@@ -68,7 +68,7 @@ export async function adjustBatchStock(
   const [b] = await db.select({ ps: stockBatchesTable.physicalStock, rs: stockBatchesTable.reservedStock })
     .from(stockBatchesTable).where(eq(stockBatchesTable.id, batchId)).limit(1);
   const updates: Partial<typeof stockBatchesTable.$inferInsert> = {};
-  if (physicalDelta !== 0) updates.physicalStock = String(Math.max(0, Number(b?.ps || 0) + physicalDelta));
+  if (physicalDelta !== 0) updates.physicalStock = String(Number(b?.ps || 0) + physicalDelta);
   if (reservedDelta !== 0) updates.reservedStock = String(Math.max(0, Number(b?.rs || 0) + reservedDelta));
   if (Object.keys(updates).length > 0) {
     await db.update(stockBatchesTable).set(updates).where(eq(stockBatchesTable.id, batchId));

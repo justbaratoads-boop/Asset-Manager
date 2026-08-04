@@ -1047,6 +1047,7 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
+    const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
 
   const items = await db.select().from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false")).orderBy(stockItemsTable.name);
@@ -1168,6 +1169,7 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
 
 // ── Batch-wise Stock Summary ──────────────────────────────────────────────────
 router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
+    const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
 
   const [items, batches] = await Promise.all([
@@ -1286,7 +1288,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
     // Weighted average cost for closing
     const avgDenom    = openingQty + inwardQty;
     const closingRate = avgDenom > 0 ? (openingValue + inwardValue) / avgDenom : baseRate;
-    const closingValue = Math.max(0, closingQty) * closingRate;
+    const closingValue = closingQty * closingRate;
 
     return {
       batchId, batchName: null as string | null, expiryDate: null as string | null,
@@ -1329,6 +1331,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/delivery-report", authMiddleware, async (req, res) => {
+    const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
   const conditions: any[] = [and(eq(ordersTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(ordersTable.isKaccha, false))];
   if (from) conditions.push(gte(ordersTable.date, from as string));
@@ -1381,6 +1384,7 @@ router.get("/reports/delivery-report", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/stock-current", authMiddleware, async (req, res) => {
+    const enableDualLedger = await getEnableDualLedger();
   const result = await db.execute(sql`
     SELECT
       si.id,
@@ -1416,6 +1420,7 @@ router.get("/reports/stock-current", authMiddleware, async (req, res) => {
 });
 
 router.get("/stock-availability", authMiddleware, async (req, res) => {
+    const enableDualLedger = await getEnableDualLedger();
   const result = await db.execute(sql`
     SELECT
       si.id,
@@ -1474,6 +1479,7 @@ router.get("/stock-availability", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
+    const enableDualLedger = await getEnableDualLedger();
   const itemId = Number(req.params.id);
   const { from, to } = req.query;
 
@@ -1566,6 +1572,7 @@ router.get("/reports/stock-ledger/:id", authMiddleware, async (req, res) => {
 // ── Batch / Unbatched-stock Ledger ───────────────────────────────────────────
 // GET /reports/stock-batch-ledger?itemId=X&batchId=Y|null&from=...&to=...
 router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
+    const enableDualLedger = await getEnableDualLedger();
   const itemId     = Number(req.query.itemId);
   const batchIdRaw = req.query.batchId as string | undefined;
   const batchId    = batchIdRaw === undefined || batchIdRaw === "null" ? null : Number(batchIdRaw);
@@ -1691,7 +1698,7 @@ router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
   const outwardRate  = outwardQty > 0 ? outwardValue / outwardQty : 0;
   const avgDenom     = openingQty + inwardQty;
   const closingRate  = avgDenom > 0 ? (openingValue + inwardValue) / avgDenom : baseRate;
-  const closingValue = Math.max(0, closingQty) * closingRate;
+  const closingValue = closingQty * closingRate;
 
   // Build running balance
   let balance = openingQty;
