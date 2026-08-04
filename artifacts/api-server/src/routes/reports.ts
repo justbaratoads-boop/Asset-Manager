@@ -31,7 +31,7 @@ async function getLedgersWithParties() {
     nature: p.balanceType || (p.type === 'customer' ? 'dr' : 'cr'),
     openingBalance: p.openingBalance,
   }));
-  return [...dbLedgers, ...partyLedgers];
+  return [...dbLedgers, ...partyLedgers].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
 }
 
 

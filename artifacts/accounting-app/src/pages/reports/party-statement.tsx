@@ -7,6 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
@@ -45,6 +49,7 @@ function navPath(type: string, id: number): string | null {
 export default function PartyStatement() {
   const { fy, globalFrom: from, globalTo: to } = useFY();
   const [partyId, setPartyId] = useState<string>("");
+  const [open, setOpen] = useState(false);
   
   
   const [, setLocation] = useLocation();
@@ -84,12 +89,47 @@ export default function PartyStatement() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <Label>Account</Label>
-          <Select value={partyId} onValueChange={setPartyId}>
-            <SelectTrigger className="w-[300px]"><SelectValue placeholder="Select account" /></SelectTrigger>
-            <SelectContent className="max-h-[400px]">
-              {allAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} <span className="text-xs text-muted-foreground ml-2">({a.group})</span></SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-[300px] justify-between font-normal"
+              >
+                {selectedAccount ? selectedAccount.name : "Select account"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0">
+              <Command>
+                <CommandInput placeholder="Search account..." />
+                <CommandList>
+                  <CommandEmpty>No account found.</CommandEmpty>
+                  <CommandGroup>
+                    {allAccounts.map((a) => (
+                      <CommandItem
+                        key={a.id}
+                        value={`${a.name} ${a.group}`}
+                        onSelect={() => {
+                          setPartyId(a.id);
+                          setOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            partyId === a.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {a.name} <span className="text-xs text-muted-foreground ml-2">({a.group})</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
         
         
