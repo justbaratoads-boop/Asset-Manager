@@ -36,19 +36,19 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="hidden sm:flex items-center gap-2 mr-2">
+        <div className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">
           <Input 
             type="date" 
             value={globalFrom} 
             onChange={(e) => setGlobalFrom(e.target.value)} 
-            className="w-36 h-8 text-xs" 
+            className="w-[100px] sm:w-36 h-8 text-[10px] sm:text-xs px-1 sm:px-3" 
           />
-          <span className="text-muted-foreground text-xs">to</span>
+          <span className="text-muted-foreground text-[10px] sm:text-xs">to</span>
           <Input 
             type="date" 
             value={globalTo} 
             onChange={(e) => setGlobalTo(e.target.value)} 
-            className="w-36 h-8 text-xs" 
+            className="w-[100px] sm:w-36 h-8 text-[10px] sm:text-xs px-1 sm:px-3" 
           />
         </div>
         <Badge variant="outline" className="hidden lg:flex text-xs font-medium text-muted-foreground border-dashed">

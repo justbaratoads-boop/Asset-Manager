@@ -40,6 +40,7 @@ function KpiCard({ title, value, icon: Icon, variant = "default", onClick }: { t
 
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useFY } from "@/lib/financial-year";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -50,8 +51,7 @@ export default function Dashboard() {
     return null;
   }
 
-  const [periodFrom, setPeriodFrom] = useState(monthStart);
-  const [periodTo, setPeriodTo] = useState(todayStr);
+  const { globalFrom: periodFrom, globalTo: periodTo } = useFY();
 
   const { data: summary, isLoading: loadingSum } = useQuery({
     queryKey: ["dashboard-summary", periodFrom, periodTo],
@@ -76,26 +76,6 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Today's business snapshot</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
-            <Input
-              type="date"
-              value={periodFrom}
-              onChange={e => setPeriodFrom(e.target.value)}
-              className="h-8 w-36 text-sm"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
-            <Input
-              type="date"
-              value={periodTo}
-              onChange={e => setPeriodTo(e.target.value)}
-              className="h-8 w-36 text-sm"
-            />
-          </div>
         </div>
       </div>
 
