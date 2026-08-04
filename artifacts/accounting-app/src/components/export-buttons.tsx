@@ -30,7 +30,7 @@ export function ExportButtons({ data, columns, filename = "report", title }: Exp
   const { data: companySettings } = useGetCompanySettings();
   const { globalFrom, globalTo } = useFY();
   
-  const businessName = companySettings?.name || "Business Name";
+  const businessName = companySettings?.companyName || "Business Name";
   const dateStr = `From: ${formatDate(globalFrom)} To: ${formatDate(globalTo)}`;
 
   const handleCSV = () => {
