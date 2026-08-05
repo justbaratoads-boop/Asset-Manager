@@ -320,6 +320,16 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
     if (items.length === 0) e.items = "Add at least one item";
     if (amountPaid > pakkaGrandTotal + 0.01) e.payment = `Total payments (${formatCurrency(amountPaid)}) cannot exceed pakka invoice total (${formatCurrency(pakkaGrandTotal)})`;
     if (kacchaAmountPaid > kacchaGrandTotal + 0.01) e.kacchaPayment = `Total kaccha payments (${formatCurrency(kacchaAmountPaid)}) cannot exceed kaccha invoice total (${formatCurrency(kacchaGrandTotal)})`;
+    
+    if (billType === "cash") {
+      if (pakkaGrandTotal > 0 && amountPaid < pakkaGrandTotal - 0.01) {
+        e.payment = `For cash sales, the full invoice total (${formatCurrency(pakkaGrandTotal)}) must be paid in full.`;
+      }
+      if (kacchaGrandTotal > 0 && kacchaAmountPaid < kacchaGrandTotal - 0.01) {
+        e.kacchaPayment = `For cash sales, the full kaccha total (${formatCurrency(kacchaGrandTotal)}) must be paid in full.`;
+      }
+    }
+
     return e;
   };
 
