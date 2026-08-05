@@ -3,10 +3,10 @@ import { db } from "@workspace/db";
 import {
   saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockTransactionsTable,
   ordersTable,
-} from "@workspace/db/schema";
+, stockItemsTable } from "@workspace/db/schema";
 import { adjustStock, adjustReservedStock } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
-import { eq, and, ilike, gte, lte, sql, ne } from "drizzle-orm";
+import { eq, and, ilike, gte, lte, sql, ne , inArray } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeKacchaInvoiceNumber } from "../lib/counter";
 import { companySettingsTable } from "@workspace/db/schema";
@@ -252,7 +252,16 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
 
   if (enableDualLedger && data.items?.length) {
     const isKacchaInvoice = existingInvoice.isKaccha;
-    const hasInvalidItems = data.items.some((i: any) => isKacchaInvoice ? i.isTaxLiability !== false : i.isTaxLiability === false);
+    
+    const stockItemIds = data.items.map((i: any) => i.stockItemId).filter(Boolean);
+    const stockItems = stockItemIds.length ? await db.select().from(stockItemsTable).where(inArray(stockItemsTable.id, stockItemIds)) : [];
+    const stockMap = Object.fromEntries(stockItems.map((s: any) => [s.id, s.isTaxLiability]));
+
+    const hasInvalidItems = data.items.some((i: any) => {
+       const isTax = i.isTaxLiability !== undefined ? i.isTaxLiability : stockMap[i.stockItemId] ?? true;
+       return isKacchaInvoice ? isTax !== false : isTax === false;
+    });
+
     
     if (hasInvalidItems) {
       return res.status(400).json({ error: isKacchaInvoice ? "Cannot add Pakka (taxable) items to a Kaccha bill." : "Cannot add Kaccha (non-taxable) items to a Pakka bill." });
