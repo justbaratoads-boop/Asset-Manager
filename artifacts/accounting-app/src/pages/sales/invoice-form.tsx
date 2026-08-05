@@ -90,10 +90,17 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
   };
 }
 
-function GstToggle({ value }: { value: boolean; onChange: (v: boolean) => void }) {
+function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="h-8 flex items-center justify-center bg-muted rounded border text-xs font-medium text-muted-foreground px-2">
-      {value ? "In" : "Ex"}
+    <div className="flex rounded overflow-hidden border text-xs font-medium">
+      <button type="button" onClick={() => onChange(false)}
+        className={`px-1.5 py-0.5 transition-colors ${!value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        Ex
+      </button>
+      <button type="button" onClick={() => onChange(true)}
+        className={`px-1.5 py-0.5 border-l transition-colors ${value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        In
+      </button>
     </div>
   );
 }
@@ -552,9 +559,16 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                     {/* GST Type + Rate */}
                     <div className="col-span-2 space-y-1">
                       <Label className="text-xs text-muted-foreground">GST Type</Label>
-                      <div className="flex items-center justify-center bg-muted rounded-md border text-sm font-medium text-muted-foreground h-10">
-      {item.gstInclusive ? "Inclusive" : "Exclusive"}
-    </div>
+                      <div className="flex rounded-md overflow-hidden border text-sm font-medium h-10">
+                        <button type="button" onClick={() => updateItem(index, "gstInclusive", false)}
+                          className={`flex-1 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                          Exclusive
+                        </button>
+                        <button type="button" onClick={() => updateItem(index, "gstInclusive", true)}
+                          className={`flex-1 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                          Inclusive
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">GST%</Label>
                       <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground">
@@ -712,7 +726,9 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                         <UnitSelect value={item.unit} onChange={v => updateItem(index, "unit", v)} className="h-9" />
                       )}</TableCell>
                       <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(index, "rate", e.target.value)} placeholder="Rate" /></TableCell>
-                      <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></TableCell>
+                      {enableDiscount && (
+                        <TableCell><Input className="h-9 text-sm" type="number" min="0" max="100" value={item.discountPct || ""} onChange={e => updateItem(index, "discountPct", e.target.value)} placeholder="0" /></TableCell>
+                      )}
                       <TableCell>
                         <div className="space-y-1">
                           <GstToggle value={item.gstInclusive} onChange={v => updateItem(index, "gstInclusive", v)} />

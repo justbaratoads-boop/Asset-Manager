@@ -69,10 +69,17 @@ function calcItem(item: Partial<OrderItem>): OrderItem {
   };
 }
 
-function GstToggle({ value }: { value: boolean; onChange: (v: boolean) => void }) {
+function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="h-8 flex items-center justify-center bg-muted rounded border text-xs font-medium text-muted-foreground px-2">
-      {value ? "In" : "Ex"}
+    <div className="flex rounded overflow-hidden border text-xs font-medium">
+      <button type="button" onClick={() => onChange(false)}
+        className={`px-1.5 py-0.5 transition-colors ${!value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        Ex
+      </button>
+      <button type="button" onClick={() => onChange(true)}
+        className={`px-1.5 py-0.5 border-l transition-colors ${value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        In
+      </button>
     </div>
   );
 }
@@ -326,12 +333,26 @@ export default function OrderForm() {
                   {/* Per-item GST Type toggle */}
                   <div className="col-span-2 space-y-1">
                     <Label className="text-xs text-muted-foreground">GST Type</Label>
-                    <div className="flex items-center justify-center bg-muted rounded-md border text-sm font-medium text-muted-foreground h-10">
-      {item.gstInclusive ? "Inclusive" : "Exclusive"}
-    </div>
+                    <div className="flex rounded-md overflow-hidden border text-sm font-medium h-10">
+                      <button type="button" onClick={() => updateItem(i, "gstInclusive", false)}
+                        className={`flex-1 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                        Exclusive
+                      </button>
+                      <button type="button" onClick={() => updateItem(i, "gstInclusive", true)}
+                        className={`flex-1 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                        Inclusive
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">GST%</Label>
-                    <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
+                    {item.gstLocked ? (
+                      <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
+                    ) : (
+                      <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
+                        <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div></div>
                 </div>
@@ -433,7 +454,14 @@ export default function OrderForm() {
                     <TableCell>
                       <div className="space-y-1">
                         <GstToggle value={item.gstInclusive} onChange={v => updateItem(i, "gstInclusive", v)} />
-                        <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
+                        {item.gstLocked ? (
+                          <div className="h-8 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>
+                        ) : (
+                          <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                          </Select>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>

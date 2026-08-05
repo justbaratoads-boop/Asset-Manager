@@ -81,10 +81,17 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
   };
 }
 
-function GstToggle({ value }: { value: boolean; onChange: (v: boolean) => void }) {
+function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="h-8 flex items-center justify-center bg-muted rounded border text-xs font-medium text-muted-foreground px-2">
-      {value ? "In" : "Ex"}
+    <div className="flex rounded overflow-hidden border text-xs font-medium">
+      <button type="button" onClick={() => onChange(false)}
+        className={`px-1.5 py-0.5 transition-colors ${!value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        Ex
+      </button>
+      <button type="button" onClick={() => onChange(true)}
+        className={`px-1.5 py-0.5 border-l transition-colors ${value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+        In
+      </button>
     </div>
   );
 }
