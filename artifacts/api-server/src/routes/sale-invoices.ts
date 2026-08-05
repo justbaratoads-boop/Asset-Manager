@@ -220,7 +220,26 @@ router.get("/sale-invoices/:id", authMiddleware, async (req, res) => {
     .where(eq(saleInvoicesTable.id, Number(id))).limit(1);
   if (!invoice) return res.status(404).json({ error: "Not found" });
 
-  const items = await db.select().from(saleInvoiceItemsTable).where(eq(saleInvoiceItemsTable.invoiceId, Number(id)));
+  const items = await db.select({
+    id: saleInvoiceItemsTable.id,
+    invoiceId: saleInvoiceItemsTable.invoiceId,
+    stockItemId: saleInvoiceItemsTable.stockItemId,
+    itemName: saleInvoiceItemsTable.itemName,
+    hsnCode: saleInvoiceItemsTable.hsnCode,
+    quantity: saleInvoiceItemsTable.quantity,
+    unit: saleInvoiceItemsTable.unit,
+    rate: saleInvoiceItemsTable.rate,
+    discountPct: saleInvoiceItemsTable.discountPct,
+    gstPct: saleInvoiceItemsTable.gstPct,
+    taxableAmount: saleInvoiceItemsTable.taxableAmount,
+    cgst: saleInvoiceItemsTable.cgst,
+    sgst: saleInvoiceItemsTable.sgst,
+    igst: saleInvoiceItemsTable.igst,
+    total: saleInvoiceItemsTable.total,
+    batchId: saleInvoiceItemsTable.batchId,
+    description: saleInvoiceItemsTable.description,
+    isTaxLiability: stockItemsTable.isTaxLiability,
+  }).from(saleInvoiceItemsTable).leftJoin(stockItemsTable, eq(saleInvoiceItemsTable.stockItemId, stockItemsTable.id)).where(eq(saleInvoiceItemsTable.invoiceId, Number(id)));
   const payments = await db.select().from(saleInvoicePaymentsTable).where(eq(saleInvoicePaymentsTable.invoiceId, Number(id)));
 
   res.json({
@@ -234,7 +253,7 @@ router.get("/sale-invoices/:id", authMiddleware, async (req, res) => {
     totalSgst: Number(invoice.totalSgst),
     totalIgst: Number(invoice.totalIgst),
     totalGst: Number(invoice.totalGst),
-    items: items.map(i => ({ ...i, quantity: (isNaN(Number(i.quantity)) ? 0 : Number(i.quantity)), rate: (isNaN(Number(i.rate)) ? 0 : Number(i.rate)), discountPct: (isNaN(Number(i.discountPct)) ? 0 : Number(i.discountPct)), gstPct: (isNaN(Number(i.gstPct)) ? 0 : Number(i.gstPct)), taxableAmount: (isNaN(Number(i.taxableAmount)) ? 0 : Number(i.taxableAmount)), total: (isNaN(Number(i.total)) ? 0 : Number(i.total)), cgst: (isNaN(Number(i.cgst)) ? 0 : Number(i.cgst)), sgst: (isNaN(Number(i.sgst)) ? 0 : Number(i.sgst)), igst: (isNaN(Number(i.igst)) ? 0 : Number(i.igst)) })),
+    items: items.map(i => ({ ...i, quantity: (isNaN(Number(i.quantity)) ? 0 : Number(i.quantity)), rate: (isNaN(Number(i.rate)) ? 0 : Number(i.rate)), discountPct: (isNaN(Number(i.discountPct)) ? 0 : Number(i.discountPct)), gstPct: (isNaN(Number(i.gstPct)) ? 0 : Number(i.gstPct)), taxableAmount: (isNaN(Number(i.taxableAmount)) ? 0 : Number(i.taxableAmount)), total: (isNaN(Number(i.total)) ? 0 : Number(i.total)), cgst: (isNaN(Number(i.cgst)) ? 0 : Number(i.cgst)), sgst: (isNaN(Number(i.sgst)) ? 0 : Number(i.sgst)), igst: (isNaN(Number(i.igst)) ? 0 : Number(i.igst)), isTaxLiability: i.isTaxLiability ?? true })),
     payments: payments.map(p => ({ ...p, amount: Number(p.amount) })),
   });
 });
@@ -284,18 +303,18 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
     billingAddress: data.billingAddress,
     isGst: data.isGst,
     isInterstate: data.isInterstate,
-    subtotal: String(data.subtotal || 0),
+    subtotal: String(existingInvoice.isKaccha ? ((data.kacchaSubtotal ?? data.subtotal) || 0) : (data.subtotal || 0)),
     totalDiscount: String(data.totalDiscount || 0),
     totalTaxable: String(data.totalTaxable || 0),
     totalCgst: String(data.totalCgst || 0),
     totalSgst: String(data.totalSgst || 0),
     totalIgst: String(data.totalIgst || 0),
     totalGst: String(data.totalGst || 0),
-    grandTotal: String(data.grandTotal || 0),
-    amountPaid: String(data.amountPaid || 0),
-    balanceDue: String(data.balanceDue || 0),
+    grandTotal: String(existingInvoice.isKaccha ? ((data.kacchaGrandTotal ?? data.grandTotal) || 0) : (data.grandTotal || 0)),
+    amountPaid: String(existingInvoice.isKaccha ? ((data.kacchaAmountPaid ?? data.amountPaid) || 0) : (data.amountPaid || 0)),
+    balanceDue: String(existingInvoice.isKaccha ? ((data.kacchaBalanceDue ?? data.balanceDue) || 0) : (data.balanceDue || 0)),
     notes: data.notes,
-    otherCharges: data.otherCharges || null,
+    otherCharges: existingInvoice.isKaccha ? (data.kacchaCharges ? JSON.stringify(data.kacchaCharges) : null) : (data.otherCharges || null),
     status: data.amountPaid >= data.grandTotal ? "paid" : (data.amountPaid > 0 ? "partial" : "confirmed"),
   }).where(eq(saleInvoicesTable.id, Number(id))).returning();
 
