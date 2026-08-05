@@ -9,6 +9,7 @@ const SYSTEM_LEDGERS = [
   { name: "CGST",  group: "Duties & Taxes", nature: "cr" },
   { name: "SGST",  group: "Duties & Taxes", nature: "cr" },
   { name: "IGST",  group: "Duties & Taxes", nature: "cr" },
+  { name: "Round Off", group: "Indirect Expenses", nature: "dr" },
 ] as const;
 
 // Old names that should be migrated to new names on startup

@@ -403,36 +403,38 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   useEffect(() => {
     if (!autoRoundOff) return;
     const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
+    const roundOffLedger = indirectLedgers.find(l => l.name === "Round Off");
+    const roundOffId = roundOffLedger ? roundOffLedger.id : 0;
     
     // Auto round off Pakka
     const rawPakka = computedItems.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0);
-    const pakkaTotalBeforeRoundOff = rawPakka + charges.filter(c => c.name !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
+    const pakkaTotalBeforeRoundOff = rawPakka + charges.filter(c => (c.ledgerName || c.name) !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
     const roundedPakka = Math.round(pakkaTotalBeforeRoundOff);
     const diffPakka = roundedPakka - pakkaTotalBeforeRoundOff;
     
     setCharges(prev => {
-      const filtered = prev.filter(c => c.name !== "Round Off");
+      const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
       if (Math.abs(diffPakka) > 0.001) {
-        filtered.push({ name: "Round Off", amount: String(Math.abs(diffPakka).toFixed(2)), type: diffPakka > 0 ? "add" : "deduct" });
+        filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffPakka).toFixed(2)) as any, type: diffPakka > 0 ? "add" : "deduct" });
       }
       return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
     });
 
     if (enableDualLedger) {
       const rawKaccha = computedItems.filter(i => !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
-      const kacchaTotalBeforeRoundOff = rawKaccha + (!hasPakka ? charges.filter(c => c.name !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0) : 0);
+      const kacchaTotalBeforeRoundOff = rawKaccha + (!hasPakka ? charges.filter(c => (c.ledgerName || c.name) !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0) : 0);
       const roundedKaccha = Math.round(kacchaTotalBeforeRoundOff);
       const diffKaccha = roundedKaccha - kacchaTotalBeforeRoundOff;
       
       setKacchaCharges(prev => {
-        const filtered = prev.filter(c => c.name !== "Round Off");
+        const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
         if (Math.abs(diffKaccha) > 0.001) {
-          filtered.push({ name: "Round Off", amount: String(Math.abs(diffKaccha).toFixed(2)), type: diffKaccha > 0 ? "add" : "deduct" });
+          filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffKaccha).toFixed(2)) as any, type: diffKaccha > 0 ? "add" : "deduct" });
         }
         return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
       });
     }
-  }, [autoRoundOff, computedItems, enableDualLedger, charges]);
+  }, [autoRoundOff, computedItems, charges, kacchaCharges, enableDualLedger, indirectLedgers]);
 
   
   return (
