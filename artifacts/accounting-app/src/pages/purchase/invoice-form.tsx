@@ -268,11 +268,9 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   };
 
   
-
   useEffect(() => {
-    useEffect(() => {
-      if (!autoRoundOff) return;
-      const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
+    if (!autoRoundOff) return;
+    const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
       const roundOffLedger = indirectLedgers.find(l => l.name === "Round Off");
       const roundOffId = roundOffLedger ? roundOffLedger.id : 0;
       
