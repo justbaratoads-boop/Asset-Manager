@@ -145,7 +145,7 @@ export default function OrderForm() {
         stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: wasInclusive,
+        gstLocked: !!i.stockItemId, gstInclusive: wasInclusive, isTaxLiability: i.isTaxLiability,
         });
       }));
     }

@@ -167,7 +167,7 @@ export default function DebitNoteForm() {
         rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0,
         gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: false, }, interstate)));
+        gstLocked: !!i.stockItemId, gstInclusive: false, isTaxLiability: i.isTaxLiability, }, interstate)));
     }
     if (n.otherCharges) {
       try { setCharges(JSON.parse(n.otherCharges)); } catch { setCharges([]); }

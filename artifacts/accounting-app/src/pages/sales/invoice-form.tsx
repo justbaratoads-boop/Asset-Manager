@@ -246,7 +246,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
         stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: false,
+        gstLocked: !!i.stockItemId, gstInclusive: false, isTaxLiability: i.isTaxLiability,
       }, interstate)));
     }
   }, [existing]);
@@ -262,7 +262,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
           stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
           quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
           discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-          gstLocked: !!i.stockItemId, gstInclusive: false,
+          gstLocked: !!i.stockItemId, gstInclusive: false, isTaxLiability: i.isTaxLiability,
         }, false)));
       }
     }).catch(() => {});
