@@ -235,7 +235,12 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       notes,
         items: computedItems,
         payments,
+      kacchaGrandTotal,
+      kacchaAmountPaid: 0,
+      kacchaBalanceDue: kacchaGrandTotal,
+      kacchaSubtotal: computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + (Number(item.quantity)*Number(item.rate)), 0),
       otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
+      kacchaCharges: kacchaCharges.length > 0 ? kacchaCharges : null,
     };
   };
 
