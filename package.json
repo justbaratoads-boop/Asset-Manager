@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "build": "NODE_ENV=development CI=true npx pnpm@9.15.9 install --no-frozen-lockfile --ignore-scripts && chmod -R +x node_modules/.pnpm 2>/dev/null || true && NODE_ENV=production npx pnpm@9.15.9 --filter @workspace/accounting-app run build && npx pnpm@9.15.9 --filter @workspace/api-server run build",
+    "build": "NODE_ENV=development CI=true npx pnpm@9.15.9 install --no-frozen-lockfile --ignore-scripts && chmod -R +x node_modules/.pnpm 2>/dev/null || true && NODE_ENV=production npx pnpm@9.15.9 --filter @workspace/accounting-app run build && npx pnpm@9.15.9 --filter @workspace/api-server run build && mkdir -p tmp && touch tmp/restart.txt",
     "start": "NODE_ENV=production node artifacts/api-server/dist/index.mjs",
     "typecheck:libs": "pnpm tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
