@@ -11,6 +11,21 @@ import { authMiddleware } from "../lib/auth";
 const router = Router();
 
 router.get("/ledgers", authMiddleware, async (req, res) => {
+  // Auto-heal Round Off ledger for any tenant that didn't restart their server
+  try {
+    const [existingRoundOff] = await db.select().from(ledgersTable)
+      .where(and(eq(ledgersTable.name, "Round Off"), eq(ledgersTable.isDeleted, "false")))
+      .limit(1);
+    if (!existingRoundOff) {
+      await db.insert(ledgersTable).values({
+        name: "Round Off", group: "Indirect Expenses", nature: "dr",
+        openingBalance: "0", isSystem: "true",
+      });
+    }
+  } catch (e) {
+    console.error("Auto-heal Round Off failed:", e);
+  }
+
   const { group, search } = req.query;
   const conditions: any[] = [eq(ledgersTable.isDeleted, "false")];
   if (group) conditions.push(eq(ledgersTable.group, group as string));
