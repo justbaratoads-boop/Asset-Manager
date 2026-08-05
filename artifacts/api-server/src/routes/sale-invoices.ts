@@ -3,10 +3,10 @@ import { db } from "@workspace/db";
 import {
   saleInvoicesTable, saleInvoiceItemsTable, saleInvoicePaymentsTable, stockTransactionsTable,
   ordersTable,
-, stockItemsTable } from "@workspace/db/schema";
+  stockItemsTable } from "@workspace/db/schema";
 import { adjustStock, adjustReservedStock } from "../lib/batch-stock";
 import { partiesTable } from "@workspace/db/schema";
-import { eq, and, ilike, gte, lte, sql, ne , inArray } from "drizzle-orm";
+import { eq, and, ilike, gte, lte, sql, ne, inArray } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeKacchaInvoiceNumber } from "../lib/counter";
 import { companySettingsTable } from "@workspace/db/schema";

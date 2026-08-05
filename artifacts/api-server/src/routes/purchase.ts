@@ -2,9 +2,9 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   purchaseInvoicesTable, purchaseInvoiceItemsTable, purchaseInvoicePaymentsTable,
-  purchaseOrdersTable, purchaseOrderItemsTable, stockTransactionsTable, companySettingsTable
-, stockItemsTable } from "@workspace/db/schema";
-import { eq, and, ilike, sql , inArray } from "drizzle-orm";
+  purchaseOrdersTable, purchaseOrderItemsTable, stockTransactionsTable, companySettingsTable,
+  stockItemsTable } from "@workspace/db/schema";
+import { eq, and, ilike, sql, inArray } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeKacchaInvoiceNumber, makeVoucherNumber } from "../lib/counter";
 import { adjustStock } from "../lib/batch-stock";
