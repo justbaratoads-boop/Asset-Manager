@@ -73,6 +73,20 @@ router.get("/journals/:id", authMiddleware, async (req, res) => {
     .leftJoin(ledgersTable, eq(journalLinesTable.ledgerId, ledgersTable.id))
     .leftJoin(partiesTable, eq(journalLinesTable.partyId, partiesTable.id))
     .where(eq(journalLinesTable.entryId, Number(req.params.id)));
+
+  // Fix old data where party was saved as ledgerId = 1000000 + partyId
+  for (const line of lines) {
+    if (!line.ledgerName && !line.partyName && line.ledgerId >= 1000000) {
+      const pId = line.ledgerId - 1000000;
+      const [party] = await db.select().from(partiesTable).where(eq(partiesTable.id, pId)).limit(1);
+      if (party) {
+        (line as any).partyName = party.name;
+        (line as any).partyId = party.id;
+        (line as any).ledgerId = 0;
+      }
+    }
+  }
+
   res.json({ ...entry, totalDebit: Number(entry.totalDebit), totalCredit: Number(entry.totalCredit), lines });
 });
 
