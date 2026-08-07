@@ -241,82 +241,84 @@ export default function JournalForm() {
           </div>
 
           {/* Lines table */}
-          <div>
-            <div className="grid grid-cols-[1fr_120px_120px_32px] gap-x-2 items-center mb-1.5 px-0.5">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ledger Account</span>
-              <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide text-right">Dr (₹)</span>
-              <span className="text-xs font-semibold text-rose-700 uppercase tracking-wide text-right">Cr (₹)</span>
-              <span></span>
-            </div>
+          <div className="overflow-x-auto -mx-1 px-1 pb-1">
+            <div className="min-w-[480px]">
+              <div className="grid grid-cols-[1fr_110px_110px_32px] sm:grid-cols-[1fr_120px_120px_32px] gap-x-2 items-center mb-1.5 px-0.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ledger Account</span>
+                <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide text-right">Dr (₹)</span>
+                <span className="text-xs font-semibold text-rose-700 uppercase tracking-wide text-right">Cr (₹)</span>
+                <span></span>
+              </div>
 
-            <div className="space-y-1.5">
-              {lines.map((line, i) => (
-                <div key={i} className="grid grid-cols-[1fr_120px_120px_32px] gap-x-2 items-center">
-                  <LedgerCombobox
-                    ledgerId={line.ledgerId}
-                    partyId={line.partyId}
-                    onChange={(newLedgerId, newPartyId, name) => {
-                      updateLine(i, "ledgerId", newLedgerId);
-                      updateLine(i, "partyId", newPartyId);
-                      updateLine(i, "ledgerName", name);
-                    }}
-                    accounts={allAccounts}
-                  />
-                  <div className="flex flex-col gap-0.5">
-                    <Input
-                      className="h-8 text-xs text-right"
-                      type="number"
-                      min="0"
-                      step="any"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={line.drAmount || ""}
-                      onChange={e => {
-                        updateLine(i, "drAmount", Number(e.target.value));
-                        if (Number(e.target.value) > 0) updateLine(i, "crAmount", 0);
+              <div className="space-y-1.5">
+                {lines.map((line, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_110px_110px_32px] sm:grid-cols-[1fr_120px_120px_32px] gap-x-2 items-center">
+                    <LedgerCombobox
+                      ledgerId={line.ledgerId}
+                      partyId={line.partyId}
+                      onChange={(newLedgerId, newPartyId, name) => {
+                        updateLine(i, "ledgerId", newLedgerId);
+                        updateLine(i, "partyId", newPartyId);
+                        updateLine(i, "ledgerName", name);
                       }}
+                      accounts={allAccounts}
                     />
-                    {line.drAmount % 1 !== 0 && line.drAmount > 0 && (
-                      <button type="button" onClick={() => updateLine(i, "drAmount", Math.ceil(line.drAmount))} className="text-[9px] text-primary text-right font-medium hover:underline">↑ Round Up</button>
-                    )}
+                    <div className="flex flex-col gap-0.5">
+                      <Input
+                        className="h-8 text-xs text-right"
+                        type="number"
+                        min="0"
+                        step="any"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={line.drAmount || ""}
+                        onChange={e => {
+                          updateLine(i, "drAmount", Number(e.target.value));
+                          if (Number(e.target.value) > 0) updateLine(i, "crAmount", 0);
+                        }}
+                      />
+                      {line.drAmount % 1 !== 0 && line.drAmount > 0 && (
+                        <button type="button" onClick={() => updateLine(i, "drAmount", Math.ceil(line.drAmount))} className="text-[9px] text-primary text-right font-medium hover:underline">↑ Round Up</button>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <Input
+                        className="h-8 text-xs text-right"
+                        type="number"
+                        min="0"
+                        step="any"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={line.crAmount || ""}
+                        onChange={e => {
+                          updateLine(i, "crAmount", Number(e.target.value));
+                          if (Number(e.target.value) > 0) updateLine(i, "drAmount", 0);
+                        }}
+                      />
+                      {line.crAmount % 1 !== 0 && line.crAmount > 0 && (
+                        <button type="button" onClick={() => updateLine(i, "crAmount", Math.ceil(line.crAmount))} className="text-[9px] text-primary text-right font-medium hover:underline">↑ Round Up</button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="h-8 w-8 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      onClick={() => removeLine(i)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    <Input
-                      className="h-8 text-xs text-right"
-                      type="number"
-                      min="0"
-                      step="any"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={line.crAmount || ""}
-                      onChange={e => {
-                        updateLine(i, "crAmount", Number(e.target.value));
-                        if (Number(e.target.value) > 0) updateLine(i, "drAmount", 0);
-                      }}
-                    />
-                    {line.crAmount % 1 !== 0 && line.crAmount > 0 && (
-                      <button type="button" onClick={() => updateLine(i, "crAmount", Math.ceil(line.crAmount))} className="text-[9px] text-primary text-right font-medium hover:underline">↑ Round Up</button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="h-8 w-8 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                    onClick={() => removeLine(i)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* Totals row */}
-            <div className="grid grid-cols-[1fr_120px_120px_32px] gap-x-2 items-center mt-2 pt-2 border-t">
-              <span className={`text-xs font-semibold ${balanced ? "text-green-600" : totalDr > 0 || totalCr > 0 ? "text-red-600" : "text-muted-foreground"}`}>
-                {balanced ? "✓ Balanced" : totalDr > 0 || totalCr > 0 ? `Difference: ${formatCurrency(Math.abs(totalDr - totalCr))}` : "Enter amounts above"}
-              </span>
-              <span className="text-right text-xs font-bold text-sky-700">{formatCurrency(totalDr)}</span>
-              <span className="text-right text-xs font-bold text-rose-700">{formatCurrency(totalCr)}</span>
-              <span></span>
+              {/* Totals row */}
+              <div className="grid grid-cols-[1fr_110px_110px_32px] sm:grid-cols-[1fr_120px_120px_32px] gap-x-2 items-center mt-2 pt-2 border-t">
+                <span className={`text-xs font-semibold ${balanced ? "text-green-600" : totalDr > 0 || totalCr > 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                  {balanced ? "✓ Balanced" : totalDr > 0 || totalCr > 0 ? `Difference: ${formatCurrency(Math.abs(totalDr - totalCr))}` : "Enter amounts above"}
+                </span>
+                <span className="text-right text-xs font-bold text-sky-700">{formatCurrency(totalDr)}</span>
+                <span className="text-right text-xs font-bold text-rose-700">{formatCurrency(totalCr)}</span>
+                <span></span>
+              </div>
             </div>
           </div>
 
