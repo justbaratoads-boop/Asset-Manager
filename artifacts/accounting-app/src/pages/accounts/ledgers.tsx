@@ -20,7 +20,7 @@ import { customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 
 const PAGE_SIZE = 25;
-const BLANK_LEDGER = { name: "", group: "", nature: "dr", openingBalance: "", bankName: "", bankBranch: "", accountNumber: "", ifscCode: "", upiId: "", isGstApplicable: false, gstRate: "", hsnSac: "" };
+const BLANK_LEDGER = { name: "", group: "", nature: "dr", openingBalance: "", bankName: "", bankBranch: "", accountNumber: "", ifscCode: "", upiId: "", isGstApplicable: false, gstCalculationMethod: "none", gstRate: "", hsnSac: "" };
 const BLANK_PARTY = {
   name: "", accountGroup: "Sundry Debtors",
   gstType: "unregistered",
@@ -197,7 +197,7 @@ export default function LedgerAccounts() {
       name: l.name, group: l.group, nature: l.nature, openingBalance: String(l.openingBalance),
       bankName: l.bankName || "", bankBranch: l.bankBranch || "",
       accountNumber: l.accountNumber || "", ifscCode: l.ifscCode || "", upiId: l.upiId || "",
-      isGstApplicable: l.isGstApplicable || false, gstRate: l.gstRate || "", hsnSac: l.hsnSac || "",
+      isGstApplicable: l.isGstApplicable || false, gstCalculationMethod: l.gstCalculationMethod || "none", gstRate: l.gstRate || "", hsnSac: l.hsnSac || "",
     });
     setLedgerNameError("");
     setDialogOpen(true);
