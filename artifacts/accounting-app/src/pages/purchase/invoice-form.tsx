@@ -118,7 +118,8 @@ export default function PurchaseInvoiceForm() {
 
   const [charges, setCharges] = useState<OtherCharge[]>([]);
   const [kacchaCharges, setKacchaCharges] = useState<OtherCharge[]>([]);
-const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
+  const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
+  const [kacchaPayRows, setKacchaPayRows] = useState<{ mode: string; amount: string; reference: string }[]>([]);
   const [indirectLedgers, setIndirectLedgers] = useState<{ id: number; name: string; group: string }[]>([]);
   const hasLoadedRef = useRef(false);
 
@@ -142,13 +143,26 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   const totals = { ...cTotals, grand: cTotals.grand - cTotals.chargesTotal };
 
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
+  const kacchaChargesTotal = kacchaCharges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
 
+  const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
+  const hasKaccha = computedItems.some(i => !i.isTaxLiability);
+  const rawKacchaSubtotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
+  const kacchaGrandTotal = rawKacchaSubtotal + (!hasPakka ? chargesTotal : 0) + kacchaChargesTotal;
+
   const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const kacchaAmountPaid = kacchaPayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  
   const balanceDue = grandTotal - amountPaid;
+  const kacchaBalanceDue = kacchaGrandTotal - kacchaAmountPaid;
 
   const updatePayRow = (i: number, field: string, value: string) => {
     setPayRows(prev => { const u = [...prev]; u[i] = { ...u[i], [field]: value }; return u; });
+  };
+
+  const updateKacchaPayRow = (i: number, field: string, value: string) => {
+    setKacchaPayRows(prev => { const u = [...prev]; u[i] = { ...u[i], [field]: value }; return u; });
   };
 
   useEffect(() => {
@@ -167,6 +181,14 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       setPayRows(inv.payments.map((p: any) => ({ mode: p.mode || "cash", amount: String(p.amount || ""), reference: p.reference || "" })));
     } else {
       setPayRows([]);
+    }
+    if (inv.kacchaPayments?.length) {
+      setKacchaPayRows(inv.kacchaPayments.map((p: any) => ({ mode: p.mode || "cash", amount: String(p.amount || ""), reference: p.reference || "" })));
+    } else {
+      setKacchaPayRows([]);
+    }
+    if (inv.kacchaCharges) {
+      try { setKacchaCharges(typeof inv.kacchaCharges === "string" ? JSON.parse(inv.kacchaCharges) : inv.kacchaCharges); } catch { setKacchaCharges([]); }
     }
     if (inv.items?.length) {
       setItems(inv.items.map((i: any) => calc({
@@ -237,11 +259,12 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
         items: computedItems,
         payments,
       kacchaGrandTotal,
-      kacchaAmountPaid: 0,
-      kacchaBalanceDue: kacchaGrandTotal,
-      kacchaSubtotal: computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + (Number(item.quantity)*Number(item.rate)), 0),
-      otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
-      kacchaCharges: kacchaCharges.length > 0 ? kacchaCharges : null,
+      kacchaAmountPaid,
+      kacchaBalanceDue,
+      kacchaSubtotal: rawKacchaSubtotal,
+      kacchaPayments: kacchaPayRows.filter(r => Number(r.amount) > 0).map(r => ({ mode: r.mode, amount: Number(r.amount), reference: r.reference })),
+      otherCharges: (!hasPakka ? [] : charges).length > 0 ? JSON.stringify(!hasPakka ? [] : charges) : null,
+      kacchaCharges: (!hasPakka ? [...charges, ...kacchaCharges] : kacchaCharges).length > 0 ? JSON.stringify(!hasPakka ? [...charges, ...kacchaCharges] : kacchaCharges) : null,
     };
   };
 
@@ -283,7 +306,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       
       setCharges(prev => {
         const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
-        if (Math.abs(diffPakka) > 0.001) {
+        if (hasPakka && Math.abs(diffPakka) > 0.001) {
           filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffPakka).toFixed(2)) as any, type: diffPakka > 0 ? "add" : "deduct" });
         }
         return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
@@ -605,9 +628,52 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
               ))}
               {errors.payment && <p className="text-xs text-destructive">{errors.payment}</p>}
               <div className="border-t pt-2 space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Amount Paid</span><span className="font-semibold text-green-600">{formatCurrency(amountPaid)}</span></div>
-                <div className="flex justify-between font-bold"><span>Balance Due</span><span className={balanceDue > 0 ? "text-red-600" : "text-green-600"}>{formatCurrency(balanceDue)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{kacchaGrandTotal > 0 ? "Pakka Amount Paid" : "Amount Paid"}</span><span className="font-semibold text-green-600">{formatCurrency(amountPaid)}</span></div>
+                <div className="flex justify-between font-bold"><span>{kacchaGrandTotal > 0 ? "Pakka Balance Due" : "Balance Due"}</span><span className={balanceDue > 0 ? "text-red-600" : "text-green-600"}>{formatCurrency(balanceDue)}</span></div>
               </div>
+
+              {kacchaGrandTotal > 0 && (
+                <>
+                  <div className="flex items-center justify-between mb-1 mt-4 pt-4 border-t">
+                    <span className="text-xs text-muted-foreground">Kaccha Payments</span>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1"
+                      onClick={() => setKacchaPayRows(p => [...p, { mode: "cash", amount: "", reference: "" }])}>
+                      <Plus className="h-3.5 w-3.5" />Add Payment
+                    </Button>
+                  </div>
+                  {kacchaPayRows.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-1 italic">No kaccha payment recorded — balance will be due.</p>
+                  )}
+                  {kacchaPayRows.map((row, i) => (
+                    <div key={i} className="flex flex-wrap gap-1.5 items-center">
+                      <Select value={row.mode} onValueChange={v => updateKacchaPayRow(i, "mode", v)}>
+                        <SelectTrigger className="h-8 text-xs w-full sm:w-[120px] shrink-0"><SelectValue /></SelectTrigger>
+                        <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <div className="flex gap-1.5 items-center flex-1 min-w-0">
+                        <div className="relative flex-1 min-w-[70px]">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
+                          <Input className="pl-5 h-8 text-sm" type="number" inputMode="decimal" min="0" step="any"
+                            value={row.amount}
+                            onChange={e => { updateKacchaPayRow(i, "amount", e.target.value); }}
+                            placeholder="0.00" />
+                        </div>
+                        <Input className="h-8 text-xs flex-1 min-w-[60px]" placeholder="Ref / UTR" value={row.reference}
+                          onChange={e => updateKacchaPayRow(i, "reference", e.target.value)} />
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive shrink-0"
+                          onClick={() => setKacchaPayRows(p => p.filter((_, j) => j !== i))}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 space-y-1 text-sm">
+                    {kacchaChargesTotal !== 0 && <div className="flex justify-between text-muted-foreground"><span>Kaccha Additional</span><span className={kacchaChargesTotal < 0 ? "text-red-600" : ""}>{kacchaChargesTotal < 0 ? "- " : "+ "}{formatCurrency(Math.abs(kacchaChargesTotal))}</span></div>}
+                    <div className="flex justify-between"><span className="text-muted-foreground">Kaccha Paid</span><span className="font-semibold text-amber-600">{formatCurrency(kacchaAmountPaid)}</span></div>
+                    <div className="flex justify-between font-bold"><span>Kaccha Balance</span><span className={kacchaBalanceDue > 0 ? "text-red-600" : "text-amber-600"}>{formatCurrency(kacchaBalanceDue)}</span></div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

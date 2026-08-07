@@ -214,7 +214,7 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
     balanceDue: String(balanceDue),
     status,
     notes: data.notes,
-    otherCharges: data.otherCharges || null,
+    otherCharges: existingInvoice.isKaccha ? (data.kacchaCharges || null) : (data.otherCharges || null),
   }).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).returning();
   if (!invoice) return res.status(404).json({ error: "Not found" });
 

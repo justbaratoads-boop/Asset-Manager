@@ -314,7 +314,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
     amountPaid: String(existingInvoice.isKaccha ? ((data.kacchaAmountPaid ?? data.amountPaid) || 0) : (data.amountPaid || 0)),
     balanceDue: String(existingInvoice.isKaccha ? ((data.kacchaBalanceDue ?? data.balanceDue) || 0) : (data.balanceDue || 0)),
     notes: data.notes,
-    otherCharges: existingInvoice.isKaccha ? (data.kacchaCharges ? JSON.stringify(data.kacchaCharges) : null) : (data.otherCharges || null),
+    otherCharges: existingInvoice.isKaccha ? (data.kacchaCharges || null) : (data.otherCharges || null),
     status: data.amountPaid >= data.grandTotal ? "paid" : (data.amountPaid > 0 ? "partial" : "confirmed"),
   }).where(eq(saleInvoicesTable.id, Number(id))).returning();
 

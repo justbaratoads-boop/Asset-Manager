@@ -362,8 +362,8 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       items: computedItems,
       payments,
       kacchaPayments: kacchaPayRows.filter(r => Number(r.amount) > 0).map(r => ({ mode: r.mode, amount: Number(r.amount), reference: r.reference })),
-      otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,
-      kacchaCharges: kacchaCharges.length > 0 ? kacchaCharges : null,
+      otherCharges: (!hasPakka ? [] : charges).length > 0 ? JSON.stringify(!hasPakka ? [] : charges) : null,
+      kacchaCharges: (!hasPakka ? [...charges, ...kacchaCharges] : kacchaCharges).length > 0 ? JSON.stringify(!hasPakka ? [...charges, ...kacchaCharges] : kacchaCharges) : null,
       fromOrderId: fromOrderId ? Number(fromOrderId) : undefined,
     };
   };
@@ -414,7 +414,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
     
     setCharges(prev => {
       const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
-      if (Math.abs(diffPakka) > 0.001) {
+      if (hasPakka && Math.abs(diffPakka) > 0.001) {
         filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffPakka).toFixed(2)) as any, type: diffPakka > 0 ? "add" : "deduct" });
       }
       return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
