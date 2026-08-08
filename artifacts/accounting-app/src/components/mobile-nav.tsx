@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Receipt, Package, ShoppingCart } from "lucide-react";
+import { Home, Receipt, BookOpen, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
@@ -17,14 +17,14 @@ export function MobileNav() {
       href: "/sales/invoices/new",
     },
     {
-      label: "Stock items",
-      icon: Package,
-      href: "/inventory/items/new",
+      label: "All Sales",
+      icon: FileText,
+      href: "/sales/invoices",
     },
     {
-      label: "Purchase",
-      icon: ShoppingCart,
-      href: "/purchase/invoices/new",
+      label: "Ledgers",
+      icon: BookOpen,
+      href: "/accounts/ledgers",
     },
   ];
 
