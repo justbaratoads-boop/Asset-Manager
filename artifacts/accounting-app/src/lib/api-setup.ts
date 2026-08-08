@@ -7,6 +7,6 @@ export function setupApi() {
   });
 
   // Base URL is determined by current origin for proxy, or env var if needed
-  // In Replit, relative paths to /api will be handled correctly by Vite proxy
-  setBaseUrl(null); 
+  // In Capacitor or production builds, we need a fully qualified URL.
+  setBaseUrl(import.meta.env.VITE_API_URL || null); 
 }

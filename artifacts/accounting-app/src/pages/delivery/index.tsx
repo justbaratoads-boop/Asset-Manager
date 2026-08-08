@@ -44,7 +44,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ── ASSIGN BILL DIALOG ─────────────────────────────────────
-function AssignBillDialog() {
+function AssignBillDialog({ deliveries = [] }: { deliveries?: any[] }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     saleInvoiceId: "",
@@ -62,7 +62,11 @@ function AssignBillDialog() {
   const { toast } = useToast();
 
   const invoices: any[] = (invoicesData as any)?.invoices || invoicesData || [];
-  const pendingInvoices = invoices.filter((inv: any) => inv.status !== "cancelled" && inv.isDeleted !== "true");
+  const pendingInvoices = invoices.filter((inv: any) => 
+    inv.status !== "cancelled" && 
+    inv.isDeleted !== "true" &&
+    !deliveries.some(d => d.saleInvoiceId === inv.id && d.status !== "cancelled")
+  );
 
   const reset = () => setForm({ saleInvoiceId: "", driverId: "", vehicleId: "", date: today(), destination: "", notes: "" });
 
@@ -147,7 +151,7 @@ function AssignBillDialog() {
             {/* Date */}
             <div className="space-y-1">
               <Label>Dispatch Date</Label>
-              <Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+              <Input type="date" min={selectedInv?.date || ""} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
             </div>
 
             {/* Destination */}
@@ -195,7 +199,7 @@ function DeliveriesTab() {
     <>
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-base">Delivery Challans</h2>
-        <AssignBillDialog />
+        <AssignBillDialog deliveries={list} />
       </div>
 
       {isLoading ? (

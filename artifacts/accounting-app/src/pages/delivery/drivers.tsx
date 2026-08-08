@@ -20,17 +20,17 @@ export default function DriversAndVehicles() {
   // Queries
   const { data: drivers = [], isLoading: isLoadingDrivers } = useQuery({
     queryKey: ["drivers"],
-    queryFn: () => customFetch("/api/delivery/drivers")
+    queryFn: () => customFetch("/api/drivers")
   });
 
   const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery({
     queryKey: ["vehicles"],
-    queryFn: () => customFetch("/api/delivery/vehicles")
+    queryFn: () => customFetch("/api/vehicles")
   });
 
   // Mutations
   const createDriver = useMutation({
-    mutationFn: (data: any) => customFetch("/api/delivery/drivers", {
+    mutationFn: (data: any) => customFetch("/api/drivers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
@@ -43,7 +43,7 @@ export default function DriversAndVehicles() {
   });
 
   const deleteDriver = useMutation({
-    mutationFn: (id: number) => customFetch(`/api/delivery/drivers/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) => customFetch(`/api/drivers/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["drivers"] });
       toast({ title: "Driver deleted" });
@@ -51,7 +51,7 @@ export default function DriversAndVehicles() {
   });
 
   const createVehicle = useMutation({
-    mutationFn: (data: any) => customFetch("/api/delivery/vehicles", {
+    mutationFn: (data: any) => customFetch("/api/vehicles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
@@ -64,7 +64,7 @@ export default function DriversAndVehicles() {
   });
 
   const deleteVehicle = useMutation({
-    mutationFn: (id: number) => customFetch(`/api/delivery/vehicles/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) => customFetch(`/api/vehicles/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       toast({ title: "Vehicle deleted" });
