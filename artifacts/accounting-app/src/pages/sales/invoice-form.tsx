@@ -193,10 +193,15 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const grandTotal = totals.grand + chargesTotal;
 
+  const assessableCharges = enrichedCharges.filter(c => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+
   const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
-  const pakkaGrandTotal = computedItems.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0) + (hasPakka ? chargesTotal : 0);
+  const pakkaGrandTotal = enableDualLedger
+    ? (computedItems.filter(i => i.isTaxLiability).reduce((acc, item) => acc + item.total, 0) + (hasPakka ? chargesTotal : 0) - (hasPakka ? totalAssessableAmount : 0))
+    : grandTotal;
   const kacchaChargesTotal = kacchaCharges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
-    const kacchaGrandTotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0) + (!hasPakka ? chargesTotal : 0) + kacchaChargesTotal;
+  const kacchaGrandTotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0) + (!hasPakka ? chargesTotal : 0) + kacchaChargesTotal;
 
   const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const kacchaAmountPaid = kacchaPayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);

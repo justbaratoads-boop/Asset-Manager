@@ -125,17 +125,32 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     </tr>`;
   }).join("");
 
+  const isInterstate = inv?.isInterstate === true || inv?.isInterstate === "true";
+  const baseCgst = Number(items.reduce((sum, item) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseSgst = Number(items.reduce((sum, item) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseIgst = Number(items.reduce((sum, item) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+
+  const extraCgst = Math.max(0, Number(inv?.totalCgst || 0) - baseCgst);
+  const extraSgst = Math.max(0, Number(inv?.totalSgst || 0) - baseSgst);
+  const extraIgst = Math.max(0, Number(inv?.totalIgst || 0) - baseIgst);
+
   const totalsHtml = [
     `<div class="tot-row"><span>Taxable</span><span>${fmtN(baseTaxableTotal)}</span></div>`,
     Number(inv?.totalDiscount) > 0
       ? `<div class="tot-row disc"><span>Discount</span><span>−${fmtN(inv?.totalDiscount)}</span></div>` : "",
-    Number(inv?.totalCgst) > 0 && showGstInfo
-      ? `<div class="tot-row"><span>CGST</span><span>${fmtN(inv?.totalCgst)}</span></div>` : "",
-    Number(inv?.totalSgst) > 0 && showGstInfo
-      ? `<div class="tot-row"><span>SGST</span><span>${fmtN(inv?.totalSgst)}</span></div>` : "",
-    Number(inv?.totalIgst) > 0 && showGstInfo
-      ? `<div class="tot-row"><span>IGST</span><span>${fmtN(inv?.totalIgst)}</span></div>` : "",
+    baseCgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>CGST</span><span>${fmtN(baseCgst)}</span></div>` : "",
+    baseSgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>SGST</span><span>${fmtN(baseSgst)}</span></div>` : "",
+    baseIgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>IGST</span><span>${fmtN(baseIgst)}</span></div>` : "",
     ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || c.ledgerName || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
+    extraCgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>CGST (Gst according invoice value)</span><span>+ ${fmtN(extraCgst)}</span></div>` : "",
+    extraSgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>SGST (Gst according invoice value)</span><span>+ ${fmtN(extraSgst)}</span></div>` : "",
+    extraIgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>IGST (Gst according invoice value)</span><span>+ ${fmtN(extraIgst)}</span></div>` : "",
     `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
     `<div class="tot-row paid"><span>Paid</span><span>${fmtN(inv?.amountPaid)}</span></div>`,
     Number(inv?.balanceDue) > 0
@@ -398,6 +413,19 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
     return sum + (qty * rate) * (1 - disc / 100);
   }, 0) || 0;
 
+  const assessableCharges = otherChargesList.filter(c => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+  const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
+
+  const isInterstate = invoice?.isInterstate === true || invoice?.isInterstate === "true";
+  const baseCgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseSgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseIgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+
+  const extraCgst = Math.max(0, Number(invoice?.totalCgst || 0) - baseCgst);
+  const extraSgst = Math.max(0, Number(invoice?.totalSgst || 0) - baseSgst);
+  const extraIgst = Math.max(0, Number(invoice?.totalIgst || 0) - baseIgst);
+
   return (
     <div className="bg-white border rounded-xl p-4 sm:p-8 max-w-3xl mx-auto text-black" id="invoice-print">
       {copyLabel && (
@@ -490,14 +518,14 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
           {Number(invoice.totalDiscount) > 0 && (
             <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>
           )}
-          {Number(invoice.totalCgst) > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>
+          {baseCgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(baseCgst)}</span></div>
           )}
-          {Number(invoice.totalSgst) > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>
+          {baseSgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(baseSgst)}</span></div>
           )}
-          {Number(invoice.totalIgst) > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>
+          {baseIgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(baseIgst)}</span></div>
           )}
           {(() => {
             let parsedCharges: {name?: string; ledgerName?: string; amount: number; type?: string}[] = [];
@@ -506,6 +534,15 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
               <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || c.ledgerName || "Other Charges"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
             ));
           })()}
+          {extraCgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">CGST (Gst according invoice value)</span><span>{formatCurrency(extraCgst)}</span></div>
+          )}
+          {extraSgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">SGST (Gst according invoice value)</span><span>{formatCurrency(extraSgst)}</span></div>
+          )}
+          {extraIgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">IGST (Gst according invoice value)</span><span>{formatCurrency(extraIgst)}</span></div>
+          )}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
             <span>Total</span><span>{formatCurrency(invoice.grandTotal)}</span>
           </div>
@@ -670,12 +707,15 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
         <div className="w-56 space-y-1 text-sm">
           <div className="flex justify-between text-gray-500"><span>Taxable</span><span>{formatCurrency(baseTaxableTotal)}</span></div>
           {Number(invoice.totalDiscount) > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>}
-          {Number(invoice.totalCgst) > 0 && <div className="flex justify-between text-gray-500"><span>CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>}
-          {Number(invoice.totalSgst) > 0 && <div className="flex justify-between text-gray-500"><span>SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>}
-          {Number(invoice.totalIgst) > 0 && <div className="flex justify-between text-gray-500"><span>IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>}
+          {baseCgst > 0 && <div className="flex justify-between text-gray-500"><span>CGST</span><span>{formatCurrency(baseCgst)}</span></div>}
+          {baseSgst > 0 && <div className="flex justify-between text-gray-500"><span>SGST</span><span>{formatCurrency(baseSgst)}</span></div>}
+          {baseIgst > 0 && <div className="flex justify-between text-gray-500"><span>IGST</span><span>{formatCurrency(baseIgst)}</span></div>}
           {otherChargesList.map((c: any, i: number) => (
             <div key={i} className="flex justify-between text-gray-500"><span>{c.name || c.ledgerName || "Other"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
           ))}
+          {extraCgst > 0 && <div className="flex justify-between text-gray-500"><span>CGST (Gst according invoice value)</span><span>{formatCurrency(extraCgst)}</span></div>}
+          {extraSgst > 0 && <div className="flex justify-between text-gray-500"><span>SGST (Gst according invoice value)</span><span>{formatCurrency(extraSgst)}</span></div>}
+          {extraIgst > 0 && <div className="flex justify-between text-gray-500"><span>IGST (Gst according invoice value)</span><span>{formatCurrency(extraIgst)}</span></div>}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1"><span>Total</span><span>{formatCurrency(grandTotal)}</span></div>
           <div className="flex justify-between text-green-600 font-medium"><span>Amount Received</span><span>{formatCurrency(amountPaid)}</span></div>
           {!isFullyPaid && (
