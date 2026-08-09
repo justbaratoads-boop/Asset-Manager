@@ -745,7 +745,7 @@ export default function SaleInvoiceView() {
         : "";
       elements.push(`${pageBreak}${copyBadge}${invoiceBody}`);
     }
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${inv?.invoiceNumber}</title><style>${css}@media print{@page{margin:0}}</style></head><body>${elements.join("")}</body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${inv?.invoiceNumber}</title><style>${css}</style></head><body>${elements.join("")}</body></html>`;
   };
 
   const handleOpenPreview = () => {
@@ -824,7 +824,7 @@ export default function SaleInvoiceView() {
 
       {/* Render the actual selected template on-screen and for Ctrl+P */}
       <div className="bg-white border print:border-0 rounded-xl overflow-hidden max-w-4xl mx-auto shadow-sm print:shadow-none" id="invoice-print">
-        <style dangerouslySetInnerHTML={{ __html: (PRINT_CSS[`${ps.printerType || "a4"}_${ps.layoutStyle || "1"}`] || PRINT_CSS["a4_1"]).replace(/body\s*\{/g, ".inv-template-wrapper{").replace(/@media print\s*\{\s*@page\s*\{[^}]*\}\s*\}/g, "") }} />
+        <style dangerouslySetInnerHTML={{ __html: (PRINT_CSS[`${ps.printerType || "a4"}_${ps.layoutStyle || "1"}`] || PRINT_CSS["a4_1"]).replace(/body\s*\{/g, ".inv-template-wrapper{").replace(/@page\s*\{[^}]*\}/g, "") }} />
         <div className="inv-template-wrapper" dangerouslySetInnerHTML={{ __html: buildInvoiceHtml(inv, company, ps, batches) }} />
       </div>
 
