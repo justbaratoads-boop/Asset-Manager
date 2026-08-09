@@ -18,12 +18,21 @@ import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
-function itemBaseRate(item: any): number {
+function itemBaseRate(item: any, charges: any[] = [], totalItemValue: number = 0): number {
   const qty = Number(item.quantity) || 0;
+  const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const factor = 1 - discPct / 100;
   if (qty === 0 || factor === 0) return 0;
-  return Number(item.taxableAmount) / qty / factor;
+
+  // Calculate apportioned charge
+  const assessableCharges = charges.filter(c => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+  const itemVal = (qty * rate) * factor;
+  const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+
+  const baseTaxableAmount = Number(item.taxableAmount) - apportioned;
+  return baseTaxableAmount / qty / factor;
 }
 
 const PAGE_SIZE = 20;
@@ -84,6 +93,33 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
   const items: any[] = data?.items || [];
   const payments: any[] = data?.payments || [];
 
+  const otherChargesList: any[] = (() => {
+    try { return JSON.parse(data?.otherCharges || "[]"); } catch { return []; }
+  })();
+
+  const totalItemValue = items.reduce((sum: number, i: any) => {
+    const qty = Number(i.quantity) || 0;
+    const rate = Number(i.rate) || 0;
+    const disc = Number(i.discountPct) || 0;
+    return sum + (qty * rate) * (1 - disc / 100);
+  }, 0) || 0;
+
+  const assessableCharges = otherChargesList.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum: number, c: any) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+  const baseTaxableTotal = Number(data?.totalTaxable || 0) - totalAssessableAmount;
+
+  const isInterstate = data?.isInterstate === true || data?.isInterstate === "true";
+  const baseCgst = Number(items.reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseSgst = Number(items.reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseIgst = Number(items.reduce((sum: number, item: any) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+
+  const extraCgst = Math.max(0, Number(data?.totalCgst || 0) - baseCgst);
+  const extraSgst = Math.max(0, Number(data?.totalSgst || 0) - baseSgst);
+  const extraIgst = Math.max(0, Number(data?.totalIgst || 0) - baseIgst);
+
+  const firstAssessable = assessableCharges[0];
+  const chargeName = firstAssessable ? (firstAssessable.name || firstAssessable.ledgerName) : "Additional Field";
+
   return (
     <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -140,18 +176,28 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {items.map((item: any, i: number) => (
-                      <tr key={i} className="hover:bg-muted/20">
-                        <td className="px-3 py-2.5">
-                          <p className="font-medium">{item.itemName}</p>
-                          {item.batchId && <p className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</p>}
-                          {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
-                        </td>
-                        <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
-                        <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(Number(item.taxableAmount))}</td>
-                      </tr>
-                    ))}
+                    {items.map((item: any, i: number) => {
+                      const qty = Number(item.quantity) || 0;
+                      const rate = Number(item.rate) || 0;
+                      const discPct = Number(item.discountPct) || 0;
+                      const factor = 1 - discPct / 100;
+                      const itemVal = (qty * rate) * factor;
+                      const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+                      const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+
+                      return (
+                        <tr key={i} className="hover:bg-muted/20">
+                          <td className="px-3 py-2.5">
+                            <p className="font-medium">{item.itemName}</p>
+                            {item.batchId && <p className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</p>}
+                            {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
+                          </td>
+                          <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
+                          <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(baseTaxableAmount)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -162,37 +208,51 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
               {Number(data.totalTaxable) > 0 && (
                 <div className="flex justify-between px-4 py-2">
                   <span className="text-muted-foreground">Taxable</span>
-                  <span>{formatCurrency(Number(data.totalTaxable))}</span>
+                  <span>{formatCurrency(baseTaxableTotal)}</span>
                 </div>
               )}
-              {Number(data.totalCgst) > 0 && (
+              {baseCgst > 0 && (
                 <div className="flex justify-between px-4 py-2">
                   <span className="text-muted-foreground">CGST</span>
-                  <span>+ {formatCurrency(Number(data.totalCgst))}</span>
+                  <span>+ {formatCurrency(baseCgst)}</span>
                 </div>
               )}
-              {Number(data.totalSgst) > 0 && (
+              {baseSgst > 0 && (
                 <div className="flex justify-between px-4 py-2">
                   <span className="text-muted-foreground">SGST</span>
-                  <span>+ {formatCurrency(Number(data.totalSgst))}</span>
+                  <span>+ {formatCurrency(baseSgst)}</span>
                 </div>
               )}
-              {Number(data.totalIgst) > 0 && (
+              {baseIgst > 0 && (
                 <div className="flex justify-between px-4 py-2">
                   <span className="text-muted-foreground">IGST</span>
-                  <span>+ {formatCurrency(Number(data.totalIgst))}</span>
+                  <span>+ {formatCurrency(baseIgst)}</span>
                 </div>
               )}
-              {(() => {
-                let parsedCharges: any[] = [];
-                try { parsedCharges = JSON.parse(data?.otherCharges || "[]"); } catch {}
-                return parsedCharges.map((c: any, i: number) => (
-                  <div key={i} className="flex justify-between px-4 py-2">
-                    <span className="text-muted-foreground">{c.name || c.ledgerName || "Other Charges"}</span>
-                    <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
-                  </div>
-                ));
-              })()}
+              {otherChargesList.map((c: any, i: number) => (
+                <div key={i} className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">{c.name || c.ledgerName || "Other Charges"}</span>
+                  <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
+                </div>
+              ))}
+              {extraCgst > 0 && (
+                <div className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">CGST of {chargeName}</span>
+                  <span>+ {formatCurrency(extraCgst)}</span>
+                </div>
+              )}
+              {extraSgst > 0 && (
+                <div className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">SGST of {chargeName}</span>
+                  <span>+ {formatCurrency(extraSgst)}</span>
+                </div>
+              )}
+              {extraIgst > 0 && (
+                <div className="flex justify-between px-4 py-2">
+                  <span className="text-muted-foreground">IGST of {chargeName}</span>
+                  <span>+ {formatCurrency(extraIgst)}</span>
+                </div>
+              )}
               <div className="flex justify-between px-4 py-2.5 font-bold text-base">
                 <span>Grand Total</span>
                 <span>{formatCurrency(Number(data.grandTotal))}</span>

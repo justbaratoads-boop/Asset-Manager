@@ -133,6 +133,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   const extraCgst = Math.max(0, Number(inv?.totalCgst || 0) - baseCgst);
   const extraSgst = Math.max(0, Number(inv?.totalSgst || 0) - baseSgst);
   const extraIgst = Math.max(0, Number(inv?.totalIgst || 0) - baseIgst);
+  const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
 
   const totalsHtml = [
     `<div class="tot-row"><span>Taxable</span><span>${fmtN(baseTaxableTotal)}</span></div>`,
@@ -146,11 +147,11 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
       ? `<div class="tot-row"><span>IGST</span><span>${fmtN(baseIgst)}</span></div>` : "",
     ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || c.ledgerName || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
     extraCgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>CGST (Gst according invoice value)</span><span>+ ${fmtN(extraCgst)}</span></div>` : "",
+      ? `<div class="tot-row"><span>CGST of ${chargeName}</span><span>+ ${fmtN(extraCgst)}</span></div>` : "",
     extraSgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>SGST (Gst according invoice value)</span><span>+ ${fmtN(extraSgst)}</span></div>` : "",
+      ? `<div class="tot-row"><span>SGST of ${chargeName}</span><span>+ ${fmtN(extraSgst)}</span></div>` : "",
     extraIgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>IGST (Gst according invoice value)</span><span>+ ${fmtN(extraIgst)}</span></div>` : "",
+      ? `<div class="tot-row"><span>IGST of ${chargeName}</span><span>+ ${fmtN(extraIgst)}</span></div>` : "",
     `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
     `<div class="tot-row paid"><span>Paid</span><span>${fmtN(inv?.amountPaid)}</span></div>`,
     Number(inv?.balanceDue) > 0
@@ -416,6 +417,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
   const assessableCharges = otherChargesList.filter(c => c.gstCalculationMethod === 'assessable_value');
   const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
   const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
+  const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
 
   const isInterstate = invoice?.isInterstate === true || invoice?.isInterstate === "true";
   const baseCgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
@@ -535,13 +537,13 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
             ));
           })()}
           {extraCgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">CGST (Gst according invoice value)</span><span>{formatCurrency(extraCgst)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">CGST of {chargeName}</span><span>{formatCurrency(extraCgst)}</span></div>
           )}
           {extraSgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">SGST (Gst according invoice value)</span><span>{formatCurrency(extraSgst)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">SGST of {chargeName}</span><span>{formatCurrency(extraSgst)}</span></div>
           )}
           {extraIgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">IGST (Gst according invoice value)</span><span>{formatCurrency(extraIgst)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">IGST of {chargeName}</span><span>{formatCurrency(extraIgst)}</span></div>
           )}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
             <span>Total</span><span>{formatCurrency(invoice.grandTotal)}</span>
@@ -641,6 +643,20 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
     return sum + (qty * rate) * (1 - disc / 100);
   }, 0) || 0;
 
+  const assessableCharges = otherChargesList.filter(c => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+  const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
+  const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
+
+  const isInterstate = invoice?.isInterstate === true || invoice?.isInterstate === "true";
+  const baseCgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseSgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
+  const baseIgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+
+  const extraCgst = Math.max(0, Number(invoice?.totalCgst || 0) - baseCgst);
+  const extraSgst = Math.max(0, Number(invoice?.totalSgst || 0) - baseSgst);
+  const extraIgst = Math.max(0, Number(invoice?.totalIgst || 0) - baseIgst);
+
   return (
     <div id="acknowledgment-print" className="bg-white border rounded-xl p-8 max-w-2xl mx-auto text-black text-sm">
       {/* Header */}
@@ -713,9 +729,9 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
           {otherChargesList.map((c: any, i: number) => (
             <div key={i} className="flex justify-between text-gray-500"><span>{c.name || c.ledgerName || "Other"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
           ))}
-          {extraCgst > 0 && <div className="flex justify-between text-gray-500"><span>CGST (Gst according invoice value)</span><span>{formatCurrency(extraCgst)}</span></div>}
-          {extraSgst > 0 && <div className="flex justify-between text-gray-500"><span>SGST (Gst according invoice value)</span><span>{formatCurrency(extraSgst)}</span></div>}
-          {extraIgst > 0 && <div className="flex justify-between text-gray-500"><span>IGST (Gst according invoice value)</span><span>{formatCurrency(extraIgst)}</span></div>}
+          {extraCgst > 0 && <div className="flex justify-between text-gray-500"><span>CGST of {chargeName}</span><span>{formatCurrency(extraCgst)}</span></div>}
+          {extraSgst > 0 && <div className="flex justify-between text-gray-500"><span>SGST of {chargeName}</span><span>{formatCurrency(extraSgst)}</span></div>}
+          {extraIgst > 0 && <div className="flex justify-between text-gray-500"><span>IGST of {chargeName}</span><span>{formatCurrency(extraIgst)}</span></div>}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1"><span>Total</span><span>{formatCurrency(grandTotal)}</span></div>
           <div className="flex justify-between text-green-600 font-medium"><span>Amount Received</span><span>{formatCurrency(amountPaid)}</span></div>
           {!isFullyPaid && (
