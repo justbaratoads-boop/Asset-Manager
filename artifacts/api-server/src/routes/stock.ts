@@ -248,7 +248,7 @@ router.delete("/stock-categories/:id", authMiddleware, async (req, res) => {
 });
 
 // ---- ITEMS ----
-router.get("/stock-items", authMiddleware, async (req, res) => {
+router.get("/stock-items", async (req, res) => {
   const { search, categoryId, lowStock } = req.query;
   const conditions: any[] = [eq(stockItemsTable.isDeleted, "false")];
   if (categoryId) conditions.push(eq(stockItemsTable.categoryId, Number(categoryId)));
@@ -609,4 +609,6 @@ router.get("/stock-items/:id/gst-history", authMiddleware, async (req, res) => {
 });
 
 export default router;
+
+
 

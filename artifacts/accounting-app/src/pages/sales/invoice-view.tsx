@@ -759,7 +759,7 @@ export default function SaleInvoiceView() {
   };
 
   const handlePrintFromPreview = () => {
-    iframeRef.current?.contentWindow?.print();
+    const win = window.open(previewBlobUrl, "_blank"); if(win) { win.onload = () => win.print(); } else { iframeRef.current?.contentWindow?.print(); }
   };
 
   const handleClosePreview = () => {
@@ -980,3 +980,4 @@ export default function SaleInvoiceView() {
     </div>
   );
 }
+
