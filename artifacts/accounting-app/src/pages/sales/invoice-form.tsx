@@ -178,7 +178,16 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
 
   const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
 
-  const { items: computedItems, totals: cTotals } = computeInvoice(items.map(i => ({ ...i, isTaxLiability: enableDualLedger ? i.isTaxLiability : true })), charges, isInterstate, enableDualLedger ? !items.some(i => i.isTaxLiability) : false);
+  const enrichedCharges = charges.map(c => {
+    const ledger = indirectLedgers.find(l => l.id === c.ledgerId);
+    return {
+      ...c,
+      gstCalculationMethod: ledger?.gstCalculationMethod || c.gstCalculationMethod || "none",
+      gstRate: ledger?.gstRate !== undefined && ledger?.gstRate !== null ? Number(ledger.gstRate) : (c.gstRate || 0)
+    };
+  });
+
+  const { items: computedItems, totals: cTotals } = computeInvoice(items.map(i => ({ ...i, isTaxLiability: enableDualLedger ? i.isTaxLiability : true })), enrichedCharges, isInterstate, enableDualLedger ? !items.some(i => i.isTaxLiability) : false);
   const totals = { ...cTotals, grand: cTotals.grand - cTotals.chargesTotal };
 
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);

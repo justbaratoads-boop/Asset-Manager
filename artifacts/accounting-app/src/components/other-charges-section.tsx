@@ -171,7 +171,12 @@ export function OtherChargesSection({ charges, onChange, ledgers = [] }: Props) 
             <div className="flex-1 min-w-[220px]">
               <LedgerSelect
                 value={{ ledgerId: charge.ledgerId, ledgerName: charge.ledgerName }}
-                onChange={(ledgerId, ledgerName) => update(i, { ledgerId, ledgerName })}
+                onChange={(ledgerId, ledgerName, ledger) => update(i, { 
+                  ledgerId, 
+                  ledgerName,
+                  gstCalculationMethod: ledger?.gstCalculationMethod || "none",
+                  gstRate: Number(ledger?.gstRate) || 0
+                })}
                 ledgers={ledgers}
               />
             </div>
