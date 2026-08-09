@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, AlertTriangle } from "lucide-react";
 import { getGstRateForDate } from "../../lib/gst";
+import { validateDecimalInput } from "@/lib/utils";
 
 import { UnitSelect } from "@/components/unit-select";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
@@ -68,6 +69,8 @@ function calcItem(item: Partial<OrderItem>): OrderItem {
     taxableAmount: taxable,
     cgst: gst / 2, sgst: gst / 2, igst: 0,
     total: taxable + gst,
+    isDecimalApplicable: item.isDecimalApplicable ?? true,
+    decimalPlaces: item.decimalPlaces ?? 2,
   };
 }
 
@@ -165,14 +168,21 @@ export default function OrderForm() {
   };
 
   const updateItem = (index: number, field: keyof OrderItem, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }); return u; });
+    setItems(prev => {
+      const u = [...prev];
+      if (field === 'quantity' && typeof value === 'string') {
+        if (!validateDecimalInput(value, u[index].isDecimalApplicable ?? true, u[index].decimalPlaces ?? 2)) return prev;
+      }
+      u[index] = calcItem({ ...u[index], [field]: value });
+      return u;
+    });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 }); return u; });
     }
   };
 
@@ -184,7 +194,7 @@ export default function OrderForm() {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
       const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calcItem({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true }); return u; });
+      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calcItem({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true, isDecimalApplicable: newItem.isDecimalApplicable ?? true, decimalPlaces: newItem.decimalPlaces ?? 2 }); return u; });
     }
   };
 

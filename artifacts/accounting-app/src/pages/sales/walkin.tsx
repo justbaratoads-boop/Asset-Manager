@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { validateDecimalInput } from "@/lib/utils";
 
 interface Item { itemName: string; hsnCode: string; quantity: number; unit: string; rate: number; gstPct: number; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number; isDecimalApplicable?: boolean; decimalPlaces?: number; }
 
@@ -20,7 +21,7 @@ function calc(item: Partial<Item>): Item {
   const gstPct = Number(item.gstPct) || 0;
   const taxable = qty * rate;
   const gstAmount = taxable * (gstPct / 100);
-  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, gstPct, taxableAmount: taxable, cgst: gstAmount / 2, sgst: gstAmount / 2, igst: 0, total: taxable + gstAmount };
+  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, gstPct, taxableAmount: taxable, cgst: gstAmount / 2, sgst: gstAmount / 2, igst: 0, total: taxable + gstAmount, isDecimalApplicable: item.isDecimalApplicable ?? true, decimalPlaces: item.decimalPlaces ?? 2 };
 }
 
 export default function WalkinSale() {
@@ -36,7 +37,14 @@ export default function WalkinSale() {
   const grand = items.reduce((s, i) => s + i.total, 0);
 
   const updateItem = (index: number, field: keyof Item, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], [field]: value }); return u; });
+    setItems(prev => {
+      const u = [...prev];
+      if (field === 'quantity' && typeof value === 'string') {
+        if (!validateDecimalInput(value, u[index].isDecimalApplicable ?? true, u[index].decimalPlaces ?? 2)) return prev;
+      }
+      u[index] = calc({ ...u[index], [field]: value });
+      return u;
+    });
   };
 
   const selectStock = (index: number, id: string) => {

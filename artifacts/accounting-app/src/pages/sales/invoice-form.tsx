@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Send, Save, Lock, AlertTriangle } from "lucide-react";
 import { getGstRateForDate, computeInvoice } from "../../lib/gst";
+import { validateDecimalInput } from "@/lib/utils";
 
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { UnitSelect } from "@/components/unit-select";
@@ -287,7 +288,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = { ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 };
+        updated[index] = { ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 };
         return updated;
       });
     }

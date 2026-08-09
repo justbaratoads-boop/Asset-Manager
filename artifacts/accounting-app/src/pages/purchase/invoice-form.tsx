@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock, Save, AlertTriangle } from "lucide-react";
 import { getGstRateForDate, computeInvoice } from "../../lib/gst";
+import { validateDecimalInput } from "@/lib/utils";
 
 import { ItemSearchCombobox } from "@/components/item-search-combobox";
 import { QuickAddPartyDialog } from "@/components/quick-add-party-dialog";
@@ -66,7 +67,7 @@ function calc(item: Partial<Item>, isInterstate: boolean): Item {
   const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
   const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
-  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, discountAmount, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, gstAmount, cgst: isInterstate ? 0 : gstAmount / 2, sgst: isInterstate ? 0 : gstAmount / 2, igst: isInterstate ? gstAmount : 0, total, stockItemId: item.stockItemId, batchId: item.batchId, isTaxLiability: item.isTaxLiability };
+  return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, discountAmount, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, gstAmount, cgst: isInterstate ? 0 : gstAmount / 2, sgst: isInterstate ? 0 : gstAmount / 2, igst: isInterstate ? gstAmount : 0, total, stockItemId: item.stockItemId, batchId: item.batchId, isTaxLiability: item.isTaxLiability, isDecimalApplicable: item.isDecimalApplicable ?? true, decimalPlaces: item.decimalPlaces ?? 2 };
 }
 
 function GstToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
@@ -210,14 +211,21 @@ export default function PurchaseInvoiceForm() {
   }, [partyId]);
 
   const updateItem = (index: number, field: keyof Item, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], [field]: value }, isInterstate); return u; });
+    setItems(prev => {
+      const u = [...prev];
+      if (field === 'quantity' && typeof value === 'string') {
+        if (!validateDecimalInput(value, u[index].isDecimalApplicable ?? true, u[index].decimalPlaces ?? 2)) return prev;
+      }
+      u[index] = calc({ ...u[index], [field]: value }, isInterstate);
+      return u;
+    });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 }, isInterstate); return u; });
     }
   };
 
