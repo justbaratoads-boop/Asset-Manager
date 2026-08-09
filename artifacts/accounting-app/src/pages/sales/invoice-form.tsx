@@ -769,7 +769,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                       </TableCell>
                       <TableCell className="text-right">
                         {item.quantity > 0 && item.rate > 0 ? (
-                          <span className="font-medium text-foreground">{formatCurrency(item.taxableAmount)}</span>
+                          <span className="font-medium text-foreground">{formatCurrency(item.baseAmount)}</span>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
@@ -806,7 +806,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
             <CardContent className="space-y-1 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Subtotal (at rate)</span><span>{formatCurrency(totals.subtotal)}</span></div>
               {totals.discount > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>− {formatCurrency(totals.discount)}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Taxable (base)</span><span>{formatCurrency(totals.taxable)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Taxable (base)</span><span>{formatCurrency(totals.baseTaxable)}</span></div>
               {!isInterstate && totals.cgst > 0 && <>
                 <div className="flex justify-between"><span className="text-muted-foreground">CGST</span><span>+ {formatCurrency(totals.cgst)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>+ {formatCurrency(totals.sgst)}</span></div>

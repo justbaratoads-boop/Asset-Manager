@@ -99,7 +99,20 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
 
   const hasDiscount = items.some((item: any) => Number(item.discountPct) > 0) || Number(inv?.totalDiscount) > 0;
 
-  const itemRows = items.map((item: any, i: number) => `
+  const assessableCharges = otherCharges.filter(c => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+  const baseTaxableTotal = Number(inv?.totalTaxable || 0) - totalAssessableAmount;
+
+  const itemRows = items.map((item: any, i: number) => {
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.rate) || 0;
+    const discPct = Number(item.discountPct) || 0;
+    const factor = 1 - discPct / 100;
+    const itemVal = (qty * rate) * factor;
+    const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+
+    return `
     <tr>
       <td>${i + 1}</td>
       <td>${item.itemName || ""}${item.batchId ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${getBatchName(item.batchId, batches)}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
@@ -108,11 +121,12 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
       <td class="tr">${fmtN(itemBaseRate(item, otherCharges, totalItemValue))}</td>
       ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
       ${showGstInfo ? `<td class="tr">${item.gstPct || 0}%</td>` : ""}
-      <td class="tr"><strong>${fmtN(item.taxableAmount)}</strong></td>
-    </tr>`).join("");
+      <td class="tr"><strong>${fmtN(baseTaxableAmount)}</strong></td>
+    </tr>`;
+  }).join("");
 
   const totalsHtml = [
-    `<div class="tot-row"><span>Taxable</span><span>${fmtN(inv?.totalTaxable)}</span></div>`,
+    `<div class="tot-row"><span>Taxable</span><span>${fmtN(baseTaxableTotal)}</span></div>`,
     Number(inv?.totalDiscount) > 0
       ? `<div class="tot-row disc"><span>Discount</span><span>−${fmtN(inv?.totalDiscount)}</span></div>` : "",
     Number(inv?.totalCgst) > 0 && showGstInfo
@@ -439,22 +453,32 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
             </tr>
           </thead>
           <tbody>
-            {invoice.items?.map((item: any, i: number) => (
-              <tr key={i} className="border-b">
-                <td className="py-2 pl-4 sm:pl-0">{i + 1}</td>
-                <td className="py-2">
-                  <div>{item.itemName}</div>
-                    {item.batchId && <div className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</div>}
-                    {item.description && <div className="text-xs text-gray-500 italic mt-0.5">{item.description}</div>}
-                </td>
-                {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
-                <td className="py-2 text-right">{item.quantity} {item.unit}</td>
-                <td className="py-2 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
-                {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
-                {showGstInfo && <td className="py-2 text-right">{item.gstPct}%</td>}
-                <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.taxableAmount)}</td>
-              </tr>
-            ))}
+            {invoice.items?.map((item: any, i: number) => {
+              const qty = Number(item.quantity) || 0;
+              const rate = Number(item.rate) || 0;
+              const discPct = Number(item.discountPct) || 0;
+              const factor = 1 - discPct / 100;
+              const itemVal = (qty * rate) * factor;
+              const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+              const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+
+              return (
+                <tr key={i} className="border-b">
+                  <td className="py-2 pl-4 sm:pl-0">{i + 1}</td>
+                  <td className="py-2">
+                    <div>{item.itemName}</div>
+                      {item.batchId && <div className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</div>}
+                      {item.description && <div className="text-xs text-gray-500 italic mt-0.5">{item.description}</div>}
+                  </td>
+                  {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
+                  <td className="py-2 text-right">{item.quantity} {item.unit}</td>
+                  <td className="py-2 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
+                  {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
+                  {showGstInfo && <td className="py-2 text-right">{item.gstPct}%</td>}
+                  <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(baseTaxableAmount)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -462,7 +486,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
       {/* Totals */}
       <div className="flex justify-end mb-4">
         <div className="w-full sm:w-64 space-y-1 text-sm border rounded-lg p-3 sm:border-none sm:rounded-none sm:p-0">
-          <div className="flex justify-between"><span className="text-gray-600">Taxable</span><span>{formatCurrency(invoice.totalTaxable)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-600">Taxable</span><span>{formatCurrency(baseTaxableTotal)}</span></div>
           {Number(invoice.totalDiscount) > 0 && (
             <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>
           )}
@@ -619,26 +643,39 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
           </tr>
         </thead>
         <tbody>
-          {invoice.items?.map((item: any, i: number) => (
-            <tr key={i} className="border-b border-gray-200">
-              <td className="py-1.5">{i + 1}</td>
-              <td className="py-1.5">{item.itemName}</td>
-              <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
-              <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
-              <td className="py-1.5 text-right font-medium">{formatCurrency(item.taxableAmount)}</td>
-            </tr>
-          ))}
+          {invoice.items?.map((item: any, i: number) => {
+            const qty = Number(item.quantity) || 0;
+            const rate = Number(item.rate) || 0;
+            const discPct = Number(item.discountPct) || 0;
+            const factor = 1 - discPct / 100;
+            const itemVal = (qty * rate) * factor;
+            const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+            const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+
+            return (
+              <tr key={i} className="border-b border-gray-200">
+                <td className="py-1.5">{i + 1}</td>
+                <td className="py-1.5">{item.itemName}</td>
+                <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
+                <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
+                <td className="py-1.5 text-right font-medium">{formatCurrency(baseTaxableAmount)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
       {/* Totals */}
       <div className="flex justify-end mb-6">
         <div className="w-56 space-y-1 text-sm">
-          <div className="flex justify-between text-gray-500"><span>Taxable</span><span>{formatCurrency(invoice.totalTaxable)}</span></div>
+          <div className="flex justify-between text-gray-500"><span>Taxable</span><span>{formatCurrency(baseTaxableTotal)}</span></div>
           {Number(invoice.totalDiscount) > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>}
           {Number(invoice.totalCgst) > 0 && <div className="flex justify-between text-gray-500"><span>CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>}
           {Number(invoice.totalSgst) > 0 && <div className="flex justify-between text-gray-500"><span>SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>}
           {Number(invoice.totalIgst) > 0 && <div className="flex justify-between text-gray-500"><span>IGST</span><span>{formatCurrency(invoice.totalIgst)}</span></div>}
+          {otherChargesList.map((c: any, i: number) => (
+            <div key={i} className="flex justify-between text-gray-500"><span>{c.name || c.ledgerName || "Other"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
+          ))}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1"><span>Total</span><span>{formatCurrency(grandTotal)}</span></div>
           <div className="flex justify-between text-green-600 font-medium"><span>Amount Received</span><span>{formatCurrency(amountPaid)}</span></div>
           {!isFullyPaid && (

@@ -103,7 +103,7 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
     if (isKaccha || item.isTaxLiability === false) {
       const sub = qty * rate;
       const discAmt = sub * (disc / 100);
-      return { ...item, subtotal: sub, totalDiscount: discAmt, taxableAmount: sub - discAmt, totalGst: 0, cgst: 0, sgst: 0, igst: 0, total: sub - discAmt };
+      return { ...item, subtotal: sub, totalDiscount: discAmt, baseAmount: sub - discAmt, taxableAmount: sub - discAmt, totalGst: 0, cgst: 0, sgst: 0, igst: 0, total: sub - discAmt };
     }
 
     const computed = computeItem({
@@ -124,6 +124,8 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
     const rTotalGst = Number((rCgst + rSgst + rIgst).toFixed(2));
     const rTotal = Number((rTaxable + rTotalGst).toFixed(2));
 
+    const rBase = Number(computed.baseAmount.toFixed(2));
+
     subtotal += rSub;
     discount += rDisc;
     totalTaxable += rTaxable;
@@ -135,6 +137,7 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
       ...item,
       subtotal: rSub,
       totalDiscount: rDisc,
+      baseAmount: rBase,
       taxableAmount: rTaxable,
       totalGst: rTotalGst,
       cgst: rCgst,
@@ -182,6 +185,7 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
       subtotal: Number(subtotal.toFixed(2)),
       discount: Number(discount.toFixed(2)),
       taxable: tTaxable,
+      baseTaxable: Number((tTaxable - tAssessable).toFixed(2)),
       gst: Number((tCgst + tSgst + tIgst).toFixed(2)),
       cgst: tCgst,
       sgst: tSgst,
