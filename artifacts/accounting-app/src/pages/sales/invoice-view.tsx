@@ -16,12 +16,21 @@ import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
-function itemBaseRate(item: any): number {
+function itemBaseRate(item: any, charges: any[] = [], totalItemValue: number = 0): number {
   const qty = Number(item.quantity) || 0;
+  const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const factor = 1 - discPct / 100;
   if (qty === 0 || factor === 0) return 0;
-  return Number(item.taxableAmount) / qty / factor;
+
+  // Calculate apportioned charge
+  const assessableCharges = charges.filter(c => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+  const itemVal = (qty * rate) * factor;
+  const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+
+  const baseTaxableAmount = Number(item.taxableAmount) - apportioned;
+  return baseTaxableAmount / qty / factor;
 }
 
 const PRINT_SETTINGS_KEY = "print_settings";
@@ -77,9 +86,16 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   const coGstin = showGstin && co?.gstin ? `GSTIN: ${co.gstin}` : "";
 
   const items: any[] = inv?.items || [];
-  const otherCharges: { name?: string; ledgerName?: string; amount: number; type?: string }[] = (() => {
+  const otherCharges: { name?: string; ledgerName?: string; amount: number; type?: string; gstCalculationMethod?: string }[] = (() => {
     try { return JSON.parse(inv?.otherCharges || "[]"); } catch { return []; }
   })();
+
+  const totalItemValue = items.reduce((sum: number, i: any) => {
+    const qty = Number(i.quantity) || 0;
+    const rate = Number(i.rate) || 0;
+    const disc = Number(i.discountPct) || 0;
+    return sum + (qty * rate) * (1 - disc / 100);
+  }, 0) || 0;
 
   const hasDiscount = items.some((item: any) => Number(item.discountPct) > 0) || Number(inv?.totalDiscount) > 0;
 
@@ -89,7 +105,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
       <td>${item.itemName || ""}${item.batchId ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${getBatchName(item.batchId, batches)}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
       ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
-      <td class="tr">${fmtN(itemBaseRate(item))}</td>
+      <td class="tr">${fmtN(itemBaseRate(item, otherCharges, totalItemValue))}</td>
       ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
       ${showGstInfo ? `<td class="tr">${item.gstPct || 0}%</td>` : ""}
       <td class="tr"><strong>${fmtN(item.taxableAmount)}</strong></td>
@@ -357,6 +373,17 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
   
   const hasDiscount = (invoice?.items || []).some((item: any) => Number(item.discountPct) > 0) || Number(invoice?.totalDiscount) > 0;
 
+  const otherChargesList = (() => {
+    try { return JSON.parse(invoice?.otherCharges || "[]"); } catch { return []; }
+  })();
+
+  const totalItemValue = (invoice?.items || []).reduce((sum: number, i: any) => {
+    const qty = Number(i.quantity) || 0;
+    const rate = Number(i.rate) || 0;
+    const disc = Number(i.discountPct) || 0;
+    return sum + (qty * rate) * (1 - disc / 100);
+  }, 0) || 0;
+
   return (
     <div className="bg-white border rounded-xl p-4 sm:p-8 max-w-3xl mx-auto text-black" id="invoice-print">
       {copyLabel && (
@@ -422,7 +449,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
                 </td>
                 {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
                 <td className="py-2 text-right">{item.quantity} {item.unit}</td>
-                <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
+                <td className="py-2 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
                 {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
                 {showGstInfo && <td className="py-2 text-right">{item.gstPct}%</td>}
                 <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(item.taxableAmount)}</td>
@@ -542,6 +569,17 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
   const grandTotal = Number(invoice.grandTotal) || 0;
   const isFullyPaid = amountPaid >= grandTotal;
 
+  const otherChargesList = (() => {
+    try { return JSON.parse(invoice?.otherCharges || "[]"); } catch { return []; }
+  })();
+
+  const totalItemValue = (invoice?.items || []).reduce((sum: number, i: any) => {
+    const qty = Number(i.quantity) || 0;
+    const rate = Number(i.rate) || 0;
+    const disc = Number(i.discountPct) || 0;
+    return sum + (qty * rate) * (1 - disc / 100);
+  }, 0) || 0;
+
   return (
     <div id="acknowledgment-print" className="bg-white border rounded-xl p-8 max-w-2xl mx-auto text-black text-sm">
       {/* Header */}
@@ -586,7 +624,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
               <td className="py-1.5">{i + 1}</td>
               <td className="py-1.5">{item.itemName}</td>
               <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
-              <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item))}</td>
+              <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
               <td className="py-1.5 text-right font-medium">{formatCurrency(item.taxableAmount)}</td>
             </tr>
           ))}
