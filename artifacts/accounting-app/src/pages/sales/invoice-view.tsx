@@ -96,7 +96,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     </tr>`).join("");
 
   const totalsHtml = [
-    `<div class="tot-row"><span>Subtotal</span><span>${fmtN(inv?.subtotal)}</span></div>`,
+    `<div class="tot-row"><span>Taxable</span><span>${fmtN(inv?.totalTaxable)}</span></div>`,
     Number(inv?.totalDiscount) > 0
       ? `<div class="tot-row disc"><span>Discount</span><span>−${fmtN(inv?.totalDiscount)}</span></div>` : "",
     Number(inv?.totalCgst) > 0 && showGstInfo
@@ -435,7 +435,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
       {/* Totals */}
       <div className="flex justify-end mb-4">
         <div className="w-full sm:w-64 space-y-1 text-sm border rounded-lg p-3 sm:border-none sm:rounded-none sm:p-0">
-          <div className="flex justify-between"><span className="text-gray-600">Subtotal</span><span>{formatCurrency(invoice.subtotal)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-600">Taxable</span><span>{formatCurrency(invoice.totalTaxable)}</span></div>
           {Number(invoice.totalDiscount) > 0 && (
             <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>
           )}
@@ -596,7 +596,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
       {/* Totals */}
       <div className="flex justify-end mb-6">
         <div className="w-56 space-y-1 text-sm">
-          <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(invoice.subtotal)}</span></div>
+          <div className="flex justify-between text-gray-500"><span>Taxable</span><span>{formatCurrency(invoice.totalTaxable)}</span></div>
           {Number(invoice.totalDiscount) > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>}
           {Number(invoice.totalCgst) > 0 && <div className="flex justify-between text-gray-500"><span>CGST</span><span>{formatCurrency(invoice.totalCgst)}</span></div>}
           {Number(invoice.totalSgst) > 0 && <div className="flex justify-between text-gray-500"><span>SGST</span><span>{formatCurrency(invoice.totalSgst)}</span></div>}
