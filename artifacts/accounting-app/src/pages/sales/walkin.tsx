@@ -12,7 +12,7 @@ import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-interface Item { itemName: string; hsnCode: string; quantity: number; unit: string; rate: number; gstPct: number; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number; }
+interface Item { itemName: string; hsnCode: string; quantity: number; unit: string; rate: number; gstPct: number; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number; isDecimalApplicable?: boolean; decimalPlaces?: number; }
 
 function calc(item: Partial<Item>): Item {
   const qty = Number(item.quantity) || 0;
@@ -41,7 +41,7 @@ export default function WalkinSale() {
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
-    if (si) setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate }); return u; });
+    if (si) setItems(prev => { const u = [...prev]; u[index] = calc({ ...u[index], itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 }); return u; });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

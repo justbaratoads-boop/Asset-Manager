@@ -41,6 +41,7 @@ export default function ItemForm() {
     name: "", categoryId: "", hsnCode: "", unit: "pcs",
     purchaseRate: "", saleRate: "", minStockLevel: "", physicalStock: "", barcode: "",
     gstApplicable: false, gstRate: "", isTaxLiability: true,
+    isDecimalApplicable: true, decimalPlaces: "2",
   });
   const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
@@ -74,6 +75,8 @@ export default function ItemForm() {
       gstApplicable,
       gstRate,
       isTaxLiability: e.isTaxLiability ?? true,
+      isDecimalApplicable: e.isDecimalApplicable ?? true,
+      decimalPlaces: String(e.decimalPlaces ?? 2),
     });
   }, [existing]);
 
@@ -97,6 +100,8 @@ export default function ItemForm() {
     gstApplicable: String(form.gstApplicable),
     gstRate: Number(form.gstRate) || 0,
     isTaxLiability: form.isTaxLiability,
+    isDecimalApplicable: form.isDecimalApplicable,
+    decimalPlaces: Number(form.decimalPlaces) || 0,
     ...(gstRateChanged ? { gstEffectiveFrom } : {}),
   });
 
@@ -200,6 +205,22 @@ export default function ItemForm() {
               <Label>Unit</Label>
               <UnitSelect value={form.unit} onChange={v => set("unit", v)} className="h-9" />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Quantity & Decimals</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <Switch checked={form.isDecimalApplicable} onCheckedChange={v => set("isDecimalApplicable", v)} />
+              <Label className="cursor-pointer">Decimal Quantities Allowed</Label>
+            </div>
+            {form.isDecimalApplicable && (
+              <div className="space-y-1">
+                <Label>Allowed Decimal Places</Label>
+                <Input type="number" min="1" max="4" value={form.decimalPlaces} onChange={e => set("decimalPlaces", e.target.value)} placeholder="e.g. 2" />
+              </div>
+            )}
           </CardContent>
         </Card>
 

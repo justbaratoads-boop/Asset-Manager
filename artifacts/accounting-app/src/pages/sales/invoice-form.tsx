@@ -47,6 +47,8 @@ interface InvoiceItem {
   igst: number;
   total: number;
   isTaxLiability?: boolean;
+    isDecimalApplicable?: boolean;
+    decimalPlaces?: number;
 }
 
 function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceItem {
@@ -271,6 +273,9 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => {
       const updated = [...prev];
+        if (field === 'quantity' && typeof value === 'string') {
+          if (!validateDecimalInput(value, updated[index].isDecimalApplicable ?? true, updated[index].decimalPlaces ?? 2)) return prev;
+        }
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
@@ -282,7 +287,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = { ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true };
+        updated[index] = { ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 };
         return updated;
       });
     }

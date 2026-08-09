@@ -45,6 +45,8 @@ interface Item {
   igst: number;
   total: number;
   isTaxLiability?: boolean;
+    isDecimalApplicable?: boolean;
+    decimalPlaces?: number;
 }
 
 const PAYMENT_MODES = [

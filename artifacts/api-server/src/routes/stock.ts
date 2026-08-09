@@ -307,6 +307,8 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
     physicalStock: String(Number(d.physicalStock) || 0),
     gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
     gstRate: String(d.gstRate || 0),
+    isDecimalApplicable: d.isDecimalApplicable !== undefined ? (d.isDecimalApplicable === true || d.isDecimalApplicable === "true") : true,
+    decimalPlaces: d.decimalPlaces !== undefined ? Number(d.decimalPlaces) : 2,
     isTaxLiability: d.isTaxLiability === "false" || d.isTaxLiability === false ? false : true,
   }).returning();
   res.status(201).json({ ...item, physicalStock: Number(item.physicalStock) });
@@ -387,6 +389,8 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
     physicalStock: d.physicalStock !== undefined ? String(Number(d.physicalStock) || 0) : current.physicalStock,
     gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
     gstRate: newGstRate,
+    isDecimalApplicable: d.isDecimalApplicable !== undefined ? (d.isDecimalApplicable === true || d.isDecimalApplicable === "true") : current.isDecimalApplicable,
+    decimalPlaces: d.decimalPlaces !== undefined ? Number(d.decimalPlaces) : current.decimalPlaces,
     isTaxLiability: d.isTaxLiability !== undefined ? (d.isTaxLiability === "false" || d.isTaxLiability === false ? false : true) : current.isTaxLiability,
   }).where(eq(stockItemsTable.id, id)).returning();
 
@@ -605,3 +609,4 @@ router.get("/stock-items/:id/gst-history", authMiddleware, async (req, res) => {
 });
 
 export default router;
+

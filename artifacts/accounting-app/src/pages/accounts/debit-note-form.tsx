@@ -39,6 +39,8 @@ interface NoteItem {
   sgst: number;
   igst: number;
   total: number;
+    isDecimalApplicable?: boolean;
+    decimalPlaces?: number;
 }
 
 function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {

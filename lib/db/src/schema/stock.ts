@@ -43,6 +43,8 @@ export const stockItemsTable = pgTable("stock_items", {
   isTaxLiability: boolean("is_tax_liability").notNull().default(true),
   gstApplicable: text("gst_applicable").notNull().default("false"),
   gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  isDecimalApplicable: boolean("is_decimal_applicable").notNull().default(true),
+  decimalPlaces: integer("decimal_places").notNull().default(2),
   isDeleted: text("is_deleted").notNull().default("false"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
