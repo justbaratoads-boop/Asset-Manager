@@ -220,7 +220,7 @@ function ContraViewSheet({ id, onClose }: { id: number | null; onClose: () => vo
             </div>
 
             {/* Transfer visual */}
-            <div className="rounded-lg border overflow-hidden">
+            <div className="rounded-lg border overflow-x-auto">
               <div className="bg-muted/40 px-4 py-2 border-b">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Transfer Details</p>
               </div>

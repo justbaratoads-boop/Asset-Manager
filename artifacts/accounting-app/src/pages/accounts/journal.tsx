@@ -214,7 +214,7 @@ function JournalViewSheet({ id, onClose, onEdit }: { id: number | null; onClose:
             {/* Lines — classic T-format */}
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Journal Lines</p>
-              <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-lg border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/40 border-b">
