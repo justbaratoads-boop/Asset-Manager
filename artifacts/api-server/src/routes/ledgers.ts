@@ -139,8 +139,8 @@ router.put("/ledgers/:id", authMiddleware, async (req, res) => {
     upiId: data.upiId ?? null,
     isGstApplicable: data.isGstApplicable ?? false,
       gstCalculationMethod: data.gstCalculationMethod ?? "none",
-      gstRate: data.gstRate ?? null,
-    hsnSac: data.hsnSac ?? null,
+      gstRate: data.gstRate || null,
+      hsnSac: data.hsnSac || null,
   }).where(eq(ledgersTable.id, Number(id))).returning();
   if (!ledger) return res.status(404).json({ error: "Ledger not found" });
   res.json({ ...ledger, openingBalance: Number(ledger.openingBalance) });
