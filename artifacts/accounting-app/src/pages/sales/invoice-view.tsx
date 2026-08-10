@@ -123,10 +123,10 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
 
     const isInterstate = inv?.isInterstate === true || inv?.isInterstate === "true";
     if (isInterstate) {
-      baseIgst += (baseTaxableAmount * gstPct) / 100;
+      baseIgst += Number(((baseTaxableAmount * gstPct) / 100).toFixed(2));
     } else {
-      baseCgst += (baseTaxableAmount * (gstPct / 2)) / 100;
-      baseSgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+      baseCgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
+      baseSgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
     }
 
     return `
@@ -450,10 +450,10 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
     const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
     if (isInterstate) {
-      baseIgst += (baseTaxableAmount * gstPct) / 100;
+      baseIgst += Number(((baseTaxableAmount * gstPct) / 100).toFixed(2));
     } else {
-      baseCgst += (baseTaxableAmount * (gstPct / 2)) / 100;
-      baseSgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+      baseCgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
+      baseSgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
     }
   });
   baseCgst = Number(baseCgst.toFixed(2));
@@ -697,15 +697,13 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
     const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
     const gstPct = Number(item.gstPct) || 0;
     const grossAmount = qty * rate * factor;
-    const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
-    const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
-    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
     if (isInterstate) {
-      baseIgst += (baseTaxableAmount * gstPct) / 100;
+      baseIgst += Number(((baseTaxableAmount * gstPct) / 100).toFixed(2));
     } else {
-      baseCgst += (baseTaxableAmount * (gstPct / 2)) / 100;
-      baseSgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+      baseCgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
+      baseSgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
     }
   });
   baseCgst = Number(baseCgst.toFixed(2));
