@@ -203,12 +203,21 @@ export default function PurchaseInvoiceForm() {
       try { setKacchaCharges(typeof inv.kacchaCharges === "string" ? JSON.parse(inv.kacchaCharges) : inv.kacchaCharges); } catch { setKacchaCharges([]); }
     }
     if (inv.items?.length) {
-      setItems(inv.items.map((i: any) => calc({
-        stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, hsnCode: i.hsnCode || "",
-        quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
-        discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: false, isTaxLiability: i.isTaxLiability,
-      }, interstate)));
+      setItems(inv.items.map((i: any) => {
+        const qty = Number(i.quantity) || 0;
+        const rate = Number(i.rate) || 0;
+        const discPct = Number(i.discountPct) || 0;
+        const grossAmount = qty * rate * (1 - discPct / 100);
+        const gstPct = Number(i.gstPct) || 0;
+        const gstInclusive = gstPct > 0 && Number(i.taxableAmount || 0) < (grossAmount - 0.1);
+
+        return calc({
+          stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, hsnCode: i.hsnCode || "",
+          quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
+          discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
+          gstLocked: !!i.stockItemId, gstInclusive, isTaxLiability: i.isTaxLiability,
+        }, interstate);
+      }));
     }
   }, [existing]);
 
