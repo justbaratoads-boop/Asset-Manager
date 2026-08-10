@@ -31,7 +31,12 @@ function itemBaseRate(item: any, charges: any[] = [], totalItemValue: number = 0
   const itemVal = (qty * rate) * factor;
   const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
 
-  const baseTaxableAmount = Number(item.taxableAmount) - apportioned;
+  const gstPct = Number(item.gstPct) || 0;
+  const grossAmount = qty * rate * factor;
+  const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+  const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+
+  const baseTaxableAmount = Number(item.taxableAmount) - apportionedBase;
   return baseTaxableAmount / qty / factor;
 }
 
@@ -183,7 +188,11 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
                       const factor = 1 - discPct / 100;
                       const itemVal = (qty * rate) * factor;
                       const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-                      const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+                      const gstPct = Number(item.gstPct) || 0;
+                      const grossAmount = qty * rate * factor;
+                      const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+                      const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+                      const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
 
                       return (
                         <tr key={i} className="hover:bg-muted/20">

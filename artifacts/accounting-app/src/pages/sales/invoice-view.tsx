@@ -29,7 +29,12 @@ function itemBaseRate(item: any, charges: any[] = [], totalItemValue: number = 0
   const itemVal = (qty * rate) * factor;
   const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
 
-  const baseTaxableAmount = Number(item.taxableAmount) - apportioned;
+  const gstPct = Number(item.gstPct) || 0;
+  const grossAmount = qty * rate * factor;
+  const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+  const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+
+  const baseTaxableAmount = Number(item.taxableAmount) - apportionedBase;
   return baseTaxableAmount / qty / factor;
 }
 
@@ -103,6 +108,10 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
   const baseTaxableTotal = Number(inv?.totalTaxable || 0) - totalAssessableAmount;
 
+  let baseCgst = 0;
+  let baseSgst = 0;
+  let baseIgst = 0;
+
   const itemRows = items.map((item: any, i: number) => {
     const qty = Number(item.quantity) || 0;
     const rate = Number(item.rate) || 0;
@@ -110,7 +119,19 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     const factor = 1 - discPct / 100;
     const itemVal = (qty * rate) * factor;
     const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+    const gstPct = Number(item.gstPct) || 0;
+    const grossAmount = qty * rate * factor;
+    const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+    const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+
+    const isInterstate = inv?.isInterstate === true || inv?.isInterstate === "true";
+    if (isInterstate) {
+      baseIgst += (baseTaxableAmount * gstPct) / 100;
+    } else {
+      baseCgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+      baseSgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+    }
 
     return `
     <tr>
@@ -125,10 +146,9 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     </tr>`;
   }).join("");
 
-  const isInterstate = inv?.isInterstate === true || inv?.isInterstate === "true";
-  const baseCgst = Number(items.reduce((sum, item) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseSgst = Number(items.reduce((sum, item) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseIgst = Number(items.reduce((sum, item) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+  baseCgst = Number(baseCgst.toFixed(2));
+  baseSgst = Number(baseSgst.toFixed(2));
+  baseIgst = Number(baseIgst.toFixed(2));
 
   const extraCgst = Math.max(0, Number(inv?.totalCgst || 0) - baseCgst);
   const extraSgst = Math.max(0, Number(inv?.totalSgst || 0) - baseSgst);
@@ -420,9 +440,32 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
   const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
 
   const isInterstate = invoice?.isInterstate === true || invoice?.isInterstate === "true";
-  const baseCgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseSgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseIgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+  let baseCgst = 0;
+  let baseSgst = 0;
+  let baseIgst = 0;
+  (invoice?.items || []).forEach((item: any) => {
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.rate) || 0;
+    const discPct = Number(item.discountPct) || 0;
+    const factor = 1 - discPct / 100;
+    const itemVal = (qty * rate) * factor;
+    const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+    const gstPct = Number(item.gstPct) || 0;
+    const grossAmount = qty * rate * factor;
+    const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+    const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+
+    if (isInterstate) {
+      baseIgst += (baseTaxableAmount * gstPct) / 100;
+    } else {
+      baseCgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+      baseSgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+    }
+  });
+  baseCgst = Number(baseCgst.toFixed(2));
+  baseSgst = Number(baseSgst.toFixed(2));
+  baseIgst = Number(baseIgst.toFixed(2));
 
   const extraCgst = Math.max(0, Number(invoice?.totalCgst || 0) - baseCgst);
   const extraSgst = Math.max(0, Number(invoice?.totalSgst || 0) - baseSgst);
@@ -490,7 +533,11 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
               const factor = 1 - discPct / 100;
               const itemVal = (qty * rate) * factor;
               const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-              const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+              const gstPct = Number(item.gstPct) || 0;
+              const grossAmount = qty * rate * factor;
+              const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+              const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+              const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
 
               return (
                 <tr key={i} className="border-b">
@@ -649,9 +696,32 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
   const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
 
   const isInterstate = invoice?.isInterstate === true || invoice?.isInterstate === "true";
-  const baseCgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseSgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseIgst = Number((invoice?.items || []).reduce((sum: number, item: any) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+  let baseCgst = 0;
+  let baseSgst = 0;
+  let baseIgst = 0;
+  (invoice?.items || []).forEach((item: any) => {
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.rate) || 0;
+    const discPct = Number(item.discountPct) || 0;
+    const factor = 1 - discPct / 100;
+    const itemVal = (qty * rate) * factor;
+    const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+    const gstPct = Number(item.gstPct) || 0;
+    const grossAmount = qty * rate * factor;
+    const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+    const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+
+    if (isInterstate) {
+      baseIgst += (baseTaxableAmount * gstPct) / 100;
+    } else {
+      baseCgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+      baseSgst += (baseTaxableAmount * (gstPct / 2)) / 100;
+    }
+  });
+  baseCgst = Number(baseCgst.toFixed(2));
+  baseSgst = Number(baseSgst.toFixed(2));
+  baseIgst = Number(baseIgst.toFixed(2));
 
   const extraCgst = Math.max(0, Number(invoice?.totalCgst || 0) - baseCgst);
   const extraSgst = Math.max(0, Number(invoice?.totalSgst || 0) - baseSgst);
@@ -703,7 +773,11 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
             const factor = 1 - discPct / 100;
             const itemVal = (qty * rate) * factor;
             const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-            const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+            const gstPct = Number(item.gstPct) || 0;
+            const grossAmount = qty * rate * factor;
+            const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+            const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
+            const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
 
             return (
               <tr key={i} className="border-b border-gray-200">
