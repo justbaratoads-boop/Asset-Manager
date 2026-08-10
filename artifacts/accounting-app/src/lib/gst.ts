@@ -54,15 +54,11 @@ export function computeItem(args: CalculateItemArgs, isInterstate: boolean) {
   const gstPct = Number(args.gstPct) || 0;
   const apportioned = Number(args.apportionedChargeAmount) || 0;
 
-  const subtotal = qty * rate;
+  const baseRate = args.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+  const subtotal = qty * baseRate;
   const discountAmount = (subtotal * discPct) / 100;
-  let baseAmount = subtotal - discountAmount;
-  let taxableAmount = baseAmount + apportioned;
-
-  if (args.gstInclusive && gstPct > 0) {
-    taxableAmount = taxableAmount / (1 + gstPct / 100);
-    baseAmount = taxableAmount - apportioned;
-  }
+  const baseAmount = subtotal - discountAmount;
+  const taxableAmount = baseAmount + apportioned;
 
   const totalGst = (taxableAmount * gstPct) / 100;
   const cgst = isInterstate ? 0 : totalGst / 2;

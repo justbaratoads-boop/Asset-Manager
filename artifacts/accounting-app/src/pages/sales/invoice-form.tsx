@@ -58,19 +58,17 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
   const discPct = Number(item.discountPct) || 0;
   const gstPct = Number(item.gstPct) || 0;
   const gstInclusive = item.gstInclusive ?? false;
-  const subtotal = qty * rate;
-  // Actual user-entered discount only
+
+  const baseRate = (gstInclusive && gstPct > 0) ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+  const subtotal = qty * baseRate;
   const discountAmount = subtotal * (discPct / 100);
-  const grossAmount = subtotal - discountAmount;
-  // Inclusive: rate already contains GST — extract base and GST from grossAmount
-  // Exclusive: grossAmount is the base, GST is added on top
-  const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
-  const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
+  const taxable = subtotal - discountAmount;
+  const gstAmount = taxable * (gstPct / 100);
   const cgst = isInterstate ? 0 : gstAmount / 2;
   const sgst = isInterstate ? 0 : gstAmount / 2;
   const igst = isInterstate ? gstAmount : 0;
-  // Inclusive total = grossAmount (GST already inside); Exclusive total = grossAmount + GST
-  const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
+  const total = taxable + gstAmount;
+
   return {
     stockItemId: item.stockItemId,
     batchId: item.batchId,

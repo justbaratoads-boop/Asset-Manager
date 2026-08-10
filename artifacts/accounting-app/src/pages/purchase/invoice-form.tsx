@@ -61,12 +61,12 @@ function calc(item: Partial<Item>, isInterstate: boolean): Item {
   const qty = Number(item.quantity) || 0; const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0; const gstPct = Number(item.gstPct) || 0;
   const gstInclusive = item.gstInclusive ?? false;
-  const subtotal = qty * rate;
+  const baseRate = (gstInclusive && gstPct > 0) ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+  const subtotal = qty * baseRate;
   const discountAmount = subtotal * (discPct / 100);
-  const grossAmount = subtotal - discountAmount;
-  const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
-  const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
-  const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
+  const taxable = subtotal - discountAmount;
+  const gstAmount = taxable * (gstPct / 100);
+  const total = taxable + gstAmount;
   return { itemName: item.itemName || "", hsnCode: item.hsnCode || "", quantity: qty, unit: item.unit || "pcs", rate, discountPct: discPct, discountAmount, gstPct, gstLocked: item.gstLocked ?? false, gstInclusive, taxableAmount: taxable, gstAmount, cgst: isInterstate ? 0 : gstAmount / 2, sgst: isInterstate ? 0 : gstAmount / 2, igst: isInterstate ? gstAmount : 0, total, stockItemId: item.stockItemId, batchId: item.batchId, isTaxLiability: item.isTaxLiability, isDecimalApplicable: item.isDecimalApplicable ?? true, decimalPlaces: item.decimalPlaces ?? 2 };
 }
 
