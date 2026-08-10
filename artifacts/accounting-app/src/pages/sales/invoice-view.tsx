@@ -119,11 +119,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     const factor = 1 - discPct / 100;
     const itemVal = (qty * rate) * factor;
     const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-    const gstPct = Number(item.gstPct) || 0;
-    const grossAmount = qty * rate * factor;
-    const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
-    const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
-    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
     const isInterstate = inv?.isInterstate === true || inv?.isInterstate === "true";
     if (isInterstate) {
@@ -451,10 +447,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
     const itemVal = (qty * rate) * factor;
     const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
     const gstPct = Number(item.gstPct) || 0;
-    const grossAmount = qty * rate * factor;
-    const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
-    const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
-    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
     if (isInterstate) {
       baseIgst += (baseTaxableAmount * gstPct) / 100;
@@ -533,11 +526,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
               const factor = 1 - discPct / 100;
               const itemVal = (qty * rate) * factor;
               const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-              const gstPct = Number(item.gstPct) || 0;
-              const grossAmount = qty * rate * factor;
-              const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
-              const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
-              const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+              const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
               return (
                 <tr key={i} className="border-b">
@@ -773,11 +762,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
             const factor = 1 - discPct / 100;
             const itemVal = (qty * rate) * factor;
             const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-            const gstPct = Number(item.gstPct) || 0;
-            const grossAmount = qty * rate * factor;
-            const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
-            const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
-            const baseTaxableAmount = Number(item.taxableAmount || 0) - apportionedBase;
+            const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
             return (
               <tr key={i} className="border-b border-gray-200">
