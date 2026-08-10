@@ -16,26 +16,17 @@ import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
-function itemBaseRate(item: any, charges: any[] = [], totalItemValue: number = 0): number {
+function itemBaseRate(item: any): number {
   const qty = Number(item.quantity) || 0;
   const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const factor = 1 - discPct / 100;
   if (qty === 0 || factor === 0) return 0;
 
-  // Calculate apportioned charge
-  const assessableCharges = charges.filter(c => c.gstCalculationMethod === 'assessable_value');
-  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
-  const itemVal = (qty * rate) * factor;
-  const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-
   const gstPct = Number(item.gstPct) || 0;
   const grossAmount = qty * rate * factor;
   const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
-  const apportionedBase = isInclusive ? (apportioned / (1 + gstPct / 100)) : apportioned;
-
-  const baseTaxableAmount = Number(item.taxableAmount) - apportionedBase;
-  return baseTaxableAmount / qty / factor;
+  return isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
 }
 
 const PRINT_SETTINGS_KEY = "print_settings";
@@ -95,11 +86,14 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     try { return JSON.parse(inv?.otherCharges || "[]"); } catch { return []; }
   })();
 
+  // Use pre-tax base amounts (matching gst.ts) to apportion assessable charges
   const totalItemValue = items.reduce((sum: number, i: any) => {
     const qty = Number(i.quantity) || 0;
     const rate = Number(i.rate) || 0;
     const disc = Number(i.discountPct) || 0;
-    return sum + (qty * rate) * (1 - disc / 100);
+    const gstPct = Number(i.gstPct) || 0;
+    const baseRate = i.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    return sum + qty * baseRate * (1 - disc / 100);
   }, 0) || 0;
 
   const hasDiscount = items.some((item: any) => Number(item.discountPct) > 0) || Number(inv?.totalDiscount) > 0;
@@ -117,8 +111,10 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
     const rate = Number(item.rate) || 0;
     const discPct = Number(item.discountPct) || 0;
     const factor = 1 - discPct / 100;
-    const itemVal = (qty * rate) * factor;
-    const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+    const gstPct = Number(item.gstPct) || 0;
+    const baseRate = item.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    const baseAmount = qty * baseRate * (1 - discPct / 100);
+    const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
     const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
     const isInterstate = inv?.isInterstate === true || inv?.isInterstate === "true";
@@ -135,7 +131,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
       <td>${item.itemName || ""}${item.batchId ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${getBatchName(item.batchId, batches)}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
       ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
-      <td class="tr">${fmtN(itemBaseRate(item, otherCharges, totalItemValue))}</td>
+      <td class="tr">${fmtN(itemBaseRate(item))}</td>
       ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
       ${showGstInfo ? `<td class="tr">${item.gstPct || 0}%</td>` : ""}
       <td class="tr"><strong>${fmtN(baseTaxableAmount)}</strong></td>
@@ -423,15 +419,19 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
     try { return JSON.parse(invoice?.otherCharges || "[]"); } catch { return []; }
   })();
 
+  // Use pre-tax base amounts (matching gst.ts) to apportion assessable charges
   const totalItemValue = (invoice?.items || []).reduce((sum: number, i: any) => {
     const qty = Number(i.quantity) || 0;
     const rate = Number(i.rate) || 0;
     const disc = Number(i.discountPct) || 0;
-    return sum + (qty * rate) * (1 - disc / 100);
+    const gstPct = Number(i.gstPct) || 0;
+    const baseRate = i.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    const subtotal = qty * baseRate;
+    return sum + subtotal * (1 - disc / 100);
   }, 0) || 0;
 
-  const assessableCharges = otherChargesList.filter(c => c.gstCalculationMethod === 'assessable_value');
-  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
+  const assessableCharges = otherChargesList.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
+  const totalAssessableAmount = assessableCharges.reduce((sum: number, c: any) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
   const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
   const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
 
@@ -443,10 +443,10 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
     const qty = Number(item.quantity) || 0;
     const rate = Number(item.rate) || 0;
     const discPct = Number(item.discountPct) || 0;
-    const factor = 1 - discPct / 100;
-    const itemVal = (qty * rate) * factor;
-    const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
     const gstPct = Number(item.gstPct) || 0;
+    const baseRate = item.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    const baseAmount = qty * baseRate * (1 - discPct / 100);
+    const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
     const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
     if (isInterstate) {
@@ -538,7 +538,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
                   </td>
                   {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
                   <td className="py-2 text-right">{item.quantity} {item.unit}</td>
-                  <td className="py-2 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
+                  <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
                   {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
                   {showGstInfo && <td className="py-2 text-right">{item.gstPct}%</td>}
                   <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(baseTaxableAmount)}</td>
@@ -672,11 +672,14 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
     try { return JSON.parse(invoice?.otherCharges || "[]"); } catch { return []; }
   })();
 
+  // Use pre-tax base amounts (matching gst.ts) to apportion assessable charges
   const totalItemValue = (invoice?.items || []).reduce((sum: number, i: any) => {
     const qty = Number(i.quantity) || 0;
     const rate = Number(i.rate) || 0;
     const disc = Number(i.discountPct) || 0;
-    return sum + (qty * rate) * (1 - disc / 100);
+    const gstPct = Number(i.gstPct) || 0;
+    const baseRate = i.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    return sum + qty * baseRate * (1 - disc / 100);
   }, 0) || 0;
 
   const assessableCharges = otherChargesList.filter(c => c.gstCalculationMethod === 'assessable_value');
@@ -692,11 +695,10 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
     const qty = Number(item.quantity) || 0;
     const rate = Number(item.rate) || 0;
     const discPct = Number(item.discountPct) || 0;
-    const factor = 1 - discPct / 100;
-    const itemVal = (qty * rate) * factor;
-    const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
     const gstPct = Number(item.gstPct) || 0;
-    const grossAmount = qty * rate * factor;
+    const baseRate = item.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    const baseAmount = qty * baseRate * (1 - discPct / 100);
+    const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
     const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
     if (isInterstate) {
@@ -767,7 +769,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
                 <td className="py-1.5">{i + 1}</td>
                 <td className="py-1.5">{item.itemName}</td>
                 <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
-                <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
+                <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item))}</td>
                 <td className="py-1.5 text-right font-medium">{formatCurrency(baseTaxableAmount)}</td>
               </tr>
             );

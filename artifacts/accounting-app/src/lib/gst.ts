@@ -82,19 +82,25 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
   const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
 
   // 2. Distribute assessable charges
-  const totalItemValue = items.reduce((sum, i) => {
+  const itemsWithBase = items.map(i => {
     const qty = Number(i.quantity) || 0;
     const rate = Number(i.rate) || 0;
-    const disc = Number(i.discountPct) || 0;
-    return sum + (qty * rate) * (1 - disc / 100);
-  }, 0);
+    const discPct = Number(i.discountPct) || 0;
+    const gstPct = Number(i.gstPct) || 0;
+    const baseRate = i.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    const subtotal = qty * baseRate;
+    const discountAmount = subtotal * (discPct / 100);
+    const baseAmount = subtotal - discountAmount;
+    return { ...i, baseAmount };
+  });
 
-  const finalItems = items.map(item => {
+  const totalItemValue = itemsWithBase.reduce((sum, i) => sum + i.baseAmount, 0);
+
+  const finalItems = itemsWithBase.map(item => {
     const qty = Number(item.quantity) || 0;
     const rate = Number(item.rate) || 0;
     const disc = Number(item.discountPct) || 0;
-    const itemVal = (qty * rate) * (1 - disc / 100);
-    const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+    const apportioned = totalItemValue > 0 ? (item.baseAmount / totalItemValue) * totalAssessableAmount : 0;
     
     if (isKaccha || item.isTaxLiability === false) {
       const sub = qty * rate;

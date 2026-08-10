@@ -18,21 +18,17 @@ import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
-function itemBaseRate(item: any, charges: any[] = [], totalItemValue: number = 0): number {
+function itemBaseRate(item: any): number {
   const qty = Number(item.quantity) || 0;
   const rate = Number(item.rate) || 0;
   const discPct = Number(item.discountPct) || 0;
   const factor = 1 - discPct / 100;
   if (qty === 0 || factor === 0) return 0;
 
-  // Calculate apportioned charge
-  const assessableCharges = charges.filter(c => c.gstCalculationMethod === 'assessable_value');
-  const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
-  const itemVal = (qty * rate) * factor;
-  const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
-
-  const baseTaxableAmount = Number(item.taxableAmount) - apportioned;
-  return baseTaxableAmount / qty / factor;
+  const gstPct = Number(item.gstPct) || 0;
+  const grossAmount = qty * rate * factor;
+  const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+  return isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
 }
 
 const PAGE_SIZE = 20;
@@ -97,11 +93,14 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
     try { return JSON.parse(data?.otherCharges || "[]"); } catch { return []; }
   })();
 
+  // Use pre-tax base amounts (matching gst.ts) to apportion assessable charges
   const totalItemValue = items.reduce((sum: number, i: any) => {
     const qty = Number(i.quantity) || 0;
     const rate = Number(i.rate) || 0;
     const disc = Number(i.discountPct) || 0;
-    return sum + (qty * rate) * (1 - disc / 100);
+    const gstPct = Number(i.gstPct) || 0;
+    const baseRate = i.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    return sum + qty * baseRate * (1 - disc / 100);
   }, 0) || 0;
 
   const assessableCharges = otherChargesList.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
@@ -109,9 +108,26 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
   const baseTaxableTotal = Number(data?.totalTaxable || 0) - totalAssessableAmount;
 
   const isInterstate = data?.isInterstate === true || data?.isInterstate === "true";
-  const baseCgst = Number(items.reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseSgst = Number(items.reduce((sum: number, item: any) => sum + (isInterstate ? 0 : (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * (Number(item.gstPct || 0) / 2)) / 100)), 0).toFixed(2));
-  const baseIgst = Number(items.reduce((sum: number, item: any) => sum + (isInterstate ? (((Number(item.taxableAmount || 0) - (totalItemValue > 0 ? (((Number(item.quantity) * Number(item.rate) * (1 - Number(item.discountPct || 0)/100)) / totalItemValue) * totalAssessableAmount) : 0)) * Number(item.gstPct || 0)) / 100) : 0), 0).toFixed(2));
+  let _baseCgst = 0, _baseSgst = 0, _baseIgst = 0;
+  items.forEach((item: any) => {
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.rate) || 0;
+    const discPct = Number(item.discountPct) || 0;
+    const gstPct = Number(item.gstPct) || 0;
+    const baseRate = item.gstInclusive && gstPct > 0 ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    const baseAmount = qty * baseRate * (1 - discPct / 100);
+    const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
+    const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
+    if (isInterstate) {
+      _baseIgst += Number(((baseTaxableAmount * gstPct) / 100).toFixed(2));
+    } else {
+      _baseCgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
+      _baseSgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
+    }
+  });
+  const baseCgst = Number(_baseCgst.toFixed(2));
+  const baseSgst = Number(_baseSgst.toFixed(2));
+  const baseIgst = Number(_baseIgst.toFixed(2));
 
   const extraCgst = Math.max(0, Number(data?.totalCgst || 0) - baseCgst);
   const extraSgst = Math.max(0, Number(data?.totalSgst || 0) - baseSgst);
@@ -193,7 +209,7 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
                             {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
                           </td>
                           <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
-                          <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item, otherChargesList, totalItemValue))}</td>
+                          <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
                           <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(baseTaxableAmount)}</td>
                         </tr>
                       );
