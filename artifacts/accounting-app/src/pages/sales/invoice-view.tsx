@@ -718,9 +718,9 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
   baseSgst = Number(baseSgst.toFixed(2));
   baseIgst = Number(baseIgst.toFixed(2));
 
-  const extraCgst = Math.max(0, Number(invoice?.totalCgst || 0) - baseCgst);
-  const extraSgst = Math.max(0, Number(invoice?.totalSgst || 0) - baseSgst);
-  const extraIgst = Math.max(0, Number(invoice?.totalIgst || 0) - baseIgst);
+  const displayCgst = Number(invoice?.totalCgst || 0);
+  const displaySgst = Number(invoice?.totalSgst || 0);
+  const displayIgst = Number(invoice?.totalIgst || 0);
 
   return (
     <div id="acknowledgment-print" className="bg-white border rounded-xl p-8 max-w-2xl mx-auto text-black text-sm">
@@ -792,15 +792,30 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
         <div className="w-56 space-y-1 text-sm">
           <div className="flex justify-between text-gray-500"><span>Taxable</span><span>{formatCurrency(baseTaxableTotal)}</span></div>
           {Number(invoice.totalDiscount) > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>}
-          {baseCgst > 0 && <div className="flex justify-between text-gray-500"><span>CGST</span><span>{formatCurrency(baseCgst)}</span></div>}
-          {baseSgst > 0 && <div className="flex justify-between text-gray-500"><span>SGST</span><span>{formatCurrency(baseSgst)}</span></div>}
-          {baseIgst > 0 && <div className="flex justify-between text-gray-500"><span>IGST</span><span>{formatCurrency(baseIgst)}</span></div>}
-          {otherChargesList.map((c: any, i: number) => (
-            <div key={i} className="flex justify-between text-gray-500"><span>{c.name || c.ledgerName || "Other"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
-          ))}
-          {extraCgst > 0 && <div className="flex justify-between text-gray-500"><span>CGST of {chargeName}</span><span>{formatCurrency(extraCgst)}</span></div>}
-          {extraSgst > 0 && <div className="flex justify-between text-gray-500"><span>SGST of {chargeName}</span><span>{formatCurrency(extraSgst)}</span></div>}
-          {extraIgst > 0 && <div className="flex justify-between text-gray-500"><span>IGST of {chargeName}</span><span>{formatCurrency(extraIgst)}</span></div>}
+          {(() => {
+            const nonRoundOff = otherChargesList.filter((c: any) => (c.name || c.ledgerName || "").toLowerCase() !== "round off");
+            const roundOff = otherChargesList.find((c: any) => (c.name || c.ledgerName || "").toLowerCase() === "round off");
+
+            return (
+              <>
+                {nonRoundOff.map((c: any, i: number) => (
+                  <div key={i} className="flex justify-between text-gray-500">
+                    <span>{c.name || c.ledgerName || "Other"}</span>
+                    <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
+                  </div>
+                ))}
+                {displayCgst > 0 && <div className="flex justify-between text-gray-500"><span>CGST</span><span>{formatCurrency(displayCgst)}</span></div>}
+                {displaySgst > 0 && <div className="flex justify-between text-gray-500"><span>SGST</span><span>{formatCurrency(displaySgst)}</span></div>}
+                {displayIgst > 0 && <div className="flex justify-between text-gray-500"><span>IGST</span><span>{formatCurrency(displayIgst)}</span></div>}
+                {roundOff && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>{roundOff.name || roundOff.ledgerName}</span>
+                    <span>{roundOff.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(roundOff.amount))}</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1"><span>Total</span><span>{formatCurrency(grandTotal)}</span></div>
           <div className="flex justify-between text-green-600 font-medium"><span>Amount Received</span><span>{formatCurrency(amountPaid)}</span></div>
           {!isFullyPaid && (
