@@ -173,11 +173,11 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     .limit(1);
   if (!ledger) return res.status(404).json({ error: "Ledger not found" });
 
-  // Fetch all ledgers for mode→id mapping
-  const allLedgers = await db.select({ id: ledgersTable.id, name: ledgersTable.name })
-    .from(ledgersTable).where(eq(ledgersTable.isDeleted, "false"));
-  const cashLedger = allLedgers.find(l => l.name === "Cash");
-  const cashId = cashLedger?.id ?? 1;
+  // Try to find a party that matches the ledger's name
+  const [matchingParty] = await db.select().from(partiesTable)
+    .where(and(eq(partiesTable.name, ledger.name), eq(partiesTable.isDeleted, "false")))
+    .limit(1);
+  const matchingPartyId = matchingParty?.id;
 
   const transactions: any[] = [];
 
@@ -211,110 +211,206 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     });
   }
 
-  // ── Payment vouchers (this ledger is the cash/bank account debited) ───────
-  const pmtConds: any[] = [
-    eq(paymentsTable.ledgerId, Number(id)),
-    eq(paymentsTable.isDeleted, "false"),
-  ];
+  // ── Payment vouchers ──────────────────────────────────────────────────────
+  const pmtConds: any[] = [eq(paymentsTable.isDeleted, "false")];
   if (from) pmtConds.push(gte(paymentsTable.date, from));
   if (to) pmtConds.push(lte(paymentsTable.date, to));
 
   const pmts = await db.select().from(paymentsTable).where(and(...pmtConds));
   for (const p of pmts) {
-    transactions.push({
-      date: p.date,
-      type: "payment",
-      description: p.narration || (p.partyName ? `Payment to ${p.partyName}` : `Payment ${p.voucherNumber}`),
-      ref: p.voucherNumber,
-      dr: 0,
-      cr: Number(p.amount),
-    });
+    // 1. If cash/bank ledger matches
+    if (Number(p.ledgerId) === Number(id)) {
+      transactions.push({
+        date: p.date,
+        type: "payment",
+        description: p.narration || (p.partyName ? `Payment to ${p.partyName}` : `Payment ${p.voucherNumber}`),
+        ref: p.voucherNumber,
+        dr: 0,
+        cr: Number(p.amount),
+      });
+    }
+
+    // 2. If party ledger matches
+    if (matchingPartyId && Number(p.partyId) === Number(matchingPartyId)) {
+      transactions.push({
+        date: p.date,
+        type: "payment",
+        description: p.narration || `Payment to party ${p.partyName}`,
+        ref: p.voucherNumber,
+        dr: Number(p.amount),
+        cr: 0,
+      });
+    }
+
+    // 3. If ledger allocations contain the ledger
+    if (p.ledgerAllocations) {
+      try {
+        const allocs = JSON.parse(p.ledgerAllocations);
+        for (const a of allocs) {
+          if (Number(a.ledgerId) === Number(id) && Number(a.amount) > 0) {
+            transactions.push({
+              date: p.date,
+              type: "payment",
+              description: p.narration || `Payment Allocation for ${ledger.name}`,
+              ref: p.voucherNumber,
+              dr: Number(a.amount),
+              cr: 0,
+            });
+          }
+        }
+      } catch {}
+    }
   }
 
-  // ── Receipt vouchers (this ledger is the cash/bank account credited) ──────
-  const rcptConds: any[] = [
-    eq(receiptsTable.ledgerId, Number(id)),
-    eq(receiptsTable.isDeleted, "false"),
-  ];
+  // ── Receipt vouchers ──────────────────────────────────────────────────────
+  const rcptConds: any[] = [eq(receiptsTable.isDeleted, "false")];
   if (from) rcptConds.push(gte(receiptsTable.date, from));
   if (to) rcptConds.push(lte(receiptsTable.date, to));
 
   const rcpts = await db.select().from(receiptsTable).where(and(...rcptConds));
   for (const r of rcpts) {
-    transactions.push({
-      date: r.date,
-      type: "receipt",
-      description: r.narration || (r.partyName ? `Receipt from ${r.partyName}` : `Receipt ${r.voucherNumber}`),
-      ref: r.voucherNumber,
-      dr: Number(r.amount),
-      cr: 0,
-    });
+    // 1. If cash/bank ledger matches
+    if (Number(r.ledgerId) === Number(id)) {
+      transactions.push({
+        date: r.date,
+        type: "receipt",
+        description: r.narration || (r.partyName ? `Receipt from ${r.partyName}` : `Receipt ${r.voucherNumber}`),
+        ref: r.voucherNumber,
+        dr: Number(r.amount),
+        cr: 0,
+      });
+    }
+
+    // 2. If party ledger matches
+    if (matchingPartyId && Number(r.partyId) === Number(matchingPartyId)) {
+      transactions.push({
+        date: r.date,
+        type: "receipt",
+        description: r.narration || `Receipt from party ${r.partyName}`,
+        ref: r.voucherNumber,
+        dr: 0,
+        cr: Number(r.amount),
+      });
+    }
+
+    // 3. If ledger allocations contain the ledger
+    if (r.ledgerAllocations) {
+      try {
+        const allocs = JSON.parse(r.ledgerAllocations);
+        for (const a of allocs) {
+          if (Number(a.ledgerId) === Number(id) && Number(a.amount) > 0) {
+            transactions.push({
+              date: r.date,
+              type: "receipt",
+              description: r.narration || `Receipt Allocation for ${ledger.name}`,
+              ref: r.voucherNumber,
+              dr: 0,
+              cr: Number(a.amount),
+            });
+          }
+        }
+      } catch {}
+    }
   }
 
-  // ── Sale invoice other-charges (CR to this ledger — income earned) ────────
-  const saleConds: any[] = [
-    isNotNull(saleInvoicesTable.otherCharges),
-    eq(saleInvoicesTable.isDeleted, "false"),
-  ];
+  // ── Sale invoices other-charges & party mapping ───────────────────────────
+  const saleConds: any[] = [eq(saleInvoicesTable.isDeleted, "false")];
   if (from) saleConds.push(gte(saleInvoicesTable.date, from));
   if (to) saleConds.push(lte(saleInvoicesTable.date, to));
 
   const saleInvs = await db.select({
     date: saleInvoicesTable.date,
     invoiceNumber: saleInvoicesTable.invoiceNumber,
+    partyId: saleInvoicesTable.partyId,
     partyName: saleInvoicesTable.partyName,
     otherCharges: saleInvoicesTable.otherCharges,
+    kacchaCharges: saleInvoicesTable.kacchaCharges,
+    grandTotal: saleInvoicesTable.grandTotal,
+    isKaccha: saleInvoicesTable.isKaccha,
   }).from(saleInvoicesTable).where(and(...saleConds));
 
   for (const inv of saleInvs) {
-    try {
-      const charges = JSON.parse(inv.otherCharges as string || "[]");
-      for (const charge of charges) {
-        if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
-          transactions.push({
-            date: inv.date,
-            type: "sale_invoice",
-            description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
-            ref: inv.invoiceNumber,
-            dr: 0,
-            cr: Number(charge.amount),
-          });
+    // 1. If party ledger matches
+    if (matchingPartyId && Number(inv.partyId) === Number(matchingPartyId)) {
+      transactions.push({
+        date: inv.date,
+        type: "sale_invoice",
+        description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+        ref: inv.invoiceNumber,
+        dr: Number(inv.grandTotal),
+        cr: 0,
+      });
+    }
+
+    // 2. Parse other charges & kaccha charges for ledger matching
+    const chargesStr = inv.isKaccha ? inv.kacchaCharges : inv.otherCharges;
+    if (chargesStr) {
+      try {
+        const charges = JSON.parse(chargesStr as string || "[]");
+        for (const charge of charges) {
+          if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
+            transactions.push({
+              date: inv.date,
+              type: "sale_invoice",
+              description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""} (Charge: ${charge.name || charge.ledgerName})`,
+              ref: inv.invoiceNumber,
+              dr: 0,
+              cr: Number(charge.amount),
+            });
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
-  // ── Purchase invoice other-charges (DR to this ledger — expense incurred) ─
-  const purchConds: any[] = [
-    isNotNull(purchaseInvoicesTable.otherCharges),
-    eq(purchaseInvoicesTable.isDeleted, "false"),
-  ];
+  // ── Purchase invoices other-charges & party mapping ───────────────────────
+  const purchConds: any[] = [eq(purchaseInvoicesTable.isDeleted, "false")];
   if (from) purchConds.push(gte(purchaseInvoicesTable.date, from));
   if (to) purchConds.push(lte(purchaseInvoicesTable.date, to));
 
   const purchInvs = await db.select({
     date: purchaseInvoicesTable.date,
     invoiceNumber: purchaseInvoicesTable.invoiceNumber,
+    partyId: purchaseInvoicesTable.partyId,
     partyName: purchaseInvoicesTable.partyName,
     otherCharges: purchaseInvoicesTable.otherCharges,
+    kacchaCharges: purchaseInvoicesTable.kacchaCharges,
+    grandTotal: purchaseInvoicesTable.grandTotal,
+    isKaccha: purchaseInvoicesTable.isKaccha,
   }).from(purchaseInvoicesTable).where(and(...purchConds));
 
   for (const inv of purchInvs) {
-    try {
-      const charges = JSON.parse(inv.otherCharges as string || "[]");
-      for (const charge of charges) {
-        if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
-          transactions.push({
-            date: inv.date,
-            type: "purchase_invoice",
-            description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
-            ref: inv.invoiceNumber,
-            dr: Number(charge.amount),
-            cr: 0,
-          });
+    // 1. If party ledger matches
+    if (matchingPartyId && Number(inv.partyId) === Number(matchingPartyId)) {
+      transactions.push({
+        date: inv.date,
+        type: "purchase_invoice",
+        description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+        ref: inv.invoiceNumber,
+        dr: 0,
+        cr: Number(inv.grandTotal),
+      });
+    }
+
+    // 2. Parse other charges & kaccha charges for ledger matching
+    const chargesStr = inv.isKaccha ? inv.kacchaCharges : inv.otherCharges;
+    if (chargesStr) {
+      try {
+        const charges = JSON.parse(chargesStr as string || "[]");
+        for (const charge of charges) {
+          if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
+            transactions.push({
+              date: inv.date,
+              type: "purchase_invoice",
+              description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""} (Charge: ${charge.name || charge.ledgerName})`,
+              ref: inv.invoiceNumber,
+              dr: Number(charge.amount),
+              cr: 0,
+            });
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
   // ── GST ledger entries from sale/purchase invoices ────────────────────────
