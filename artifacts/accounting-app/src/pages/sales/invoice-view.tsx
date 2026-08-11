@@ -137,29 +137,21 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   baseSgst = Number(baseSgst.toFixed(2));
   baseIgst = Number(baseIgst.toFixed(2));
 
-  const extraCgst = Math.max(0, Number(inv?.totalCgst || 0) - baseCgst);
-  const extraSgst = Math.max(0, Number(inv?.totalSgst || 0) - baseSgst);
-  const extraIgst = Math.max(0, Number(inv?.totalIgst || 0) - baseIgst);
-  const chargeWithGst = otherCharges.find((c: any) => Number(c.gstRate) > 0 || c.gstCalculationMethod === 'flat_rate' || c.gstCalculationMethod === 'assessable_value');
-  const chargeName = chargeWithGst ? (chargeWithGst.name || chargeWithGst.ledgerName) : "Additional Field";
+  const displayCgst = Number(inv?.totalCgst || 0);
+  const displaySgst = Number(inv?.totalSgst || 0);
+  const displayIgst = Number(inv?.totalIgst || 0);
 
   const totalsHtml = [
     `<div class="tot-row"><span>Taxable</span><span>${fmtN(baseTaxableTotal)}</span></div>`,
     Number(inv?.totalDiscount) > 0
       ? `<div class="tot-row disc"><span>Discount</span><span>−${fmtN(inv?.totalDiscount)}</span></div>` : "",
-    baseCgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>CGST</span><span>${fmtN(baseCgst)}</span></div>` : "",
-    baseSgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>SGST</span><span>${fmtN(baseSgst)}</span></div>` : "",
-    baseIgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>IGST</span><span>${fmtN(baseIgst)}</span></div>` : "",
     ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || c.ledgerName || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
-    extraCgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>CGST of ${chargeName}</span><span>+ ${fmtN(extraCgst)}</span></div>` : "",
-    extraSgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>SGST of ${chargeName}</span><span>+ ${fmtN(extraSgst)}</span></div>` : "",
-    extraIgst > 0 && showGstInfo
-      ? `<div class="tot-row"><span>IGST of ${chargeName}</span><span>+ ${fmtN(extraIgst)}</span></div>` : "",
+    displayCgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>CGST</span><span>${fmtN(displayCgst)}</span></div>` : "",
+    displaySgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>SGST</span><span>${fmtN(displaySgst)}</span></div>` : "",
+    displayIgst > 0 && showGstInfo
+      ? `<div class="tot-row"><span>IGST</span><span>${fmtN(displayIgst)}</span></div>` : "",
     `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
     `<div class="tot-row paid"><span>Paid</span><span>${fmtN(inv?.amountPaid)}</span></div>`,
     Number(inv?.balanceDue) > 0
@@ -457,9 +449,9 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
   baseSgst = Number(baseSgst.toFixed(2));
   baseIgst = Number(baseIgst.toFixed(2));
 
-  const extraCgst = Math.max(0, Number(invoice?.totalCgst || 0) - baseCgst);
-  const extraSgst = Math.max(0, Number(invoice?.totalSgst || 0) - baseSgst);
-  const extraIgst = Math.max(0, Number(invoice?.totalIgst || 0) - baseIgst);
+  const displayCgst = Number(invoice?.totalCgst || 0);
+  const displaySgst = Number(invoice?.totalSgst || 0);
+  const displayIgst = Number(invoice?.totalIgst || 0);
 
   return (
     <div className="bg-white border rounded-xl p-4 sm:p-8 max-w-3xl mx-auto text-black" id="invoice-print">
@@ -557,15 +549,6 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
           {Number(invoice.totalDiscount) > 0 && (
             <div className="flex justify-between text-red-600"><span>Discount</span><span>-{formatCurrency(invoice.totalDiscount)}</span></div>
           )}
-          {baseCgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(baseCgst)}</span></div>
-          )}
-          {baseSgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(baseSgst)}</span></div>
-          )}
-          {baseIgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(baseIgst)}</span></div>
-          )}
           {(() => {
             let parsedCharges: {name?: string; ledgerName?: string; amount: number; type?: string}[] = [];
             try { parsedCharges = JSON.parse(invoice.otherCharges || "[]"); } catch {}
@@ -573,14 +556,14 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
               <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || c.ledgerName || "Other Charges"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
             ));
           })()}
-          {extraCgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">CGST of {chargeName}</span><span>{formatCurrency(extraCgst)}</span></div>
+          {displayCgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(displayCgst)}</span></div>
           )}
-          {extraSgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">SGST of {chargeName}</span><span>{formatCurrency(extraSgst)}</span></div>
+          {displaySgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(displaySgst)}</span></div>
           )}
-          {extraIgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">IGST of {chargeName}</span><span>{formatCurrency(extraIgst)}</span></div>
+          {displayIgst > 0 && showGstInfo && (
+            <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(displayIgst)}</span></div>
           )}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
             <span>Total</span><span>{formatCurrency(invoice.grandTotal)}</span>
