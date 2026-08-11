@@ -141,17 +141,22 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   const displaySgst = Number(inv?.totalSgst || 0);
   const displayIgst = Number(inv?.totalIgst || 0);
 
+  const otherChargesExcludingRoundOff = otherCharges.filter(c => (c.name || c.ledgerName || "").toLowerCase() !== "round off");
+  const roundOffCharge = otherCharges.find(c => (c.name || c.ledgerName || "").toLowerCase() === "round off");
+
   const totalsHtml = [
     `<div class="tot-row"><span>Taxable</span><span>${fmtN(baseTaxableTotal)}</span></div>`,
     Number(inv?.totalDiscount) > 0
       ? `<div class="tot-row disc"><span>Discount</span><span>−${fmtN(inv?.totalDiscount)}</span></div>` : "",
-    ...otherCharges.map(c => `<div class="tot-row"><span>${c.name || c.ledgerName || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
+    ...otherChargesExcludingRoundOff.map(c => `<div class="tot-row"><span>${c.name || c.ledgerName || "Other"}</span><span>${c.type === "deduct" ? "- " : "+ "}${fmtN(c.amount)}</span></div>`),
     displayCgst > 0 && showGstInfo
       ? `<div class="tot-row"><span>CGST</span><span>${fmtN(displayCgst)}</span></div>` : "",
     displaySgst > 0 && showGstInfo
       ? `<div class="tot-row"><span>SGST</span><span>${fmtN(displaySgst)}</span></div>` : "",
     displayIgst > 0 && showGstInfo
       ? `<div class="tot-row"><span>IGST</span><span>${fmtN(displayIgst)}</span></div>` : "",
+    roundOffCharge
+      ? `<div class="tot-row"><span>${roundOffCharge.name || roundOffCharge.ledgerName}</span><span>${roundOffCharge.type === "deduct" ? "- " : "+ "}${fmtN(roundOffCharge.amount)}</span></div>` : "",
     `<div class="tot-row grand"><span>Total</span><span>${fmtN(inv?.grandTotal)}</span></div>`,
     `<div class="tot-row paid"><span>Paid</span><span>${fmtN(inv?.amountPaid)}</span></div>`,
     Number(inv?.balanceDue) > 0
@@ -543,7 +548,6 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
       </div>
 
       {/* Totals */}
-      <div className="flex justify-end mb-4">
         <div className="w-full sm:w-64 space-y-1 text-sm border rounded-lg p-3 sm:border-none sm:rounded-none sm:p-0">
           <div className="flex justify-between"><span className="text-gray-600">Taxable</span><span>{formatCurrency(baseTaxableTotal)}</span></div>
           {Number(invoice.totalDiscount) > 0 && (
@@ -552,19 +556,35 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
           {(() => {
             let parsedCharges: {name?: string; ledgerName?: string; amount: number; type?: string}[] = [];
             try { parsedCharges = JSON.parse(invoice.otherCharges || "[]"); } catch {}
-            return parsedCharges.map((c: any, i: number) => (
-              <div key={i} className="flex justify-between"><span className="text-gray-600">{c.name || c.ledgerName || "Other Charges"}</span><span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span></div>
-            ));
+            const nonRoundOff = parsedCharges.filter(c => (c.name || c.ledgerName || "").toLowerCase() !== "round off");
+            const roundOff = parsedCharges.find(c => (c.name || c.ledgerName || "").toLowerCase() === "round off");
+
+            return (
+              <>
+                {nonRoundOff.map((c: any, i: number) => (
+                  <div key={i} className="flex justify-between">
+                    <span className="text-gray-600">{c.name || c.ledgerName || "Other Charges"}</span>
+                    <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
+                  </div>
+                ))}
+                {displayCgst > 0 && showGstInfo && (
+                  <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(displayCgst)}</span></div>
+                )}
+                {displaySgst > 0 && showGstInfo && (
+                  <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(displaySgst)}</span></div>
+                )}
+                {displayIgst > 0 && showGstInfo && (
+                  <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(displayIgst)}</span></div>
+                )}
+                {roundOff && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">{roundOff.name || roundOff.ledgerName}</span>
+                    <span>{roundOff.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(roundOff.amount))}</span>
+                  </div>
+                )}
+              </>
+            );
           })()}
-          {displayCgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">CGST</span><span>{formatCurrency(displayCgst)}</span></div>
-          )}
-          {displaySgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">SGST</span><span>{formatCurrency(displaySgst)}</span></div>
-          )}
-          {displayIgst > 0 && showGstInfo && (
-            <div className="flex justify-between"><span className="text-gray-600">IGST</span><span>{formatCurrency(displayIgst)}</span></div>
-          )}
           <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
             <span>Total</span><span>{formatCurrency(invoice.grandTotal)}</span>
           </div>
