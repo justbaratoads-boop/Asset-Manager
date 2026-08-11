@@ -204,18 +204,11 @@ export default function PurchaseInvoiceForm() {
     }
     if (inv.items?.length) {
       setItems(inv.items.map((i: any) => {
-        const qty = Number(i.quantity) || 0;
-        const rate = Number(i.rate) || 0;
-        const discPct = Number(i.discountPct) || 0;
-        const grossAmount = qty * rate * (1 - discPct / 100);
-        const gstPct = Number(i.gstPct) || 0;
-        const gstInclusive = gstPct > 0 && Number(i.taxableAmount || 0) < (grossAmount - 0.1);
-
         return calc({
           stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, hsnCode: i.hsnCode || "",
           quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
           discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-          gstLocked: !!i.stockItemId, gstInclusive, isTaxLiability: i.isTaxLiability,
+          gstLocked: !!i.stockItemId, gstInclusive: i.gstInclusive === true || i.gstInclusive === "true", isTaxLiability: i.isTaxLiability,
         }, interstate);
       }));
     }
@@ -400,7 +393,7 @@ export default function PurchaseInvoiceForm() {
 
               {/* Mobile card layout */}
               <div className="md:hidden space-y-3">
-                {items.map((item, i) => (
+                {computedItems.map((item, i) => (
                   <div key={i} className="border rounded-lg p-3 space-y-3 bg-card shadow-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-semibold text-muted-foreground">Item {i + 1}</span>
@@ -473,8 +466,8 @@ export default function PurchaseInvoiceForm() {
                         <p className="font-semibold text-amber-800 mb-1">GST Inclusive Breakdown</p>
                         <div className="flex justify-between text-amber-900"><span>Rate entered (incl. {item.gstPct}% GST)</span><span className="font-medium">{formatCurrency(item.rate)} × {item.quantity}</span></div>
                         {item.discountAmount > 0 && <div className="flex justify-between text-red-700"><span>Discount ({item.discountPct}%)</span><span>− {formatCurrency(item.discountAmount)}</span></div>}
-                        <div className="flex justify-between text-green-800 font-medium"><span>Cost Price (base)</span><span>{formatCurrency(item.taxableAmount)}</span></div>
-                        <div className="flex justify-between text-blue-800 font-medium"><span>GST ({item.gstPct}%)</span><span>+ {formatCurrency(item.gstAmount)}</span></div>
+                        <div className="flex justify-between text-green-800 font-medium"><span>Cost Price (base)</span><span>{formatCurrency(item.baseAmount)}</span></div>
+                        <div className="flex justify-between text-blue-800 font-medium"><span>GST ({item.gstPct}%)</span><span>+ {formatCurrency(item.totalGst)}</span></div>
                         <div className="flex justify-between font-bold border-t border-amber-200 pt-1 mt-0.5 text-amber-900"><span>Item Total</span><span>{formatCurrency(item.total)}</span></div>
                       </div>
                     )}
@@ -483,8 +476,8 @@ export default function PurchaseInvoiceForm() {
                       <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-xs space-y-0.5">
                         {item.discountAmount > 0 && <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(item.quantity * item.rate)}</span></div>}
                         {item.discountAmount > 0 && <div className="flex justify-between text-red-600"><span>Discount ({item.discountPct}%)</span><span>− {formatCurrency(item.discountAmount)}</span></div>}
-                        <div className="flex justify-between text-muted-foreground"><span>{item.discountAmount > 0 ? "Taxable" : "Base amount"}</span><span>{formatCurrency(item.taxableAmount)}</span></div>
-                        {item.gstPct > 0 && <div className="flex justify-between text-muted-foreground"><span>GST ({item.gstPct}%)</span><span>+ {formatCurrency(item.gstAmount)}</span></div>}
+                        <div className="flex justify-between text-muted-foreground"><span>{item.discountAmount > 0 ? "Taxable" : "Base amount"}</span><span>{formatCurrency(item.baseAmount)}</span></div>
+                        {item.gstPct > 0 && <div className="flex justify-between text-muted-foreground"><span>GST ({item.gstPct}%)</span><span>+ {formatCurrency(item.totalGst)}</span></div>}
                         <div className="flex justify-between font-bold border-t border-border/60 pt-1 mt-1"><span>Total</span><span>{formatCurrency(item.total)}</span></div>
                       </div>
                     )}
@@ -510,7 +503,7 @@ export default function PurchaseInvoiceForm() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((item, i) => (
+                    {computedItems.map((item, i) => (
                       <TableRow key={i}>
                         <TableCell>
                           <ItemSearchCombobox
@@ -567,7 +560,7 @@ export default function PurchaseInvoiceForm() {
                             {item.gstLocked ? (<div className="h-8 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>) : (<Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select>)}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right text-sm">{formatCurrency(item.taxableAmount)}</TableCell>
+                        <TableCell className="text-right text-sm">{formatCurrency(item.baseAmount)}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
                         <TableCell><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></TableCell>
                       </TableRow>

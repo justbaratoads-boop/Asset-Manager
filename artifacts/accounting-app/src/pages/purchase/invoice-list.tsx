@@ -21,11 +21,10 @@ import { useToast } from "@/hooks/use-toast";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
 function itemBaseRate(item: any): number {
-  const qty = Number(item.quantity) || 0;
-  const discPct = Number(item.discountPct) || 0;
-  const factor = 1 - discPct / 100;
-  if (qty === 0 || factor === 0) return 0;
-  return Number(item.taxableAmount) / qty / factor;
+  const rate = Number(item.rate) || 0;
+  const gstPct = Number(item.gstPct) || 0;
+  const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
+  return isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
 }
 
 const PAGE_SIZE = 20;
@@ -86,6 +85,16 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
   const allPaymentModes = [{ value: "cash", label: "Cash" }, ...bankAccounts];
   const items: any[] = data?.items || [];
   const payments: any[] = data?.payments || [];
+
+  const baseTaxableTotal = items.reduce((sum: number, i: any) => {
+    const qty = Number(i.quantity) || 0;
+    const rate = Number(i.rate) || 0;
+    const discPct = Number(i.discountPct) || 0;
+    const gstPct = Number(i.gstPct) || 0;
+    const isInclusive = (i.gstInclusive === true || i.gstInclusive === "true") && gstPct > 0;
+    const baseRate = isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+    return sum + qty * baseRate * (1 - discPct / 100);
+  }, 0) || 0;
 
   return (
     <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
@@ -149,18 +158,28 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {items.map((item: any, i: number) => (
-                      <tr key={i} className="hover:bg-muted/20">
-                        <td className="px-3 py-2.5">
-                          <p className="font-medium">{item.itemName}</p>
-                          {item.batchId && <p className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</p>}
-                          {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
-                        </td>
-                        <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
-                        <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(Number(item.taxableAmount))}</td>
-                      </tr>
-                    ))}
+                    {items.map((item: any, i: number) => {
+                      const qty = Number(item.quantity) || 0;
+                      const rate = Number(item.rate) || 0;
+                      const discPct = Number(item.discountPct) || 0;
+                      const gstPct = Number(item.gstPct) || 0;
+                      const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
+                      const baseRate = isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+                      const baseAmount = qty * baseRate * (1 - discPct / 100);
+
+                      return (
+                        <tr key={i} className="hover:bg-muted/20">
+                          <td className="px-3 py-2.5">
+                            <p className="font-medium">{item.itemName}</p>
+                            {item.batchId && <p className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</p>}
+                            {Number(item.gstPct) > 0 && <p className="text-xs text-muted-foreground">GST {item.gstPct}%</p>}
+                          </td>
+                          <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
+                          <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(baseAmount)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -168,12 +187,22 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
 
             {/* Totals */}
             <div className="rounded-lg border bg-muted/30 divide-y text-sm">
-              {Number(data.totalTaxable) > 0 && (
+              {baseTaxableTotal > 0 && (
                 <div className="flex justify-between px-4 py-2">
                   <span className="text-muted-foreground">Taxable</span>
-                  <span>{formatCurrency(Number(data.totalTaxable))}</span>
+                  <span>{formatCurrency(baseTaxableTotal)}</span>
                 </div>
               )}
+              {(() => {
+                let parsedCharges: any[] = [];
+                try { parsedCharges = JSON.parse(data?.otherCharges || "[]"); } catch {}
+                return parsedCharges.filter(c => (c.name || c.ledgerName || "").toLowerCase() !== "round off").map((c: any, i: number) => (
+                  <div key={i} className="flex justify-between px-4 py-2">
+                    <span className="text-muted-foreground">{c.name || c.ledgerName || "Other Charges"}</span>
+                    <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
+                  </div>
+                ));
+              })()}
               {Number(data.totalCgst) > 0 && (
                 <div className="flex justify-between px-4 py-2">
                   <span className="text-muted-foreground">CGST</span>
@@ -195,12 +224,14 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
               {(() => {
                 let parsedCharges: any[] = [];
                 try { parsedCharges = JSON.parse(data?.otherCharges || "[]"); } catch {}
-                return parsedCharges.map((c: any, i: number) => (
-                  <div key={i} className="flex justify-between px-4 py-2">
-                    <span className="text-muted-foreground">{c.name || c.ledgerName || "Other Charges"}</span>
-                    <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
+                const ro = parsedCharges.find(c => (c.name || c.ledgerName || "").toLowerCase() === "round off");
+                if (!ro) return null;
+                return (
+                  <div className="flex justify-between px-4 py-2 text-muted-foreground">
+                    <span>Round Off</span>
+                    <span>{ro.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(ro.amount))}</span>
                   </div>
-                ));
+                );
               })()}
               <div className="flex justify-between px-4 py-2.5 font-bold text-base">
                 <span>Grand Total</span>
