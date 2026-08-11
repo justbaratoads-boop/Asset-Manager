@@ -124,12 +124,9 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
   const baseSgst = Number(_baseSgst.toFixed(2));
   const baseIgst = Number(_baseIgst.toFixed(2));
 
-  const extraCgst = Math.max(0, Number(data?.totalCgst || 0) - baseCgst);
-  const extraSgst = Math.max(0, Number(data?.totalSgst || 0) - baseSgst);
-  const extraIgst = Math.max(0, Number(data?.totalIgst || 0) - baseIgst);
-
-  const firstAssessable = assessableCharges[0];
-  const chargeName = firstAssessable ? (firstAssessable.name || firstAssessable.ledgerName) : "Additional Field";
+  const displayCgst = Number(data?.totalCgst || 0);
+  const displaySgst = Number(data?.totalSgst || 0);
+  const displayIgst = Number(data?.totalIgst || 0);
 
   return (
     <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
@@ -226,48 +223,45 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
                   <span>{formatCurrency(baseTaxableTotal)}</span>
                 </div>
               )}
-              {baseCgst > 0 && (
-                <div className="flex justify-between px-4 py-2">
-                  <span className="text-muted-foreground">CGST</span>
-                  <span>+ {formatCurrency(baseCgst)}</span>
-                </div>
-              )}
-              {baseSgst > 0 && (
-                <div className="flex justify-between px-4 py-2">
-                  <span className="text-muted-foreground">SGST</span>
-                  <span>+ {formatCurrency(baseSgst)}</span>
-                </div>
-              )}
-              {baseIgst > 0 && (
-                <div className="flex justify-between px-4 py-2">
-                  <span className="text-muted-foreground">IGST</span>
-                  <span>+ {formatCurrency(baseIgst)}</span>
-                </div>
-              )}
-              {otherChargesList.map((c: any, i: number) => (
-                <div key={i} className="flex justify-between px-4 py-2">
-                  <span className="text-muted-foreground">{c.name || c.ledgerName || "Other Charges"}</span>
-                  <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
-                </div>
-              ))}
-              {extraCgst > 0 && (
-                <div className="flex justify-between px-4 py-2">
-                  <span className="text-muted-foreground">CGST of {chargeName}</span>
-                  <span>+ {formatCurrency(extraCgst)}</span>
-                </div>
-              )}
-              {extraSgst > 0 && (
-                <div className="flex justify-between px-4 py-2">
-                  <span className="text-muted-foreground">SGST of {chargeName}</span>
-                  <span>+ {formatCurrency(extraSgst)}</span>
-                </div>
-              )}
-              {extraIgst > 0 && (
-                <div className="flex justify-between px-4 py-2">
-                  <span className="text-muted-foreground">IGST of {chargeName}</span>
-                  <span>+ {formatCurrency(extraIgst)}</span>
-                </div>
-              )}
+              {(() => {
+                const nonRoundOff = otherChargesList.filter((c: any) => (c.name || c.ledgerName || "").toLowerCase() !== "round off");
+                const roundOff = otherChargesList.find((c: any) => (c.name || c.ledgerName || "").toLowerCase() === "round off");
+
+                return (
+                  <>
+                    {nonRoundOff.map((c: any, i: number) => (
+                      <div key={i} className="flex justify-between px-4 py-2">
+                        <span className="text-muted-foreground">{c.name || c.ledgerName || "Other Charges"}</span>
+                        <span>{c.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(c.amount))}</span>
+                      </div>
+                    ))}
+                    {displayCgst > 0 && (
+                      <div className="flex justify-between px-4 py-2">
+                        <span className="text-muted-foreground">CGST</span>
+                        <span>+ {formatCurrency(displayCgst)}</span>
+                      </div>
+                    )}
+                    {displaySgst > 0 && (
+                      <div className="flex justify-between px-4 py-2">
+                        <span className="text-muted-foreground">SGST</span>
+                        <span>+ {formatCurrency(displaySgst)}</span>
+                      </div>
+                    )}
+                    {displayIgst > 0 && (
+                      <div className="flex justify-between px-4 py-2">
+                        <span className="text-muted-foreground">IGST</span>
+                        <span>+ {formatCurrency(displayIgst)}</span>
+                      </div>
+                    )}
+                    {roundOff && (
+                      <div className="flex justify-between px-4 py-2">
+                        <span className="text-muted-foreground">{roundOff.name || roundOff.ledgerName}</span>
+                        <span>{roundOff.type === "deduct" ? "- " : "+ "}{formatCurrency(Number(roundOff.amount))}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <div className="flex justify-between px-4 py-2.5 font-bold text-base">
                 <span>Grand Total</span>
                 <span>{formatCurrency(Number(data.grandTotal))}</span>
