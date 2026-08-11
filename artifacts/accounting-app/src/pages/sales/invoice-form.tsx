@@ -639,7 +639,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                       </div>
                       <div className="flex justify-between text-blue-800 font-medium">
                         <span>GST ({item.gstPct}%)</span>
-                        <span>+ {formatCurrency(item.gstAmount)}</span>
+                        <span>+ {formatCurrency(item.totalGst)}</span>
                       </div>
                       <div className="flex justify-between font-bold border-t border-amber-200 pt-1 mt-0.5 text-amber-900">
                         <span>Item Total</span>
@@ -670,7 +670,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                       {item.gstPct > 0 && (
                         <div className="flex justify-between text-muted-foreground">
                           <span>GST ({item.gstPct}%)</span>
-                          <span>+ {formatCurrency(item.gstAmount)}</span>
+                          <span>+ {formatCurrency(item.totalGst)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-bold border-t border-border/60 pt-1 mt-1">

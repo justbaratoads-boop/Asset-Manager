@@ -129,7 +129,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
       <td class="tr">${fmtN(itemBaseRate(item))}</td>
       ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
       ${showGstInfo ? `<td class="tr">${item.gstPct || 0}%</td>` : ""}
-      <td class="tr"><strong>${fmtN(baseTaxableAmount)}</strong></td>
+      <td class="tr"><strong>${fmtN(baseAmount)}</strong></td>
     </tr>`;
   }).join("");
 
@@ -523,8 +523,6 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
               const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
               const baseRate = isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
               const baseAmount = qty * baseRate * factor;
-              const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
-              const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
               return (
                 <tr key={i} className="border-b">
@@ -539,7 +537,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
                   <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
                   {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
                   {showGstInfo && <td className="py-2 text-right">{item.gstPct}%</td>}
-                  <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(baseTaxableAmount)}</td>
+                  <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(baseAmount)}</td>
                 </tr>
               );
             })}
@@ -771,8 +769,6 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
             const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
             const baseRate = isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
             const baseAmount = qty * baseRate * factor;
-            const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
-            const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
             return (
               <tr key={i} className="border-b border-gray-200">
@@ -780,7 +776,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
                 <td className="py-1.5">{item.itemName}</td>
                 <td className="py-1.5 text-right">{item.quantity} {item.unit}</td>
                 <td className="py-1.5 text-right">{formatCurrency(itemBaseRate(item))}</td>
-                <td className="py-1.5 text-right font-medium">{formatCurrency(baseTaxableAmount)}</td>
+                <td className="py-1.5 text-right font-medium">{formatCurrency(baseAmount)}</td>
               </tr>
             );
           })}

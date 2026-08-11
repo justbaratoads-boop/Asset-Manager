@@ -191,11 +191,9 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
                       const factor = 1 - discPct / 100;
                       const gstPct = Number(item.gstPct) || 0;
                       // Use pre-tax base rate for apportionment (same as totalItemValue above)
-                      const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
+                       const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
                       const baseRate = isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
                       const baseAmount = qty * baseRate * factor;
-                      const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
-                      const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
                       return (
                         <tr key={i} className="hover:bg-muted/20">
@@ -206,7 +204,7 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
                           </td>
                           <td className="px-2 py-2.5 text-right text-muted-foreground whitespace-nowrap">{Number(item.quantity)} {item.unit}</td>
                           <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(baseTaxableAmount)}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold whitespace-nowrap">{formatCurrency(baseAmount)}</td>
                         </tr>
                       );
                     })}
