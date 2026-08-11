@@ -17,15 +17,10 @@ import { customFetch } from "@workspace/api-client-react";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
 function itemBaseRate(item: any): number {
-  const qty = Number(item.quantity) || 0;
   const rate = Number(item.rate) || 0;
-  const discPct = Number(item.discountPct) || 0;
-  const factor = 1 - discPct / 100;
-  if (qty === 0 || factor === 0) return 0;
-
   const gstPct = Number(item.gstPct) || 0;
-  const grossAmount = qty * rate * factor;
-  const isInclusive = gstPct > 0 && Number(item.taxableAmount || 0) < (grossAmount - 0.1);
+  // Read gstInclusive directly from DB — no heuristic needed
+  const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
   return isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
 }
 
@@ -524,8 +519,12 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
               const rate = Number(item.rate) || 0;
               const discPct = Number(item.discountPct) || 0;
               const factor = 1 - discPct / 100;
-              const itemVal = (qty * rate) * factor;
-              const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+              const gstPct = Number(item.gstPct) || 0;
+              // Use pre-tax base rate for apportionment (same as totalItemValue above)
+              const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
+              const baseRate = isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+              const baseAmount = qty * baseRate * factor;
+              const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
               const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
               return (
@@ -760,8 +759,12 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
             const rate = Number(item.rate) || 0;
             const discPct = Number(item.discountPct) || 0;
             const factor = 1 - discPct / 100;
-            const itemVal = (qty * rate) * factor;
-            const apportioned = totalItemValue > 0 ? (itemVal / totalItemValue) * totalAssessableAmount : 0;
+            const gstPct = Number(item.gstPct) || 0;
+            // Use pre-tax base rate for apportionment (same as totalItemValue above)
+            const isInclusive = (item.gstInclusive === true || item.gstInclusive === "true") && gstPct > 0;
+            const baseRate = isInclusive ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+            const baseAmount = qty * baseRate * factor;
+            const apportioned = totalItemValue > 0 ? (baseAmount / totalItemValue) * totalAssessableAmount : 0;
             const baseTaxableAmount = Number(item.taxableAmount || 0) - apportioned;
 
             return (

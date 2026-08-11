@@ -105,6 +105,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(isKaccha ? 0 : (Number(item.gstPct) || 0)),
+        gstInclusive: isKaccha ? false : (item.gstInclusive === true || item.gstInclusive === "true"),
         taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(isKaccha ? 0 : (Number(item.cgst) || 0)),
         sgst: String(isKaccha ? 0 : (Number(item.sgst) || 0)),
@@ -161,7 +162,7 @@ router.get("/purchase-invoices/:id", authMiddleware, async (req, res) => {
   if (!invoice) return res.status(404).json({ error: "Not found" });
   const items = await db.select().from(purchaseInvoiceItemsTable).where(eq(purchaseInvoiceItemsTable.invoiceId, Number(req.params.id)));
   const payments = await db.select().from(purchaseInvoicePaymentsTable).where(eq(purchaseInvoicePaymentsTable.invoiceId, Number(req.params.id)));
-  res.json({ ...invoice, grandTotal: Number(invoice.grandTotal), items: items.map(i => ({ ...i, quantity: (isNaN(Number(i.quantity)) ? 0 : Number(i.quantity)), rate: (isNaN(Number(i.rate)) ? 0 : Number(i.rate)), discountPct: (isNaN(Number(i.discountPct)) ? 0 : Number(i.discountPct)), gstPct: (isNaN(Number(i.gstPct)) ? 0 : Number(i.gstPct)), taxableAmount: (isNaN(Number(i.taxableAmount)) ? 0 : Number(i.taxableAmount)), total: (isNaN(Number(i.total)) ? 0 : Number(i.total)), cgst: (isNaN(Number(i.cgst)) ? 0 : Number(i.cgst)), sgst: (isNaN(Number(i.sgst)) ? 0 : Number(i.sgst)), igst: (isNaN(Number(i.igst)) ? 0 : Number(i.igst)), isTaxLiability: i.isTaxLiability ?? true })), payments });
+  res.json({ ...invoice, grandTotal: Number(invoice.grandTotal), items: items.map(i => ({ ...i, quantity: (isNaN(Number(i.quantity)) ? 0 : Number(i.quantity)), rate: (isNaN(Number(i.rate)) ? 0 : Number(i.rate)), discountPct: (isNaN(Number(i.discountPct)) ? 0 : Number(i.discountPct)), gstPct: (isNaN(Number(i.gstPct)) ? 0 : Number(i.gstPct)), gstInclusive: i.gstInclusive === true, taxableAmount: (isNaN(Number(i.taxableAmount)) ? 0 : Number(i.taxableAmount)), total: (isNaN(Number(i.total)) ? 0 : Number(i.total)), cgst: (isNaN(Number(i.cgst)) ? 0 : Number(i.cgst)), sgst: (isNaN(Number(i.sgst)) ? 0 : Number(i.sgst)), igst: (isNaN(Number(i.igst)) ? 0 : Number(i.igst)), isTaxLiability: i.isTaxLiability ?? true })), payments });
 });
 
 router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
@@ -240,6 +241,7 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
+        gstInclusive: item.gstInclusive === true || item.gstInclusive === "true",
         taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),

@@ -42,6 +42,7 @@ export const saleInvoiceItemsTable = pgTable("sale_invoice_items", {
   rate: numeric("rate", { precision: 15, scale: 2 }).notNull(),
   discountPct: numeric("discount_pct", { precision: 5, scale: 2 }).notNull().default("0"),
   gstPct: numeric("gst_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  gstInclusive: boolean("gst_inclusive").notNull().default(false),
   taxableAmount: numeric("taxable_amount", { precision: 15, scale: 2 }).notNull(),
   cgst: numeric("cgst", { precision: 15, scale: 2 }).notNull().default("0"),
   sgst: numeric("sgst", { precision: 15, scale: 2 }).notNull().default("0"),
