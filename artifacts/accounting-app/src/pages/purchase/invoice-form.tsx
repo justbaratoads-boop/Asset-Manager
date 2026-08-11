@@ -458,7 +458,7 @@ export default function PurchaseInvoiceForm() {
                         </div>
                       </div>
                       <div className="space-y-1"><Label className="text-xs text-muted-foreground">GST%</Label>{item.gstLocked ? (<div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.gstPct}%</div>) : (<Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)}><SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger><SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent></Select>)}</div>
-                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div></div>
+                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total</Label><div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.baseAmount + (item.baseAmount * (Number(item.gstPct) || 0) / 100))}</div></div>
                     </div>
                     {/* Inclusive GST breakdown */}
                     {item.quantity > 0 && item.rate > 0 && item.gstInclusive && item.gstPct > 0 && (
@@ -561,7 +561,7 @@ export default function PurchaseInvoiceForm() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right text-sm">{formatCurrency(item.baseAmount)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(item.baseAmount + (item.baseAmount * (Number(item.gstPct) || 0) / 100))}</TableCell>
                         <TableCell><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></TableCell>
                       </TableRow>
                     ))}
