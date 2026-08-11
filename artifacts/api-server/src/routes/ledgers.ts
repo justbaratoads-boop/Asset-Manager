@@ -324,7 +324,6 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     partyId: saleInvoicesTable.partyId,
     partyName: saleInvoicesTable.partyName,
     otherCharges: saleInvoicesTable.otherCharges,
-    kacchaCharges: saleInvoicesTable.kacchaCharges,
     grandTotal: saleInvoicesTable.grandTotal,
     isKaccha: saleInvoicesTable.isKaccha,
   }).from(saleInvoicesTable).where(and(...saleConds));
@@ -342,8 +341,8 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       });
     }
 
-    // 2. Parse other charges & kaccha charges for ledger matching
-    const chargesStr = inv.isKaccha ? inv.kacchaCharges : inv.otherCharges;
+    // 2. Parse other charges for ledger matching
+    const chargesStr = inv.otherCharges;
     if (chargesStr) {
       try {
         const charges = JSON.parse(chargesStr as string || "[]");
@@ -374,7 +373,6 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     partyId: purchaseInvoicesTable.partyId,
     partyName: purchaseInvoicesTable.partyName,
     otherCharges: purchaseInvoicesTable.otherCharges,
-    kacchaCharges: purchaseInvoicesTable.kacchaCharges,
     grandTotal: purchaseInvoicesTable.grandTotal,
     isKaccha: purchaseInvoicesTable.isKaccha,
   }).from(purchaseInvoicesTable).where(and(...purchConds));
@@ -392,8 +390,8 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       });
     }
 
-    // 2. Parse other charges & kaccha charges for ledger matching
-    const chargesStr = inv.isKaccha ? inv.kacchaCharges : inv.otherCharges;
+    // 2. Parse other charges for ledger matching
+    const chargesStr = inv.otherCharges;
     if (chargesStr) {
       try {
         const charges = JSON.parse(chargesStr as string || "[]");

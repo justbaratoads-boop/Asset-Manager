@@ -60,16 +60,37 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
     const cgst = itemsToSave.reduce((s, i) => s + Number(i.cgst || 0), 0);
     const sgst = itemsToSave.reduce((s, i) => s + Number(i.sgst || 0), 0);
     const igst = itemsToSave.reduce((s, i) => s + Number(i.igst || 0), 0);
-    const totGst = cgst + sgst + igst;
 
     let otherChargesParsed = 0;
+    let flatCgst = 0;
+    let flatSgst = 0;
+    let flatIgst = 0;
     const targetCharges = isKaccha ? data.kacchaCharges : data.otherCharges;
     if (targetCharges) {
       try {
         const charges = JSON.parse(targetCharges);
         otherChargesParsed = charges.reduce((s: number, c: any) => s + ((c.type ?? "add") === "deduct" ? -Number(c.amount) : Number(c.amount)), 0);
+        if (!isKaccha) {
+          const flatCharges = charges.filter((c: any) => c.gstCalculationMethod === 'flat_rate');
+          for (const c of flatCharges) {
+            const amt = c.type === 'deduct' ? -Number(c.amount) : Number(c.amount);
+            const rate = Number(c.gstRate) || 0;
+            const tax = (amt * rate) / 100;
+            if (data.isInterstate) {
+              flatIgst += tax;
+            } else {
+              flatCgst += tax / 2;
+              flatSgst += tax / 2;
+            }
+          }
+        }
       } catch (e) {}
     }
+
+    const finalCgst = cgst + flatCgst;
+    const finalSgst = sgst + flatSgst;
+    const finalIgst = igst + flatIgst;
+    const totGst = finalCgst + finalSgst + finalIgst;
     const gTotal = partGrandTotal ?? (base + totGst + otherChargesParsed);
 
     const [inv] = await db.insert(purchaseInvoicesTable).values({
@@ -84,9 +105,9 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
       isKaccha: isKaccha,
       subtotal: String(sub),
       totalTaxable: String(base),
-      totalCgst: String(cgst),
-      totalSgst: String(sgst),
-      totalIgst: String(igst),
+      totalCgst: String(finalCgst),
+      totalSgst: String(finalSgst),
+      totalIgst: String(finalIgst),
       grandTotal: String(gTotal),
       amountPaid: String(partAmountPaid || 0),
       balanceDue: String(partBalanceDue || 0),
