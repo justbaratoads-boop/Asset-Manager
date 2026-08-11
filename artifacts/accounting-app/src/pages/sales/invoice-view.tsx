@@ -548,6 +548,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
       </div>
 
       {/* Totals */}
+      <div className="flex justify-end mb-4">
         <div className="w-full sm:w-64 space-y-1 text-sm border rounded-lg p-3 sm:border-none sm:rounded-none sm:p-0">
           <div className="flex justify-between"><span className="text-gray-600">Taxable</span><span>{formatCurrency(baseTaxableTotal)}</span></div>
           {Number(invoice.totalDiscount) > 0 && (
