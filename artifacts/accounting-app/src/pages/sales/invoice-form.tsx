@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey, getListStockItemsQueryKey, useGetCompanySettings } from "@workspace/api-client-react";
+import { useCreateSaleInvoice, useGetSaleInvoice, useListParties, useListStockItems, getListSaleInvoicesQueryKey, getListStockItemsQueryKey, useGetCompanySettings, getGetSaleInvoiceQueryKey } from "@workspace/api-client-react";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
 import { useQueryClient } from "@tanstack/react-query";
@@ -196,7 +196,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
 
   const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
   const pakkaGrandTotal = enableDualLedger
-    ? (computedItems.filter(i => i.isTaxLiability).reduce((acc, item) => acc + item.total, 0) + (hasPakka ? chargesTotal : 0) - (hasPakka ? totalAssessableAmount : 0))
+    ? Number((grandTotal - computedItems.filter(i => !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0)).toFixed(2))
     : grandTotal;
   const kacchaChargesTotal = kacchaCharges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
   const kacchaGrandTotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0) + (!hasPakka ? chargesTotal : 0) + kacchaChargesTotal;
@@ -407,6 +407,9 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       } else {
         inv = await createMutation.mutateAsync({ data: buildPayload() as any });
         toast({ title: "Invoice created successfully" });
+      }
+      if (isEdit) {
+        queryClient.invalidateQueries({ queryKey: getGetSaleInvoiceQueryKey(editId) });
       }
       queryClient.invalidateQueries({ queryKey: getListSaleInvoicesQueryKey() });
       if (then) then(inv);

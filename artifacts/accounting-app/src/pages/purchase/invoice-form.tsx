@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch, useGetCompanySettings } from "@workspace/api-client-react";
+import { useCreatePurchaseInvoice, useGetPurchaseInvoice, useListParties, useListStockItems, getListPurchaseInvoicesQueryKey, getListStockItemsQueryKey, customFetch, useGetCompanySettings, getGetPurchaseInvoiceQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStockAvailability } from "@/hooks/use-stock-availability";
 import { useFetch } from "@/hooks/use-fetch";
@@ -308,6 +308,9 @@ export default function PurchaseInvoiceForm() {
       } else {
         await createMutation.mutateAsync({ data: buildPayload() as any });
         toast({ title: "Purchase invoice created" });
+      }
+      if (isEdit) {
+        queryClient.invalidateQueries({ queryKey: getGetPurchaseInvoiceQueryKey(editId) });
       }
       queryClient.invalidateQueries({ queryKey: getListPurchaseInvoicesQueryKey() });
       setLocation("/purchase/invoices");

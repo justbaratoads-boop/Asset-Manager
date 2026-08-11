@@ -140,7 +140,8 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   const extraCgst = Math.max(0, Number(inv?.totalCgst || 0) - baseCgst);
   const extraSgst = Math.max(0, Number(inv?.totalSgst || 0) - baseSgst);
   const extraIgst = Math.max(0, Number(inv?.totalIgst || 0) - baseIgst);
-  const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
+  const chargeWithGst = otherCharges.find((c: any) => Number(c.gstRate) > 0 || c.gstCalculationMethod === 'flat_rate' || c.gstCalculationMethod === 'assessable_value');
+  const chargeName = chargeWithGst ? (chargeWithGst.name || chargeWithGst.ledgerName) : "Additional Field";
 
   const totalsHtml = [
     `<div class="tot-row"><span>Taxable</span><span>${fmtN(baseTaxableTotal)}</span></div>`,
@@ -428,7 +429,8 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
   const assessableCharges = otherChargesList.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
   const totalAssessableAmount = assessableCharges.reduce((sum: number, c: any) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
   const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
-  const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
+  const chargeWithGst = otherChargesList.find((c: any) => Number(c.gstRate) > 0 || c.gstCalculationMethod === 'flat_rate' || c.gstCalculationMethod === 'assessable_value');
+  const chargeName = chargeWithGst ? (chargeWithGst.name || chargeWithGst.ledgerName) : "Additional Field";
 
   const isInterstate = invoice?.isInterstate === true || invoice?.isInterstate === "true";
   let baseCgst = 0;
@@ -684,7 +686,8 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
   const assessableCharges = otherChargesList.filter(c => c.gstCalculationMethod === 'assessable_value');
   const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
   const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
-  const chargeName = assessableCharges[0] ? (assessableCharges[0].name || assessableCharges[0].ledgerName) : "Additional Field";
+  const chargeWithGst = otherChargesList.find((c: any) => Number(c.gstRate) > 0 || c.gstCalculationMethod === 'flat_rate' || c.gstCalculationMethod === 'assessable_value');
+  const chargeName = chargeWithGst ? (chargeWithGst.name || chargeWithGst.ledgerName) : "Additional Field";
 
   const isInterstate = invoice?.isInterstate === true || invoice?.isInterstate === "true";
   let baseCgst = 0;
