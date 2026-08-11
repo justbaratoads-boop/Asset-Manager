@@ -59,7 +59,7 @@ function calcItem(item: Partial<InvoiceItem>, isInterstate: boolean): InvoiceIte
   const gstPct = Number(item.gstPct) || 0;
   const gstInclusive = item.gstInclusive ?? false;
 
-  const baseRate = (gstInclusive && gstPct > 0) ? rate / (1 + gstPct / 100) : rate;
+  const baseRate = (gstInclusive && gstPct > 0) ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
   const subtotal = qty * baseRate;
   const discountAmount = subtotal * (discPct / 100);
   const taxable = subtotal - discountAmount;
