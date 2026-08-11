@@ -100,7 +100,7 @@ function SaleInvoiceViewSheet({ id, onClose }: { id: number | null; onClose: () 
 
   const assessableCharges = otherChargesList.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
   const totalAssessableAmount = assessableCharges.reduce((sum: number, c: any) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
-  const baseTaxableTotal = Number(data?.totalTaxable || 0) - totalAssessableAmount;
+  const baseTaxableTotal = totalItemValue;
 
   const isInterstate = data?.isInterstate === true || data?.isInterstate === "true";
   let _baseCgst = 0, _baseSgst = 0, _baseIgst = 0;

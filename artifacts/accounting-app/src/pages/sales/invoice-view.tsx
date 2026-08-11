@@ -95,7 +95,7 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
 
   const assessableCharges = otherCharges.filter(c => c.gstCalculationMethod === 'assessable_value');
   const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
-  const baseTaxableTotal = Number(inv?.totalTaxable || 0) - totalAssessableAmount;
+  const baseTaxableTotal = totalItemValue;
 
   let baseCgst = 0;
   let baseSgst = 0;
@@ -425,7 +425,7 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
 
   const assessableCharges = otherChargesList.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
   const totalAssessableAmount = assessableCharges.reduce((sum: number, c: any) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
-  const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
+  const baseTaxableTotal = totalItemValue;
   const chargeWithGst = otherChargesList.find((c: any) => Number(c.gstRate) > 0 || c.gstCalculationMethod === 'flat_rate' || c.gstCalculationMethod === 'assessable_value');
   const chargeName = chargeWithGst ? (chargeWithGst.name || chargeWithGst.ledgerName) : "Additional Field";
 
@@ -687,7 +687,7 @@ function AcknowledgmentDocument({ invoice, company }: { invoice: any; company: a
 
   const assessableCharges = otherChargesList.filter(c => c.gstCalculationMethod === 'assessable_value');
   const totalAssessableAmount = assessableCharges.reduce((sum, c) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
-  const baseTaxableTotal = Number(invoice?.totalTaxable || 0) - totalAssessableAmount;
+  const baseTaxableTotal = totalItemValue;
   const chargeWithGst = otherChargesList.find((c: any) => Number(c.gstRate) > 0 || c.gstCalculationMethod === 'flat_rate' || c.gstCalculationMethod === 'assessable_value');
   const chargeName = chargeWithGst ? (chargeWithGst.name || chargeWithGst.ledgerName) : "Additional Field";
 
