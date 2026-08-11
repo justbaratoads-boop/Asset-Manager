@@ -86,6 +86,7 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
     const qty = Number(i.quantity) || 0;
     const rate = Number(i.rate) || 0;
     const discPct = Number(i.discountPct) || 0;
+    const gstPct = Number(i.gstPct) || 0;
     const baseRate = i.gstInclusive && gstPct > 0 ? rate / (1 + gstPct / 100) : rate;
     const subtotal = qty * baseRate;
     const discountAmount = subtotal * (discPct / 100);
