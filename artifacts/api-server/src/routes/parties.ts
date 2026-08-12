@@ -234,6 +234,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
       eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
       eq(saleInvoicesTable.isDeleted, "false"),
       eq(saleInvoicesTable.partyId, Number(id)),
+      ne(saleInvoicePaymentsTable.mode, "receipt_voucher"),
     ));
   for (const p of saleInvPayments) {
     transactions.push({
@@ -257,6 +258,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
       eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
       eq(purchaseInvoicesTable.isDeleted, "false"),
       eq(purchaseInvoicesTable.partyId, Number(id)),
+      ne(purchaseInvoicePaymentsTable.mode, "payment_voucher"),
     ));
   for (const p of purchInvPayments) {
     transactions.push({

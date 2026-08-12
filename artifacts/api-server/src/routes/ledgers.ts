@@ -485,6 +485,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   const salePmtJoinConds: any[] = [
     eq(saleInvoicePaymentsTable.invoiceId, saleInvoicesTable.id),
     eq(saleInvoicesTable.isDeleted, "false"),
+    ne(saleInvoicePaymentsTable.mode, "receipt_voucher"),
   ];
   if (from) salePmtJoinConds.push(gte(saleInvoicesTable.date, from));
   if (to) salePmtJoinConds.push(lte(saleInvoicesTable.date, to));
@@ -513,6 +514,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   const purchPmtJoinConds: any[] = [
     eq(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoicesTable.id),
     eq(purchaseInvoicesTable.isDeleted, "false"),
+    ne(purchaseInvoicePaymentsTable.mode, "payment_voucher"),
   ];
   if (from) purchPmtJoinConds.push(gte(purchaseInvoicesTable.date, from));
   if (to) purchPmtJoinConds.push(lte(purchaseInvoicesTable.date, to));
