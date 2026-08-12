@@ -374,7 +374,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       totalSgst: totals.sgst,
       totalIgst: totals.igst,
       totalGst: totals.cgst + totals.sgst + totals.igst,
-      grandTotal,
+      grandTotal: pakkaGrandTotal,
       amountPaid,
       balanceDue,
       kacchaAmountPaid,
@@ -433,8 +433,9 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
     const roundOffId = roundOffLedger ? roundOffLedger.id : 0;
     
     // Auto round off Pakka
-    const rawPakka = computedItems.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0);
-    const pakkaTotalBeforeRoundOff = rawPakka + charges.filter(c => (c.ledgerName || c.name) !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
+    const roundOffCharge = charges.find(c => (c.ledgerName || c.name) === "Round Off");
+    const roundOffAmt = roundOffCharge ? ((roundOffCharge.type ?? "add") === "deduct" ? -Number(roundOffCharge.amount) : Number(roundOffCharge.amount)) : 0;
+    const pakkaTotalBeforeRoundOff = pakkaGrandTotal - roundOffAmt;
     const roundedPakka = Math.round(pakkaTotalBeforeRoundOff);
     const diffPakka = roundedPakka - pakkaTotalBeforeRoundOff;
     
@@ -447,8 +448,9 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
     });
 
     if (enableDualLedger) {
-      const rawKaccha = computedItems.filter(i => !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
-      const kacchaTotalBeforeRoundOff = rawKaccha + (!hasPakka ? charges.filter(c => (c.ledgerName || c.name) !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0) : 0);
+      const kacchaRoundOffCharge = kacchaCharges.find(c => (c.ledgerName || c.name) === "Round Off");
+      const kacchaRoundOffAmt = kacchaRoundOffCharge ? ((kacchaRoundOffCharge.type ?? "add") === "deduct" ? -Number(kacchaRoundOffCharge.amount) : Number(kacchaRoundOffCharge.amount)) : 0;
+      const kacchaTotalBeforeRoundOff = kacchaGrandTotal - kacchaRoundOffAmt;
       const roundedKaccha = Math.round(kacchaTotalBeforeRoundOff);
       const diffKaccha = roundedKaccha - kacchaTotalBeforeRoundOff;
       
@@ -460,7 +462,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
         return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
       });
     }
-  }, [autoRoundOff, computedItems, charges, kacchaCharges, enableDualLedger, indirectLedgers]);
+  }, [autoRoundOff, computedItems, pakkaGrandTotal, kacchaGrandTotal, charges, kacchaCharges, enableDualLedger, indirectLedgers]);
 
   
   return (

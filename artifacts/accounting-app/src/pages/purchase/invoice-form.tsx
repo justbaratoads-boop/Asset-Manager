@@ -163,10 +163,14 @@ export default function PurchaseInvoiceForm() {
   const rawKacchaSubtotal = computedItems.filter(i => enableDualLedger && !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
   const kacchaGrandTotal = rawKacchaSubtotal + (!hasPakka ? chargesTotal : 0) + kacchaChargesTotal;
 
+  const pakkaGrandTotal = enableDualLedger
+    ? Number((grandTotal - computedItems.filter(i => !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0)).toFixed(2))
+    : grandTotal;
+
   const amountPaid = payRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const kacchaAmountPaid = kacchaPayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   
-  const balanceDue = grandTotal - amountPaid;
+  const balanceDue = pakkaGrandTotal - amountPaid;
   const kacchaBalanceDue = kacchaGrandTotal - kacchaAmountPaid;
 
   const updatePayRow = (i: number, field: string, value: string) => {
@@ -275,7 +279,10 @@ export default function PurchaseInvoiceForm() {
       isGst: items.some(i => i.gstPct > 0), isInterstate, isReverseCharge: false,
       subtotal: totals.subtotal, totalTaxable: totals.taxable,
       totalCgst: totals.cgst, totalSgst: totals.sgst, totalIgst: totals.igst,
-      grandTotal, amountPaid, balanceDue,
+      grandTotal: pakkaGrandTotal,
+      pakkaGrandTotal,
+      amountPaid,
+      balanceDue,
       notes,
         items: computedItems,
         payments,
@@ -319,38 +326,40 @@ export default function PurchaseInvoiceForm() {
   useEffect(() => {
     if (!autoRoundOff) return;
     const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
-      const roundOffLedger = indirectLedgers.find(l => l.name === "Round Off");
-      const roundOffId = roundOffLedger ? roundOffLedger.id : 0;
+    const roundOffLedger = indirectLedgers.find(l => l.name === "Round Off");
+    const roundOffId = roundOffLedger ? roundOffLedger.id : 0;
+    
+    // Auto round off Pakka
+    const roundOffCharge = charges.find(c => (c.ledgerName || c.name) === "Round Off");
+    const roundOffAmt = roundOffCharge ? ((roundOffCharge.type ?? "add") === "deduct" ? -Number(roundOffCharge.amount) : Number(roundOffCharge.amount)) : 0;
+    const pakkaTotalBeforeRoundOff = pakkaGrandTotal - roundOffAmt;
+    const roundedPakka = Math.round(pakkaTotalBeforeRoundOff);
+    const diffPakka = roundedPakka - pakkaTotalBeforeRoundOff;
+    
+    setCharges(prev => {
+      const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
+      if (hasPakka && Math.abs(diffPakka) > 0.001) {
+        filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffPakka).toFixed(2)) as any, type: diffPakka > 0 ? "add" : "deduct" });
+      }
+      return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
+    });
+
+    if (enableDualLedger) {
+      const kacchaRoundOffCharge = kacchaCharges.find(c => (c.ledgerName || c.name) === "Round Off");
+      const kacchaRoundOffAmt = kacchaRoundOffCharge ? ((kacchaRoundOffCharge.type ?? "add") === "deduct" ? -Number(kacchaRoundOffCharge.amount) : Number(kacchaRoundOffCharge.amount)) : 0;
+      const kacchaTotalBeforeRoundOff = kacchaGrandTotal - kacchaRoundOffAmt;
+      const roundedKaccha = Math.round(kacchaTotalBeforeRoundOff);
+      const diffKaccha = roundedKaccha - kacchaTotalBeforeRoundOff;
       
-      // Auto round off Pakka
-      const rawPakka = computedItems.filter(i => enableDualLedger ? i.isTaxLiability : true).reduce((acc, item) => acc + item.total, 0);
-      const pakkaTotalBeforeRoundOff = rawPakka + charges.filter(c => (c.ledgerName || c.name) !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
-      const roundedPakka = Math.round(pakkaTotalBeforeRoundOff);
-      const diffPakka = roundedPakka - pakkaTotalBeforeRoundOff;
-      
-      setCharges(prev => {
+      setKacchaCharges(prev => {
         const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
-        if (hasPakka && Math.abs(diffPakka) > 0.001) {
-          filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffPakka).toFixed(2)) as any, type: diffPakka > 0 ? "add" : "deduct" });
+        if (Math.abs(diffKaccha) > 0.001) {
+          filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffKaccha).toFixed(2)) as any, type: diffKaccha > 0 ? "add" : "deduct" });
         }
         return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
       });
-
-      if (enableDualLedger) {
-        const rawKaccha = computedItems.filter(i => !i.isTaxLiability).reduce((acc, item) => acc + item.total, 0);
-        const kacchaTotalBeforeRoundOff = rawKaccha + (!hasPakka ? charges.filter(c => (c.ledgerName || c.name) !== "Round Off").reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0) : 0);
-        const roundedKaccha = Math.round(kacchaTotalBeforeRoundOff);
-        const diffKaccha = roundedKaccha - kacchaTotalBeforeRoundOff;
-        
-        setKacchaCharges(prev => {
-          const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
-          if (Math.abs(diffKaccha) > 0.001) {
-            filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffKaccha).toFixed(2)) as any, type: diffKaccha > 0 ? "add" : "deduct" });
-          }
-          return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
-        });
-      }
-    }, [autoRoundOff, computedItems, charges, kacchaCharges, enableDualLedger, indirectLedgers]);
+    }
+  }, [autoRoundOff, computedItems, pakkaGrandTotal, kacchaGrandTotal, charges, kacchaCharges, enableDualLedger, indirectLedgers]);
 
   
   return (
