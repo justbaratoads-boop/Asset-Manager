@@ -105,7 +105,15 @@ export function computeInvoice(items: any[], charges: any[], isInterstate: boole
     if (isKaccha || item.isTaxLiability === false) {
       const sub = qty * rate;
       const discAmt = sub * (disc / 100);
-      return { ...item, subtotal: sub, totalDiscount: discAmt, baseAmount: sub - discAmt, taxableAmount: sub - discAmt, totalGst: 0, cgst: 0, sgst: 0, igst: 0, total: sub - discAmt };
+      const rSub = Number(sub.toFixed(2));
+      const rDisc = Number(discAmt.toFixed(2));
+      const rTaxable = Number((sub - discAmt).toFixed(2));
+      
+      subtotal += rSub;
+      discount += rDisc;
+      totalTaxable += rTaxable;
+      
+      return { ...item, subtotal: rSub, totalDiscount: rDisc, baseAmount: rTaxable, taxableAmount: rTaxable, totalGst: 0, cgst: 0, sgst: 0, igst: 0, total: rTaxable };
     }
 
     const computed = computeItem({
