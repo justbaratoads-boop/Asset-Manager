@@ -114,6 +114,7 @@ export default function DebitNoteForm() {
   const { data: ledgers = [] } = useListLedgers();
 
   const [partyId, setPartyId] = useState<number | undefined>();
+  const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
   const [date, setDate] = useState(today());
   const [reason, setReason] = useState("");
   const [isInterstate, setIsInterstate] = useState(false);
@@ -174,8 +175,6 @@ export default function DebitNoteForm() {
       try { setCharges(JSON.parse(n.otherCharges)); } catch { setCharges([]); }
     }
   }, [existing]);
-
-  const selectedParty = (parties as any[]).find((p: any) => p.id === partyId);
 
   useEffect(() => {
     if (selectedParty) {
