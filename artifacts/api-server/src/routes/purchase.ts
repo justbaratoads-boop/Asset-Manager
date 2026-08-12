@@ -172,7 +172,7 @@ router.post("/purchase-invoices", authMiddleware, async (req, res) => {
   }
   
   if (pakkaItems.length > 0) {
-    const pInv = await createInvoicePart(pakkaItems, false, data.payments || [], data.amountPaid, data.balanceDue, data.pakkaGrandTotal ?? data.grandTotal);
+    const pInv = await createInvoicePart(pakkaItems, false, data.payments || [], data.amountPaid, data.balanceDue, data.pakkaGrandTotal ?? (enableDualLedger ? undefined : data.grandTotal));
     finalInvoice = pInv;
   }
 
@@ -214,10 +214,50 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
     }
   }
 
-  const grandTotal = Number(data.grandTotal || 0);
-  const amountPaid = Number(data.amountPaid || 0);
-  const balanceDue = grandTotal - amountPaid;
-  const status = balanceDue <= 0 ? "paid" : amountPaid > 0 ? "partial" : "confirmed";
+  // Calculate correct totals from target items
+  const targetItems = data.items || [];
+  const sub = targetItems.reduce((acc: number, i: any) => acc + Number(i.quantity) * Number(i.rate), 0);
+  const base = targetItems.reduce((acc: number, i: any) => acc + Number(i.taxableAmount || 0), 0);
+  const cgst = targetItems.reduce((acc: number, i: any) => acc + Number(i.cgst || 0), 0);
+  const sgst = targetItems.reduce((acc: number, i: any) => acc + Number(i.sgst || 0), 0);
+  const igst = targetItems.reduce((acc: number, i: any) => acc + Number(i.igst || 0), 0);
+
+  // Flat rate charges calculation for Pakka invoice
+  let otherChargesParsed = 0;
+  let flatCgst = 0;
+  let flatSgst = 0;
+  let flatIgst = 0;
+  const isKacchaInvoice = existingInvoice.isKaccha;
+  const targetCharges = isKacchaInvoice ? data.kacchaCharges : data.otherCharges;
+  if (targetCharges) {
+    try {
+      const charges = JSON.parse(targetCharges);
+      otherChargesParsed = charges.reduce((s: number, c: any) => s + ((c.type ?? "add") === "deduct" ? -Number(c.amount) : Number(c.amount)), 0);
+      if (!isKacchaInvoice) {
+        const flatCharges = charges.filter((c: any) => c.gstCalculationMethod === 'flat_rate');
+        for (const c of flatCharges) {
+          const amt = c.type === 'deduct' ? -Number(c.amount) : Number(c.amount);
+          const rate = Number(c.gstRate) || 0;
+          const tax = (amt * rate) / 100;
+          if (data.isInterstate) {
+            flatIgst += tax;
+          } else {
+            flatCgst += tax / 2;
+            flatSgst += tax / 2;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  const finalCgst = cgst + flatCgst;
+  const finalSgst = sgst + flatSgst;
+  const finalIgst = igst + flatIgst;
+  const totGst = finalCgst + finalSgst + finalIgst;
+  const gTotal = base + totGst + otherChargesParsed;
+  const partAmountPaid = isKacchaInvoice ? (data.kacchaAmountPaid || 0) : (data.amountPaid || 0);
+  const partBalanceDue = isKacchaInvoice ? (data.kacchaBalanceDue || 0) : (data.balanceDue || 0);
+  const status = Number(partBalanceDue) <= 0 ? "paid" : Number(partAmountPaid) > 0 ? "partial" : "confirmed";
 
   const [invoice] = await db.update(purchaseInvoicesTable).set({
     supplierInvoiceNumber: data.supplierInvoiceNumber,
@@ -226,17 +266,17 @@ router.put("/purchase-invoices/:id", authMiddleware, async (req, res) => {
     partyName: data.partyName,
     isGst: data.isGst ?? true,
     isInterstate: data.isInterstate ?? false,
-    subtotal: String(data.subtotal || 0),
-    totalTaxable: String(data.totalTaxable || 0),
-    totalCgst: String(data.totalCgst || 0),
-    totalSgst: String(data.totalSgst || 0),
-    totalIgst: String(data.totalIgst || 0),
-    grandTotal: String(grandTotal),
-    amountPaid: String(amountPaid),
-    balanceDue: String(balanceDue),
+    subtotal: String(sub),
+    totalTaxable: String(base),
+    totalCgst: String(finalCgst),
+    totalSgst: String(finalSgst),
+    totalIgst: String(finalIgst),
+    grandTotal: String(gTotal),
+    amountPaid: String(partAmountPaid),
+    balanceDue: String(partBalanceDue),
     status,
     notes: data.notes,
-    otherCharges: existingInvoice.isKaccha ? (data.kacchaCharges || null) : (data.otherCharges || null),
+    otherCharges: targetCharges || null,
   }).where(eq(purchaseInvoicesTable.id, Number(req.params.id))).returning();
   if (!invoice) return res.status(404).json({ error: "Not found" });
 

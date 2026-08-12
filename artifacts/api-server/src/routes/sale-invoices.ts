@@ -223,7 +223,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
   }
   
   if (pakkaItems.length > 0) {
-    const pInv = await createInvoicePart(pakkaItems, false, data.payments || [], data.amountPaid, data.balanceDue, data.pakkaGrandTotal ?? data.grandTotal);
+    const pInv = await createInvoicePart(pakkaItems, false, data.payments || [], data.amountPaid, data.balanceDue, data.pakkaGrandTotal ?? (enableDualLedger ? undefined : data.grandTotal));
     finalInvoice = pInv;
   }
 
@@ -317,6 +317,51 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
     if (limitError) return res.status(400).json({ error: limitError, code: "CREDIT_LIMIT_REACHED" });
   }
 
+  // Calculate correct totals from target items
+  const targetItems = data.items || [];
+  const sub = targetItems.reduce((acc: number, i: any) => acc + Number(i.quantity) * Number(i.rate), 0);
+  const disc = targetItems.reduce((acc: number, i: any) => acc + (Number(i.discountPct || 0) / 100) * Number(i.quantity) * Number(i.rate), 0);
+  const base = targetItems.reduce((acc: number, i: any) => acc + Number(i.taxableAmount || 0), 0);
+  const cgst = targetItems.reduce((acc: number, i: any) => acc + Number(i.cgst || 0), 0);
+  const sgst = targetItems.reduce((acc: number, i: any) => acc + Number(i.sgst || 0), 0);
+  const igst = targetItems.reduce((acc: number, i: any) => acc + Number(i.igst || 0), 0);
+
+  // Flat rate charges calculation for Pakka invoice
+  let otherChargesParsed = 0;
+  let flatCgst = 0;
+  let flatSgst = 0;
+  let flatIgst = 0;
+  const isKacchaInvoice = existingInvoice.isKaccha;
+  const targetCharges = isKacchaInvoice ? data.kacchaCharges : data.otherCharges;
+  if (targetCharges) {
+    try {
+      const charges = JSON.parse(targetCharges);
+      otherChargesParsed = charges.reduce((s: number, c: any) => s + ((c.type ?? "add") === "deduct" ? -Number(c.amount) : Number(c.amount)), 0);
+      if (!isKacchaInvoice) {
+        const flatCharges = charges.filter((c: any) => c.gstCalculationMethod === 'flat_rate');
+        for (const c of flatCharges) {
+          const amt = c.type === 'deduct' ? -Number(c.amount) : Number(c.amount);
+          const rate = Number(c.gstRate) || 0;
+          const tax = (amt * rate) / 100;
+          if (data.isInterstate) {
+            flatIgst += tax;
+          } else {
+            flatCgst += tax / 2;
+            flatSgst += tax / 2;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  const finalCgst = cgst + flatCgst;
+  const finalSgst = sgst + flatSgst;
+  const finalIgst = igst + flatIgst;
+  const totGst = finalCgst + finalSgst + finalIgst;
+  const gTotal = base + totGst + otherChargesParsed;
+  const partAmountPaid = isKacchaInvoice ? (data.kacchaAmountPaid || 0) : (data.amountPaid || 0);
+  const partBalanceDue = isKacchaInvoice ? (data.kacchaBalanceDue || 0) : (data.balanceDue || 0);
+
   // Update the invoice header
   const [invoice] = await db.update(saleInvoicesTable).set({
     date: data.date,
@@ -326,19 +371,19 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
     billingAddress: data.billingAddress,
     isGst: data.isGst,
     isInterstate: data.isInterstate,
-    subtotal: String(existingInvoice.isKaccha ? ((data.kacchaSubtotal ?? data.subtotal) || 0) : (data.subtotal || 0)),
-    totalDiscount: String(data.totalDiscount || 0),
-    totalTaxable: String(data.totalTaxable || 0),
-    totalCgst: String(data.totalCgst || 0),
-    totalSgst: String(data.totalSgst || 0),
-    totalIgst: String(data.totalIgst || 0),
-    totalGst: String(data.totalGst || 0),
-    grandTotal: String(existingInvoice.isKaccha ? ((data.kacchaGrandTotal ?? data.grandTotal) || 0) : (data.grandTotal || 0)),
-    amountPaid: String(existingInvoice.isKaccha ? ((data.kacchaAmountPaid ?? data.amountPaid) || 0) : (data.amountPaid || 0)),
-    balanceDue: String(existingInvoice.isKaccha ? ((data.kacchaBalanceDue ?? data.balanceDue) || 0) : (data.balanceDue || 0)),
+    subtotal: String(sub),
+    totalDiscount: String(disc),
+    totalTaxable: String(base),
+    totalCgst: String(finalCgst),
+    totalSgst: String(finalSgst),
+    totalIgst: String(finalIgst),
+    totalGst: String(totGst),
+    grandTotal: String(gTotal),
+    amountPaid: String(partAmountPaid),
+    balanceDue: String(partBalanceDue),
     notes: data.notes,
-    otherCharges: existingInvoice.isKaccha ? (data.kacchaCharges || null) : (data.otherCharges || null),
-    status: data.amountPaid >= data.grandTotal ? "paid" : (data.amountPaid > 0 ? "partial" : "confirmed"),
+    otherCharges: targetCharges || null,
+    status: Number(partAmountPaid) >= gTotal ? "paid" : (Number(partAmountPaid) > 0 ? "partial" : "confirmed"),
   }).where(eq(saleInvoicesTable.id, Number(id))).returning();
 
   if (!invoice) return res.status(404).json({ error: "Not found" });
