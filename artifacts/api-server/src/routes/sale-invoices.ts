@@ -109,11 +109,14 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
     let flatCgst = 0;
     let flatSgst = 0;
     let flatIgst = 0;
+    let totalAssessableAmount = 0;
     const targetCharges = isKaccha ? data.kacchaCharges : data.otherCharges;
     if (targetCharges) {
       try {
         const charges = JSON.parse(targetCharges);
         otherChargesParsed = charges.reduce((s: number, c: any) => s + ((c.type ?? "add") === "deduct" ? -Number(c.amount) : Number(c.amount)), 0);
+        const assessableCharges = charges.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
+        totalAssessableAmount = assessableCharges.reduce((sum: number, c: any) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
         if (!isKaccha) {
           const flatCharges = charges.filter((c: any) => c.gstCalculationMethod === 'flat_rate');
           for (const c of flatCharges) {
@@ -135,7 +138,7 @@ router.post("/sale-invoices", authMiddleware, async (req, res) => {
     const finalSgst = sgst + flatSgst;
     const finalIgst = igst + flatIgst;
     const totGst = finalCgst + finalSgst + finalIgst;
-    const gTotal = partGrandTotal ?? (base + totGst + otherChargesParsed);
+    const gTotal = partGrandTotal ?? (base + totGst + otherChargesParsed - totalAssessableAmount);
 
     const [inv] = await db.insert(saleInvoicesTable).values({
       invoiceNumber: invNum,
@@ -331,12 +334,15 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
   let flatCgst = 0;
   let flatSgst = 0;
   let flatIgst = 0;
+  let totalAssessableAmount = 0;
   const isKacchaInvoice = existingInvoice.isKaccha;
   const targetCharges = isKacchaInvoice ? data.kacchaCharges : data.otherCharges;
   if (targetCharges) {
     try {
       const charges = JSON.parse(targetCharges);
       otherChargesParsed = charges.reduce((s: number, c: any) => s + ((c.type ?? "add") === "deduct" ? -Number(c.amount) : Number(c.amount)), 0);
+      const assessableCharges = charges.filter((c: any) => c.gstCalculationMethod === 'assessable_value');
+      totalAssessableAmount = assessableCharges.reduce((sum: number, c: any) => sum + (c.type === 'deduct' ? -Number(c.amount) : Number(c.amount)), 0);
       if (!isKacchaInvoice) {
         const flatCharges = charges.filter((c: any) => c.gstCalculationMethod === 'flat_rate');
         for (const c of flatCharges) {
@@ -358,7 +364,7 @@ router.put("/sale-invoices/:id", authMiddleware, async (req, res) => {
   const finalSgst = sgst + flatSgst;
   const finalIgst = igst + flatIgst;
   const totGst = finalCgst + finalSgst + finalIgst;
-  const gTotal = base + totGst + otherChargesParsed;
+  const gTotal = base + totGst + otherChargesParsed - totalAssessableAmount;
   const partAmountPaid = isKacchaInvoice ? (data.kacchaAmountPaid || 0) : (data.amountPaid || 0);
   const partBalanceDue = isKacchaInvoice ? (data.kacchaBalanceDue || 0) : (data.balanceDue || 0);
 
