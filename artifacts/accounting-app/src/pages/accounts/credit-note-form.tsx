@@ -50,17 +50,16 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
   const gstPct = Number(item.gstPct) || 0;
   const gstInclusive = item.gstInclusive ?? false;
   
-  const subtotal = qty * rate;
+  const baseRate = (gstInclusive && gstPct > 0) ? Number((rate / (1 + gstPct / 100)).toFixed(2)) : rate;
+  const subtotal = qty * baseRate;
   const discountAmount = subtotal * (discPct / 100);
-  const grossAmount = subtotal - discountAmount;
-  
-  const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
-  const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
+  const taxable = subtotal - discountAmount;
+  const gstAmount = taxable * (gstPct / 100);
   
   const cgst = isInterstate ? 0 : gstAmount / 2;
   const sgst = isInterstate ? 0 : gstAmount / 2;
   const igst = isInterstate ? gstAmount : 0;
-  const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
+  const total = taxable + gstAmount;
 
   return {
     stockItemId: item.stockItemId,
@@ -141,7 +140,7 @@ export default function CreditNoteForm() {
         rate: Number(i.rate),
         discountPct: Number(i.discountPct) || 0,
         gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: false, isTaxLiability: i.isTaxLiability, }, interstate)));
+        gstLocked: !!i.stockItemId, gstInclusive: i.gstInclusive === true || i.gstInclusive === "true", isTaxLiability: i.isTaxLiability, }, interstate)));
     }
     if (n.otherCharges) {
       try { setCharges(JSON.parse(n.otherCharges)); } catch { setCharges([]); }
@@ -158,12 +157,26 @@ export default function CreditNoteForm() {
     }
   }, [partyId]);
 
+  const indirectLedgers = ledgers.filter((l: any) => {
+    const g = (l.group || "").toLowerCase();
+    return g.includes("expense") || g.includes("income");
+  });
+  const enrichedCharges = charges.map(c => {
+    const ledger = indirectLedgers.find(l => l.id === c.ledgerId);
+    return {
+      ...c,
+      gstCalculationMethod: ledger?.gstCalculationMethod || c.gstCalculationMethod || "none",
+      gstRate: ledger?.gstRate !== undefined && ledger?.gstRate !== null ? Number(ledger.gstRate) : (c.gstRate || 0)
+    };
+  });
+
+  const { items: computedItems, totals: cTotals } = computeInvoice(items, enrichedCharges, isInterstate);
   const totals = {
-    taxable: items.reduce((s, i) => s + i.taxableAmount, 0),
-    cgst: items.reduce((s, i) => s + i.cgst, 0),
-    sgst: items.reduce((s, i) => s + i.sgst, 0),
-    igst: items.reduce((s, i) => s + i.igst, 0),
-    grand: items.reduce((s, i) => s + i.total, 0),
+    taxable: cTotals.taxable,
+    cgst: cTotals.cgst,
+    sgst: cTotals.sgst,
+    igst: cTotals.igst,
+    grand: cTotals.grand - cTotals.chargesTotal,
   };
 
   const chargesTotal = charges.reduce((s, c) => s + ((c.type ?? "add") === "deduct" ? -(Number(c.amount) || 0) : (Number(c.amount) || 0)), 0);
@@ -292,7 +305,7 @@ export default function CreditNoteForm() {
 
             {/* Mobile card layout */}
             <div className="md:hidden space-y-3">
-              {items.map((item, i) => (
+              {computedItems.map((item, i) => (
                 <div key={i} className="border rounded-lg p-3 space-y-3 bg-card shadow-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-muted-foreground">Item {i + 1}</span>
@@ -339,16 +352,25 @@ export default function CreditNoteForm() {
                       <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} placeholder="0.00" />
                     </div>
                     <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">GST Type</Label>
+                      <div className="flex rounded overflow-hidden border text-[11px] font-medium h-10">
+                        <button type="button" onClick={() => updateItem(i, "gstInclusive", false)}
+                          className={`flex-1 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>Ex</button>
+                        <button type="button" onClick={() => updateItem(i, "gstInclusive", true)}
+                          className={`flex-1 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>In</button>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground flex items-center gap-1">GST% {item.gstLocked && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
                       <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)} disabled={item.gstLocked}>
                         <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1 col-span-2 flex items-end justify-end">
+                    <div className="space-y-1 flex items-end justify-end">
                       <div>
                         <Label className="text-xs text-muted-foreground">Total</Label>
-                        <div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.total)}</div>
+                        <div className="h-10 flex items-center justify-end font-bold text-base">{formatCurrency(item.baseAmount + (item.baseAmount * (Number(item.gstPct) || 0) / 100))}</div>
                       </div>
                     </div>
                   </div>
@@ -363,16 +385,17 @@ export default function CreditNoteForm() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Item</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Rate</TableHead>
-                    <TableHead>GST%</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead className="w-24">Qty</TableHead>
+                    <TableHead className="w-24">Unit</TableHead>
+                    <TableHead className="w-28">Rate</TableHead>
+                    <TableHead className="w-32">GST Type / %</TableHead>
+                    <TableHead className="w-28 text-right">Taxable</TableHead>
+                    <TableHead className="w-28 text-right">Total</TableHead>
+                    <TableHead className="w-8"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item, i) => (
+                  {computedItems.map((item, i) => (
                     <TableRow key={i}>
                       <TableCell>
                         <Select onValueChange={v => selectStock(i, v)}>
@@ -407,15 +430,24 @@ export default function CreditNoteForm() {
                       <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" disabled={!!item.stockItemId && item.unit !== "n/a"} /></TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)} disabled={item.gstLocked}>
-                            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
-                          </Select>
-                          {item.gstLocked && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
+                        <div className="space-y-1">
+                          <div className="flex rounded overflow-hidden border text-[10px] font-medium max-w-[80px]">
+                            <button type="button" onClick={() => updateItem(i, "gstInclusive", false)}
+                              className={`flex-1 px-1 py-0.5 transition-colors ${!item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>Ex</button>
+                            <button type="button" onClick={() => updateItem(i, "gstInclusive", true)}
+                              className={`flex-1 px-1 py-0.5 border-l transition-colors ${item.gstInclusive ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>In</button>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Select value={String(item.gstPct)} onValueChange={v => updateItem(i, "gstPct", v)} disabled={item.gstLocked}>
+                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>{GST_RATES.map(r => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}</SelectContent>
+                            </Select>
+                            {item.gstLocked && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.total)}</TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">{formatCurrency(item.baseAmount)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(item.baseAmount + (item.baseAmount * (Number(item.gstPct) || 0) / 100))}</TableCell>
                       <TableCell><Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                     </TableRow>
                   ))}

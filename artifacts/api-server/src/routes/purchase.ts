@@ -384,6 +384,7 @@ router.post("/purchase-orders", authMiddleware, async (req, res) => {
       rate: String(Number(item.rate) || 0),
       discountPct: String(Number(item.discountPct) || 0),
       gstPct: String(Number(item.gstPct) || 0),
+      gstInclusive: item.gstInclusive ?? false,
       taxableAmount: String(Number(item.taxableAmount) || 0),
       cgst: String(Number(item.cgst) || 0),
       sgst: String(Number(item.sgst) || 0),
@@ -410,7 +411,7 @@ router.get("/purchase-orders/:id", authMiddleware, async (req, res) => {
   const [order] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Not found" });
   const items = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.orderId, Number(req.params.id)));
-  res.json({ ...order, grandTotal: Number(order.grandTotal), items });
+  res.json({ ...order, grandTotal: Number(order.grandTotal), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
 });
 
 router.put("/purchase-orders/:id", authMiddleware, async (req, res) => {
@@ -448,6 +449,7 @@ router.put("/purchase-orders/:id", authMiddleware, async (req, res) => {
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
+        gstInclusive: item.gstInclusive ?? false,
         taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),

@@ -61,6 +61,7 @@ router.post("/orders", authMiddleware, async (req, res) => {
         rate: String(item.rate || 0),
         discountPct: String(item.discountPct || 0),
         gstPct: String(item.gstPct || 0),
+        gstInclusive: item.gstInclusive ?? false,
         taxableAmount: String(item.taxableAmount || 0),
         cgst: String(item.cgst || 0),
         sgst: String(item.sgst || 0),
@@ -82,22 +83,60 @@ router.get("/orders/:id", authMiddleware, async (req, res) => {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Not found" });
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, Number(req.params.id)));
-  res.json({ ...order, grandTotal: Number(order.grandTotal), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total) })) });
+  res.json({ ...order, grandTotal: Number(order.grandTotal), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
 });
 
 router.put("/orders/:id", authMiddleware, async (req, res) => {
   const data = req.body;
-  const [order] = await db.update(ordersTable).set({
-    status: data.status,
-    notes: data.notes,
-    deliveryAddress: data.deliveryAddress,
-    driverName: data.driverName,
-    vehicleName: data.vehicleName,
-    vehicleNo: data.vehicleNo,
-    dispatchNotes: data.dispatchNotes,
-    deliveryDate: data.deliveryDate,
-  }).where(eq(ordersTable.id, Number(req.params.id))).returning();
+  const updateData: Record<string, unknown> = {};
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.notes !== undefined) updateData.notes = data.notes;
+  if (data.deliveryAddress !== undefined) updateData.deliveryAddress = data.deliveryAddress;
+  if (data.driverName !== undefined) updateData.driverName = data.driverName;
+  if (data.vehicleName !== undefined) updateData.vehicleName = data.vehicleName;
+  if (data.vehicleNo !== undefined) updateData.vehicleNo = data.vehicleNo;
+  if (data.dispatchNotes !== undefined) updateData.dispatchNotes = data.dispatchNotes;
+  if (data.deliveryDate !== undefined) updateData.deliveryDate = data.deliveryDate;
+  if (data.grandTotal !== undefined) updateData.grandTotal = String(data.grandTotal || 0);
+
+  const [order] = await db.update(ordersTable).set(updateData).where(eq(ordersTable.id, Number(req.params.id))).returning();
   if (!order) return res.status(404).json({ error: "Not found" });
+
+  if (data.items?.length) {
+    // Reverse reserved stock for old items before replacing
+    const oldItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, Number(req.params.id)));
+    for (const oldItem of oldItems) {
+      if (oldItem.stockItemId) {
+        await adjustReservedStock((oldItem as any).batchId || null, -Number(oldItem.quantity));
+      }
+    }
+    await db.delete(orderItemsTable).where(eq(orderItemsTable.orderId, Number(req.params.id)));
+    for (const item of data.items) {
+      await db.insert(orderItemsTable).values({
+        orderId: order.id,
+        stockItemId: item.stockItemId,
+        itemName: item.itemName,
+        hsnCode: item.hsnCode,
+        quantity: String(item.quantity || 0),
+        unit: item.unit,
+        rate: String(item.rate || 0),
+        discountPct: String(item.discountPct || 0),
+        gstPct: String(item.gstPct) || "0",
+        gstInclusive: item.gstInclusive ?? false,
+        taxableAmount: String(item.taxableAmount || 0),
+        cgst: String(item.cgst || 0),
+        sgst: String(item.sgst || 0),
+        igst: String(item.igst || 0),
+        batchId: item.batchId || null,
+        total: String(item.total || 0),
+        description: item.description || null,
+      });
+      if (item.stockItemId) {
+        await adjustReservedStock(item.batchId || null, Number(item.quantity));
+      }
+    }
+  }
+
   res.json(order);
 });
 
@@ -137,6 +176,7 @@ async function convertOrder(req: Request, res: Response) {
       rate: item.rate,
       discountPct: item.discountPct,
       gstPct: item.gstPct,
+      gstInclusive: item.gstInclusive,
       taxableAmount: item.taxableAmount,
       cgst: item.cgst,
       sgst: item.sgst,

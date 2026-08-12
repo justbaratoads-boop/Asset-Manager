@@ -317,6 +317,7 @@ router.post("/credit-notes", authMiddleware, async (req, res) => {
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
+        gstInclusive: item.gstInclusive ?? false,
         taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
@@ -337,7 +338,7 @@ router.get("/credit-notes/:id", authMiddleware, async (req, res) => {
   const [note] = await db.select().from(creditNotesTable).where(eq(creditNotesTable.id, Number(req.params.id))).limit(1);
   if (!note) return res.status(404).json({ error: "Not found" });
   const items = await db.select().from(creditNoteItemsTable).where(eq(creditNoteItemsTable.noteId, Number(req.params.id)));
-  res.json({ ...note, amount: Number(note.amount), items });
+  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
 });
 
 router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
@@ -374,6 +375,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
+        gstInclusive: item.gstInclusive ?? false,
         taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
@@ -388,7 +390,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
 
   const [note] = await db.select().from(creditNotesTable).where(eq(creditNotesTable.id, id)).limit(1);
   const items = await db.select().from(creditNoteItemsTable).where(eq(creditNoteItemsTable.noteId, id));
-  res.json({ ...note, amount: Number(note.amount), items });
+  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
 });
 
 router.delete("/credit-notes/:id", authMiddleware, async (req, res) => {
@@ -428,6 +430,7 @@ router.post("/debit-notes", authMiddleware, async (req, res) => {
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
+        gstInclusive: item.gstInclusive ?? false,
         taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
@@ -448,7 +451,7 @@ router.get("/debit-notes/:id", authMiddleware, async (req, res) => {
   const [note] = await db.select().from(debitNotesTable).where(eq(debitNotesTable.id, Number(req.params.id))).limit(1);
   if (!note) return res.status(404).json({ error: "Not found" });
   const items = await db.select().from(debitNoteItemsTable).where(eq(debitNoteItemsTable.noteId, Number(req.params.id)));
-  res.json({ ...note, amount: Number(note.amount), items });
+  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
 });
 
 router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
@@ -485,6 +488,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
         rate: String(Number(item.rate) || 0),
         discountPct: String(Number(item.discountPct) || 0),
         gstPct: String(Number(item.gstPct) || 0),
+        gstInclusive: item.gstInclusive ?? false,
         taxableAmount: String(Number(item.taxableAmount) || 0),
         cgst: String(Number(item.cgst) || 0),
         sgst: String(Number(item.sgst) || 0),
@@ -499,7 +503,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
 
   const [note] = await db.select().from(debitNotesTable).where(eq(debitNotesTable.id, id)).limit(1);
   const items = await db.select().from(debitNoteItemsTable).where(eq(debitNoteItemsTable.noteId, id));
-  res.json({ ...note, amount: Number(note.amount), items });
+  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
 });
 
 router.delete("/debit-notes/:id", authMiddleware, async (req, res) => {
