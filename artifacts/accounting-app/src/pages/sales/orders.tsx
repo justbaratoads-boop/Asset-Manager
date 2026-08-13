@@ -42,7 +42,7 @@ function SalesOrderViewSheet({ id, onClose }: { id: number | null; onClose: () =
     if (!id) { setData(null); return; }
     setLoading(true);
     setData(null);
-    customFetch<any>(`/api/sale-orders/${id}`)
+    customFetch<any>(`/api/orders/${id}`)
       .then(d => setData(d))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
