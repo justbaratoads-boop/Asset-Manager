@@ -156,6 +156,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   const [bankAccounts, setBankAccounts] = useState<{ value: string; label: string }[]>([]);
   const [indirectLedgers, setIndirectLedgers] = useState<{ id: number; name: string; group: string }[]>([]);
   const hasLoadedRef = useRef(false);
+  const hasLoadedOrderRef = useRef(false);
 
   useEffect(() => {
     customFetch<any>("/api/ledgers?group=Bank%20Accounts").then((data: any) => {
@@ -272,21 +273,26 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   }, [existing]);
 
   useEffect(() => {
-    if (!fromOrderId) return;
+    if (!fromOrderId || !stockItems?.length || hasLoadedOrderRef.current) return;
+    hasLoadedOrderRef.current = true;
     customFetch<any>(`/api/orders/${fromOrderId}`).then(order => {
       if (order.partyId) setPartyId(order.partyId);
       if (order.date) setDate(order.date);
       if (order.notes) setNotes(order.notes);
       if (order.items?.length) {
-        setItems(order.items.map((i: any) => calcItem({
-          stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
-          quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
-          discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-          gstLocked: !!i.stockItemId, gstInclusive: i.gstInclusive === true || i.gstInclusive === "true", isTaxLiability: i.isTaxLiability,
-        }, false)));
+        setItems(order.items.map((i: any) => {
+          const sItem = (stockItems as any[] || []).find((s: any) => s.id === i.stockItemId);
+          const isTaxLiability = sItem ? (sItem.isTaxLiability !== false && String(sItem.isTaxLiability) !== "false") : true;
+          return calcItem({
+            stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
+            quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
+            discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
+            gstLocked: !!i.stockItemId, gstInclusive: i.gstInclusive === true || i.gstInclusive === "true", isTaxLiability,
+          }, false);
+        }));
       }
     }).catch(() => {});
-  }, [fromOrderId]);
+  }, [fromOrderId, stockItems]);
 
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => {
