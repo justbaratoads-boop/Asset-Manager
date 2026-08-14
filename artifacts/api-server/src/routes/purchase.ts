@@ -643,6 +643,7 @@ router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => 
       igst: String(igst.toFixed(2)),
       total: String(total.toFixed(2)),
       batchId: (item as any).batchId || null,
+      gstInclusive: item.gstInclusive,
     });
   }
 
