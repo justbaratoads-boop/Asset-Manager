@@ -223,7 +223,7 @@ export default function PurchaseInvoiceForm() {
     const party = (parties as any[]).find((p: any) => p.id === partyId);
     const interstate = party?.isOutOfState === "true" || party?.isOutOfState === true;
     setItems(prev => prev.map(item => calc(item, interstate)));
-  }, [partyId]);
+  }, [partyId, parties]);
 
   const updateItem = (index: number, field: keyof Item, value: any) => {
     setItems(prev => {

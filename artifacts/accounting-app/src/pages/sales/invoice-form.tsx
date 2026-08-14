@@ -231,7 +231,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
       setIsInterstate(interstate);
       setItems(prev => prev.map(item => calcItem(item, interstate)));
     }
-  }, [partyId]);
+  }, [partyId, selectedParty]);
 
   useEffect(() => {
     if (!existing || !isEdit || hasLoadedRef.current) return;
