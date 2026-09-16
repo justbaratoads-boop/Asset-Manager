@@ -598,9 +598,6 @@ router.get("/reports/sale-register", authMiddleware, async (req, res) => {
   const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
   const conditions: any[] = [and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
-  const enableDualLedger = await getEnableDualLedger();
-  const { from, to } = req.query;
-  const conditions: any[] = [and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
   if (from) conditions.push(gte(saleInvoicesTable.date, from as string));
   if (to) conditions.push(lte(saleInvoicesTable.date, to as string));
 
