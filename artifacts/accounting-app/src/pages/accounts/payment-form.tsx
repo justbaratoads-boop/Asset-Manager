@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { useCreatePayment, useGetPayment, useListParties, useListLedgers, getListPaymentsQueryKey, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,8 +30,6 @@ interface LedgerRow {
   amount: string;
 }
 
-let rowKeyCounter = 1;
-
 export default function PaymentForm() {
   const [, setLocation] = useLocation();
   const params = useParams<{ id: string }>();
@@ -54,6 +52,10 @@ export default function PaymentForm() {
   const [form, setForm] = useState({ date: today(), amount: "", narration: "" });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
+  // Per-instance key counter — avoids shared module-level state bug
+  const keyRef = useRef(1);
+  const nextKey = () => { keyRef.current += 1; return keyRef.current; };
+
   // Ledger allocation rows
   const [allocationRows, setAllocationRows] = useState<LedgerRow[]>([
     { key: 1, ledgerId: "", amount: "" }
@@ -74,9 +76,9 @@ export default function PaymentForm() {
     // Restore ledger allocations if any
     if (e.ledgerAllocations?.length) {
       const allocs = e.ledgerAllocations as { ledgerId: number; amount: number }[];
-      setAllocationRows(allocs.map(a => ({ key: rowKeyCounter++, ledgerId: String(a.ledgerId), amount: String(a.amount || "") })));
+      setAllocationRows(allocs.map(a => ({ key: nextKey(), ledgerId: String(a.ledgerId), amount: String(a.amount || "") })));
     } else if (e.ledgerId) {
-      setAllocationRows([{ key: rowKeyCounter++, ledgerId: String(e.ledgerId), amount: String(e.amount || "") }]);
+      setAllocationRows([{ key: nextKey(), ledgerId: String(e.ledgerId), amount: String(e.amount || "") }]);
     }
   }, [existing]);
 
@@ -137,7 +139,7 @@ export default function PaymentForm() {
 
   // Ledger allocation helpers
   const addRow = () => {
-    setAllocationRows(prev => [...prev, { key: rowKeyCounter++, ledgerId: "", amount: "" }]);
+    setAllocationRows(prev => [...prev, { key: nextKey(), ledgerId: "", amount: "" }]);
   };
   const removeRow = (key: number) => {
     setAllocationRows(prev => prev.length > 1 ? prev.filter(r => r.key !== key) : prev);
