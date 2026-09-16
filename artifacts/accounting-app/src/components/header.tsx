@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Bell, Menu } from "lucide-react";
+import { Search, Bell, Menu, X } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
@@ -10,7 +10,7 @@ import { Badge } from "./ui/badge";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { fy, globalFrom, globalTo, setGlobalFrom, setGlobalTo } = useFY();
+  const { fy, globalFrom, globalTo, setGlobalFrom, setGlobalTo, clearGlobalDates } = useFY();
 
   return (
     <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-10">
@@ -42,6 +42,7 @@ export function Header() {
             value={globalFrom} 
             onChange={(e) => setGlobalFrom(e.target.value)} 
             className="w-[100px] sm:w-36 h-8 text-[10px] sm:text-xs px-1 sm:px-3" 
+            title="From Date (Saved automatically)"
           />
           <span className="text-muted-foreground text-[10px] sm:text-xs">to</span>
           <Input 
@@ -49,7 +50,20 @@ export function Header() {
             value={globalTo} 
             onChange={(e) => setGlobalTo(e.target.value)} 
             className="w-[100px] sm:w-36 h-8 text-[10px] sm:text-xs px-1 sm:px-3" 
+            title="To Date (Saved automatically)"
           />
+          {(globalFrom || globalTo) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearGlobalDates}
+              className="h-8 px-2 text-[10px] sm:text-xs text-muted-foreground hover:text-foreground border-dashed"
+              title="Clear Saved Date Filter"
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              Clear
+            </Button>
+          )}
         </div>
         <Badge variant="outline" className="hidden lg:flex text-xs font-medium text-muted-foreground border-dashed">
           FY {fy.label}

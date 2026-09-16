@@ -38,7 +38,7 @@ export function ItemSearchCombobox({
 }: ItemSearchComboboxProps) {
   const [query, setQuery] = useState(() => (stockItemId ? "" : itemName));
   const [open, setOpen] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  const [dropdownStyle, setDropdownStyle] = useState<{ top?: number; bottom?: number; left: number; width: number }>({ left: 0, width: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Sync local query with itemName prop when no item is locked
@@ -52,7 +52,23 @@ export function ItemSearchCombobox({
   const updateDropdownPosition = useCallback(() => {
     if (wrapRef.current) {
       const rect = wrapRef.current.getBoundingClientRect();
-      setDropdownStyle({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = 220;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setDropdownStyle({
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 220),
+        });
+      } else {
+        setDropdownStyle({
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 220),
+        });
+      }
     }
   }, []);
 
@@ -135,7 +151,12 @@ export function ItemSearchCombobox({
       {open && createPortal(
         <div
           className="fixed z-[9999] bg-background border rounded-md shadow-lg max-h-52 overflow-y-auto"
-          style={{ top: dropdownStyle.top, left: dropdownStyle.left, width: dropdownStyle.width }}
+          style={{
+            top: dropdownStyle.top !== undefined ? `${dropdownStyle.top}px` : "auto",
+            bottom: dropdownStyle.bottom !== undefined ? `${dropdownStyle.bottom}px` : "auto",
+            left: `${dropdownStyle.left}px`,
+            width: `${dropdownStyle.width}px`
+          }}
         >
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">

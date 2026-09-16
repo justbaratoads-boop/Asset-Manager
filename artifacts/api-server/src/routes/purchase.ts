@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   purchaseInvoicesTable, purchaseInvoiceItemsTable, purchaseInvoicePaymentsTable,
   purchaseOrdersTable, purchaseOrderItemsTable, stockTransactionsTable, companySettingsTable,
-  stockItemsTable } from "@workspace/db/schema";
+  stockItemsTable, ledgersTable } from "@workspace/db/schema";
 import { eq, and, ilike, sql, inArray } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeInvoiceNumber, makeKacchaInvoiceNumber, makeVoucherNumber } from "../lib/counter";
@@ -647,6 +647,28 @@ router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => 
     });
   }
 
+  const unroundedGrandTotal = grandTotal;
+  const roundedGrandTotal = Math.round(unroundedGrandTotal);
+  const roundDiff = Number((roundedGrandTotal - unroundedGrandTotal).toFixed(2));
+
+  let otherChargesJson: string | null = null;
+  let finalGrandTotal = unroundedGrandTotal;
+
+  if (Math.abs(roundDiff) > 0.001) {
+    const [roundOffLedger] = await db.select().from(ledgersTable)
+      .where(sql`LOWER(name) LIKE '%round%off%' OR LOWER(name) = 'round off'`).limit(1);
+    const roundOffId = roundOffLedger?.id || 0;
+
+    const charges = [{
+      ledgerId: roundOffId,
+      ledgerName: roundOffLedger?.name || "Round Off",
+      amount: Math.abs(roundDiff),
+      type: roundDiff > 0 ? "add" : "deduct"
+    }];
+    otherChargesJson = JSON.stringify(charges);
+    finalGrandTotal = roundedGrandTotal;
+  }
+
   const [invoice] = await db.insert(purchaseInvoicesTable).values({
     invoiceNumber,
     date: new Date().toISOString().slice(0, 10),
@@ -660,9 +682,10 @@ router.post("/purchase-orders/:id/receive", authMiddleware, async (req, res) => 
     totalCgst: String(totalCgst.toFixed(2)),
     totalSgst: String(totalSgst.toFixed(2)),
     totalIgst: String(totalIgst.toFixed(2)),
-    grandTotal: String(grandTotal.toFixed(2)),
+    grandTotal: String(finalGrandTotal.toFixed(2)),
     amountPaid: "0",
-    balanceDue: String(grandTotal.toFixed(2)),
+    balanceDue: String(finalGrandTotal.toFixed(2)),
+    otherCharges: otherChargesJson,
     notes: `Auto-generated from PO ${order.poNumber}`,
   }).returning();
 

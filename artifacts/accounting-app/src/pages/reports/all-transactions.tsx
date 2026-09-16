@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useGetAllTransactions } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +10,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useFY } from "@/lib/financial-year";
-import { useLocation } from "wouter";
+import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
 
 const TYPE_COLORS: Record<string, string> = {
   "Sale Invoice": "bg-green-100 text-green-700",
@@ -36,26 +35,12 @@ const ALL_COLUMNS = [
 
 const ALL_TYPES = ["Sale Invoice", "Purchase Invoice", "Payment", "Receipt", "Journal", "Order", "Credit Note", "Debit Note"];
 
-function navPath(type: string, id: number): string | null {
-  switch (type) {
-    case "Sale Invoice": return `/sales/invoices/${id}`;
-    case "Purchase Invoice": return `/purchase/invoices/${id}/edit`;
-    case "Payment": return `/accounts/payments/${id}/edit`;
-    case "Receipt": return `/accounts/receipts/${id}/edit`;
-    case "Journal": return `/accounts/journal/${id}/edit`;
-    case "Order": return `/sales/orders/${id}`;
-    case "Credit Note": return `/accounts/credit-notes/${id}`;
-    case "Debit Note": return `/accounts/debit-notes/${id}`;
-    default: return null;
-  }
-}
-
 export default function AllTransactions() {
-  const { fy, globalFrom: from, globalTo: to } = useFY();
-  
-  
+  const { globalFrom: from, globalTo: to } = useFY();
   const [typeFilter, setTypeFilter] = useState("all");
-  const [, setLocation] = useLocation();
+  const [selectedTx, setSelectedTx] = useState<TransactionTarget | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const { data, isLoading } = useGetAllTransactions({ from: from || undefined, to: to || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("all-transactions", ALL_COLUMNS);
   const vis = visibleKeys;
@@ -65,6 +50,13 @@ export default function AllTransactions() {
 
   const totalDebit = transactions.reduce((s: number, t: any) => s + (t.debit || 0), 0);
   const totalCredit = transactions.reduce((s: number, t: any) => s + (t.credit || 0), 0);
+
+  const handleRowClick = (t: any) => {
+    if (t.id) {
+      setSelectedTx({ type: t.type, id: t.id, number: t.number });
+      setSheetOpen(true);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -77,8 +69,6 @@ export default function AllTransactions() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        
-        
         <div className="flex items-center gap-2">
           <Label>Type</Label>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -116,30 +106,33 @@ export default function AllTransactions() {
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                 : !transactions.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
-                  : transactions.map((t: any, i: number) => {
-                    const path = t.id ? navPath(t.type, t.id) : null;
-                    return (
+                  : transactions.map((t: any, i: number) => (
                       <TableRow
                         key={i}
-                        className={path ? "cursor-pointer hover:bg-muted/50" : ""}
-                        onClick={() => { if (path) setLocation(path); }}
+                        className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                        onClick={() => handleRowClick(t)}
                       >
                         {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
                         {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
-                        {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
+                        {vis.has("number") && <TableCell className="font-mono text-xs text-primary">{t.number}</TableCell>}
                         {vis.has("party") && <TableCell className="max-w-xs truncate text-sm">{t.party || "-"}</TableCell>}
                         {vis.has("amount") && <TableCell className="text-right font-medium">{formatCurrency(t.amount)}</TableCell>}
                         {vis.has("debit") && <TableCell className="text-right">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
                         {vis.has("credit") && <TableCell className="text-right">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
                       </TableRow>
-                    );
-                  })
+                    ))
               }
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Side Slider View for clicked Transaction */}
+      <TransactionDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        transaction={selectedTx}
+      />
     </div>
   );
 }
-

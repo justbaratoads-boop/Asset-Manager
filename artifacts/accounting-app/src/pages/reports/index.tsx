@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 
 const reports = [
+  { title: "Ledger", href: "/accounts/ledgers", desc: "View and manage account ledgers & statements", icon: BookOpen, color: "text-blue-600" },
   { title: "Day Book", href: "/reports/day-book", desc: "All transactions for a day", icon: BookOpen, color: "text-blue-600" },
   { title: "Trial Balance", href: "/reports/trial-balance", desc: "All ledger balances", icon: BarChart2, color: "text-indigo-600" },
   { title: "Profit & Loss", href: "/reports/profit-loss", desc: "Income vs expense summary", icon: TrendingUp, color: "text-green-600" },
@@ -15,7 +16,6 @@ const reports = [
   { title: "Cash Book", href: "/reports/cash-book", desc: "Cash receipts & payments", icon: TrendingDown, color: "text-amber-600" },
   { title: "Current Stock", href: "/inventory/current-stock", desc: "Physical stock with value", icon: Package, color: "text-orange-600" },
   { title: "All Transactions", href: "/reports/all-transactions", desc: "Complete transaction history", icon: Layers, color: "text-slate-600" },
-  { title: "Party Statement", href: "/reports/party-statement", desc: "Party-wise account ledger", icon: Users, color: "text-pink-600" },
   { title: "Stock Summary", href: "/reports/stock-summary", desc: "Item-wise opening, purchase, sale & closing", icon: BarChart, color: "text-rose-600" },
   { title: "Batch-wise Stock Summary", href: "/reports/stock-summary-batch", desc: "Opening, inward, outward & closing per batch · avg cost", icon: Grid3x3, color: "text-fuchsia-600" },
   { title: "Delivery Report", href: "/reports/delivery-report", desc: "Orders dispatched by vehicle & driver", icon: Truck, color: "text-teal-600" },

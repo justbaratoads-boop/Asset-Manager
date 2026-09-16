@@ -43,6 +43,33 @@ export default function ReceiptList() {
   const list = receipts as any[];
   const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const formatLedgersSummary = (r: any) => {
+    let allocs: any[] = [];
+    if (r.ledgerAllocations) {
+      try {
+        allocs = typeof r.ledgerAllocations === "string" ? JSON.parse(r.ledgerAllocations) : r.ledgerAllocations;
+      } catch {}
+    }
+    if (allocs && allocs.length > 1) {
+      const first = ledgerName(Number(allocs[0].ledgerId));
+      return `${first} + ${allocs.length - 1} more`;
+    }
+    if (allocs && allocs.length === 1) {
+      return ledgerName(Number(allocs[0].ledgerId));
+    }
+    return ledgerName(r.ledgerId);
+  };
+
+  const getLedgerAllocations = (viewItem: any) => {
+    if (!viewItem || !viewItem.ledgerAllocations) return [];
+    try {
+      const allocs = typeof viewItem.ledgerAllocations === "string" ? JSON.parse(viewItem.ledgerAllocations) : viewItem.ledgerAllocations;
+      return Array.isArray(allocs) ? allocs : [];
+    } catch {
+      return [];
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -60,18 +87,19 @@ export default function ReceiptList() {
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No receipts found</div>
         ) : paginated.map((r: any) => (
-          <Card key={r.id}>
+          <Card key={r.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setViewItem(r)}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-bold text-base">{r.partyName || "—"}</p>
                   <p className="text-xs text-muted-foreground font-mono">{r.voucherNumber} · {formatDate(r.date)}</p>
+                  <p className="text-xs text-muted-foreground">{formatLedgersSummary(r)}</p>
                   {r.narration && <p className="text-xs text-muted-foreground">{r.narration}</p>}
                   {isEdited(r.createdAt, r.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 mt-0.5">Edited</Badge>}
                 </div>
                 <p className="font-bold text-base text-green-600">{formatCurrency(r.amount)}</p>
               </div>
-              <div className="flex gap-2 border-t pt-3">
+              <div className="flex gap-2 border-t pt-3" onClick={e => e.stopPropagation()}>
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewItem(r)}>
                   <Eye className="h-3.5 w-3.5 mr-1" />View
                 </Button>
@@ -110,16 +138,16 @@ export default function ReceiptList() {
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No receipts</TableCell></TableRow>
               ) : paginated.map((r: any) => (
-                <TableRow key={r.id}>
+                <TableRow key={r.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setViewItem(r)}>
                   <TableCell className="font-mono text-sm">
                     {r.voucherNumber}
                     {isEdited(r.createdAt, r.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 ml-1">Edited</Badge>}
                   </TableCell>
                   <TableCell className="text-sm">{formatDate(r.date)}</TableCell>
                   <TableCell>{r.partyName || "-"}</TableCell>
-                  <TableCell className="text-sm">{ledgerName(r.ledgerId)}</TableCell>
+                  <TableCell className="text-sm">{formatLedgersSummary(r)}</TableCell>
                   <TableCell className="text-right font-medium text-green-600">{formatCurrency(r.amount)}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewItem(r)}><Eye className="h-3.5 w-3.5" /></Button>
                       <Link href={`/accounts/receipts/${r.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
@@ -140,48 +168,65 @@ export default function ReceiptList() {
           <DialogHeader>
             <DialogTitle>Receipt Voucher — {viewItem?.voucherNumber}</DialogTitle>
           </DialogHeader>
-          {viewItem && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Voucher No.</p>
-                  <p className="font-mono font-medium">{viewItem.voucherNumber}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Date</p>
-                  <p className="font-medium">{formatDate(viewItem.date)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Party</p>
-                  <p className="font-medium">{viewItem.partyName || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Receipt Ledger</p>
-                  <p className="font-medium">{ledgerName(viewItem.ledgerId)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Amount</p>
-                  <p className="font-bold text-green-600 text-base">{formatCurrency(viewItem.amount)}</p>
-                </div>
-                {viewItem.narration && (
-                  <div className="col-span-2">
-                    <p className="text-xs text-muted-foreground">Narration</p>
-                    <p className="font-medium">{viewItem.narration}</p>
+          {viewItem && (() => {
+            const allocs = getLedgerAllocations(viewItem);
+            return (
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Voucher No.</p>
+                    <p className="font-mono font-medium">{viewItem.voucherNumber}</p>
                   </div>
-                )}
-              </div>
-              <div className="flex gap-2 pt-2 border-t">
-                <Link href={`/accounts/receipts/${viewItem.id}/edit`} className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setViewItem(null)}>
-                    <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+                  <div>
+                    <p className="text-xs text-muted-foreground">Date</p>
+                    <p className="font-medium">{formatDate(viewItem.date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Party</p>
+                    <p className="font-medium">{viewItem.partyName || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Amount</p>
+                    <p className="font-bold text-green-600 text-base">{formatCurrency(viewItem.amount)}</p>
+                  </div>
+                  {allocs.length > 0 ? (
+                    <div className="col-span-2 space-y-1.5 border-t pt-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ledger Allocations</p>
+                      <div className="rounded-md border bg-muted/30 p-2.5 space-y-1.5 divide-y divide-muted/50">
+                        {allocs.map((a: any, idx: number) => (
+                          <div key={idx} className={`flex justify-between items-center text-xs ${idx > 0 ? "pt-1.5" : ""}`}>
+                            <span className="font-medium text-foreground">{ledgerName(Number(a.ledgerId))}</span>
+                            <span className="font-semibold text-foreground">{formatCurrency(Number(a.amount))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Receipt Ledger</p>
+                      <p className="font-medium">{ledgerName(viewItem.ledgerId)}</p>
+                    </div>
+                  )}
+                  {viewItem.narration && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Narration</p>
+                      <p className="font-medium">{viewItem.narration}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-2 border-t">
+                  <Link href={`/accounts/receipts/${viewItem.id}/edit`} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => setViewItem(null)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={() => { setDeleteId(viewItem.id); setViewItem(null); }}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
                   </Button>
-                </Link>
-                <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={() => { setDeleteId(viewItem.id); setViewItem(null); }}>
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
-                </Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

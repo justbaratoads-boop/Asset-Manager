@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, today } from "@/lib/format";
-import { Plus, Trash2, Eye, CheckCircle2, Truck, UserRound, FileText } from "lucide-react";
+import { Plus, Trash2, Eye, CheckCircle2, Truck, UserRound, FileText, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useLocation } from "wouter";
@@ -43,18 +43,20 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── ASSIGN BILL DIALOG ─────────────────────────────────────
+// ── ASSIGN BILL DIALOG (MULTIPLE BILL SELECTION) ──────────────
 function AssignBillDialog({ deliveries = [] }: { deliveries?: any[] }) {
   const [open, setOpen] = useState(false);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<number[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState({
-    saleInvoiceId: "",
     driverId: "",
     vehicleId: "",
     date: today(),
     destination: "",
     notes: "",
   });
-  const { data: invoicesData } = useListSaleInvoices({ page: 1, limit: 200 } as any);
+
+  const { data: invoicesData } = useListSaleInvoices({ page: 1, limit: 300 } as any);
   const { data: drivers = [] } = useListDrivers({});
   const { data: vehicles = [] } = useListVehicles({});
   const createMutation = useCreateDelivery();
@@ -62,60 +64,141 @@ function AssignBillDialog({ deliveries = [] }: { deliveries?: any[] }) {
   const { toast } = useToast();
 
   const invoices: any[] = (invoicesData as any)?.invoices || invoicesData || [];
+
+  // Filter out bills already assigned to active deliveries
   const pendingInvoices = invoices.filter((inv: any) => 
     inv.status !== "cancelled" && 
     inv.isDeleted !== "true" &&
-    !deliveries.some(d => d.saleInvoiceId === inv.id && d.status !== "cancelled")
+    !deliveries.some(d => (d.invoiceIds?.includes(inv.id) || d.saleInvoiceId === inv.id) && d.status !== "cancelled")
   );
 
-  const reset = () => setForm({ saleInvoiceId: "", driverId: "", vehicleId: "", date: today(), destination: "", notes: "" });
+  const filteredInvoices = pendingInvoices.filter((inv: any) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      inv.invoiceNumber?.toLowerCase().includes(q) ||
+      inv.partyName?.toLowerCase().includes(q)
+    );
+  });
+
+  const toggleInvoice = (id: number) => {
+    setSelectedInvoiceIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const filteredIds = filteredInvoices.map((inv: any) => inv.id);
+    const allSelected = filteredIds.every((id: number) => selectedInvoiceIds.includes(id));
+    if (allSelected) {
+      setSelectedInvoiceIds(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      setSelectedInvoiceIds(prev => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
+  const selectedInvoices = pendingInvoices.filter((inv: any) => selectedInvoiceIds.includes(inv.id));
+  const totalSelectedAmount = selectedInvoices.reduce((sum: number, inv: any) => sum + Number(inv.grandTotal || 0), 0);
+
+  const reset = () => {
+    setSelectedInvoiceIds([]);
+    setSearchQuery("");
+    setForm({ driverId: "", vehicleId: "", date: today(), destination: "", notes: "" });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.saleInvoiceId) return;
+    if (selectedInvoiceIds.length === 0) return;
     await createMutation.mutateAsync({
       data: {
-        saleInvoiceId: Number(form.saleInvoiceId),
+        saleInvoiceIds: selectedInvoiceIds,
+        saleInvoiceId: selectedInvoiceIds[0],
         driverId: form.driverId ? Number(form.driverId) : undefined,
         vehicleId: form.vehicleId ? Number(form.vehicleId) : undefined,
         date: form.date,
         destination: form.destination,
+        totalAmount: totalSelectedAmount,
         notes: form.notes,
       } as any,
     });
     queryClient.invalidateQueries({ queryKey: getListDeliveriesQueryKey() });
-    toast({ title: "Delivery challan created" });
+    toast({ title: `Delivery challan created for ${selectedInvoiceIds.length} bill(s)` });
     setOpen(false);
     reset();
   };
 
-  const selectedInv = pendingInvoices.find((i: any) => String(i.id) === form.saleInvoiceId);
-
   return (
     <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
-        <Button size="sm"><Plus className="h-3.5 w-3.5 mr-1" />Assign Bill</Button>
+        <Button size="sm"><Plus className="h-3.5 w-3.5 mr-1" />Assign Bills for Delivery</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Assign Bill for Delivery</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Assign Bills for Delivery / Pickup</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Bill selection */}
-          <div className="space-y-1">
-            <Label>Select Bill *</Label>
-            <Select value={form.saleInvoiceId} onValueChange={v => setForm(p => ({ ...p, saleInvoiceId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Choose invoice..." /></SelectTrigger>
-              <SelectContent>
-                {pendingInvoices.map((inv: any) => (
-                  <SelectItem key={inv.id} value={String(inv.id)}>
-                    {inv.invoiceNumber} — {inv.partyName || "Cash"} (₹{Number(inv.grandTotal).toFixed(0)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedInv && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Party: <span className="font-medium">{selectedInv.partyName || "Cash"}</span> · Date: {formatDate(selectedInv.date)} · Amount: ₹{Number(selectedInv.grandTotal).toLocaleString("en-IN")}
-              </p>
+          
+          {/* Multiple Bill Selection Box */}
+          <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <Label className="font-semibold text-sm">Select Bills ({selectedInvoiceIds.length} selected)</Label>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 absolute left-2 top-2.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search bill# or party..."
+                    className="h-8 pl-7 w-44 text-xs"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                {filteredInvoices.length > 0 && (
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={toggleSelectAll}>
+                    {filteredInvoices.every((inv: any) => selectedInvoiceIds.includes(inv.id)) ? "Deselect All" : "Select All"}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Scrollable Checkbox List */}
+            <div className="max-h-48 overflow-y-auto border rounded-md p-2 bg-background space-y-1">
+              {filteredInvoices.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No pending bills available</p>
+              ) : (
+                filteredInvoices.map((inv: any) => {
+                  const isChecked = selectedInvoiceIds.includes(inv.id);
+                  return (
+                    <label
+                      key={inv.id}
+                      className={`flex items-center justify-between p-2 rounded text-xs cursor-pointer transition-colors ${
+                        isChecked ? "bg-primary/10 font-medium border border-primary/20" : "hover:bg-muted"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleInvoice(inv.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <span className="font-mono text-primary font-semibold">{inv.invoiceNumber}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="truncate max-w-[180px]">{inv.partyName || "Cash Sale"}</span>
+                        <span className="text-muted-foreground">· {formatDate(inv.date)}</span>
+                      </div>
+                      <span className="font-semibold">₹{Number(inv.grandTotal).toLocaleString("en-IN")}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Summary Box */}
+            {selectedInvoiceIds.length > 0 && (
+              <div className="flex items-center justify-between text-xs bg-primary/10 text-primary p-2.5 rounded border border-primary/20 font-medium">
+                <span>Selected <strong className="font-bold">{selectedInvoiceIds.length}</strong> bill(s)</span>
+                <span>Total Amount: <strong className="font-bold text-sm">₹{totalSelectedAmount.toLocaleString("en-IN")}</strong></span>
+              </div>
             )}
           </div>
 
@@ -151,24 +234,24 @@ function AssignBillDialog({ deliveries = [] }: { deliveries?: any[] }) {
             {/* Date */}
             <div className="space-y-1">
               <Label>Dispatch Date</Label>
-              <Input type="date" min={selectedInv?.date || ""} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+              <Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
             </div>
 
             {/* Destination */}
             <div className="space-y-1">
-              <Label>Destination</Label>
+              <Label>Destination / Delivery Address</Label>
               <Input value={form.destination} onChange={e => setForm(p => ({ ...p, destination: e.target.value }))} placeholder="City / address" />
             </div>
 
             {/* Notes */}
-            <div className="space-y-1 col-span-2">
+            <div className="space-y-1 sm:col-span-2">
               <Label>Notes</Label>
               <Input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={createMutation.isPending || !form.saleInvoiceId}>
-            Create Delivery Challan
+          <Button type="submit" className="w-full" disabled={createMutation.isPending || selectedInvoiceIds.length === 0}>
+            Create Delivery Challan ({selectedInvoiceIds.length} Bill{selectedInvoiceIds.length !== 1 ? "s" : ""})
           </Button>
         </form>
       </DialogContent>
@@ -207,7 +290,7 @@ function DeliveriesTab() {
       ) : list.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Truck className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No deliveries yet. Assign a bill to get started.</p>
+          <p className="text-sm">No deliveries yet. Assign bills to get started.</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -216,8 +299,9 @@ function DeliveriesTab() {
               <TableRow>
                 <TableHead>Challan#</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Bill#</TableHead>
+                <TableHead>Bill(s)#</TableHead>
                 <TableHead>Party</TableHead>
+                <TableHead className="text-right">Total Amount</TableHead>
                 <TableHead>Destination</TableHead>
                 <TableHead>Driver</TableHead>
                 <TableHead>Vehicle</TableHead>
@@ -226,58 +310,96 @@ function DeliveriesTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {list.map((d: any) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-mono text-sm font-medium">{d.challanNumber}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{d.date ? formatDate(d.date) : "-"}</TableCell>
-                  <TableCell className="text-sm">{d.invoiceNumber || "-"}</TableCell>
-                  <TableCell className="max-w-[120px] truncate text-sm">{d.partyName || "-"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{d.destination || "-"}</TableCell>
-                  <TableCell className="text-sm">
-                    {d.driverName ? (
-                      <div>
-                        <div className="font-medium">{d.driverName}</div>
-                        {d.driverPhone && <div className="text-xs text-muted-foreground">{d.driverPhone}</div>}
-                      </div>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {d.vehicleNumber ? (
-                      <div>
-                        <div className="font-medium">{d.vehicleNumber}</div>
-                        {d.vehicleType && <div className="text-xs text-muted-foreground">{d.vehicleType}</div>}
-                      </div>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell><StatusBadge status={d.status} /></TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      {d.saleInvoiceId && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-blue-600"
-                          title="View Invoice"
-                          onClick={() => navigate(`/sales/invoices/${d.saleInvoiceId}`)}
+              {list.map((d: any) => {
+                const invoiceList = d.invoices && d.invoices.length > 0 ? d.invoices : (d.saleInvoiceId ? [{ id: d.saleInvoiceId, invoiceNumber: d.invoiceNumber, partyName: d.partyName, grandTotal: d.totalAmount }] : []);
+                return (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-mono text-sm font-medium">{d.challanNumber}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{d.date ? formatDate(d.date) : "-"}</TableCell>
+                    <TableCell className="text-sm">
+                      {invoiceList.length > 1 ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="secondary" className="text-xs font-semibold px-1.5 py-0.5 bg-blue-100 text-blue-700">
+                              {invoiceList.length} Bills
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {invoiceList.map((inv: any) => (
+                              <Badge
+                                key={inv.id}
+                                variant="outline"
+                                className="cursor-pointer hover:bg-muted text-[11px] font-mono"
+                                onClick={() => navigate(`/sales/invoices/${inv.id}`)}
+                                title={`Click to view ${inv.invoiceNumber}`}
+                              >
+                                {inv.invoiceNumber}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ) : invoiceList.length === 1 ? (
+                        <span
+                          className="font-mono text-sm text-primary cursor-pointer hover:underline"
+                          onClick={() => navigate(`/sales/invoices/${invoiceList[0].id}`)}
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
+                          {invoiceList[0].invoiceNumber || d.invoiceNumber || "-"}
+                        </span>
+                      ) : (
+                        <span className="text-sm">{d.invoiceNumber || "-"}</span>
                       )}
-                      {d.status !== "delivered" && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-green-600"
-                          title="Mark Delivered"
-                          onClick={() => setCompleteId(d.id)}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="max-w-[140px] truncate text-sm">{d.partyName || "-"}</TableCell>
+                    <TableCell className="text-right font-medium text-sm">
+                      ₹{Number(d.totalAmount || 0).toLocaleString("en-IN")}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{d.destination || "-"}</TableCell>
+                    <TableCell className="text-sm">
+                      {d.driverName ? (
+                        <div>
+                          <div className="font-medium">{d.driverName}</div>
+                          {d.driverPhone && <div className="text-xs text-muted-foreground">{d.driverPhone}</div>}
+                        </div>
+                      ) : "-"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {d.vehicleNumber ? (
+                        <div>
+                          <div className="font-medium">{d.vehicleNumber}</div>
+                          {d.vehicleType && <div className="text-xs text-muted-foreground">{d.vehicleType}</div>}
+                        </div>
+                      ) : "-"}
+                    </TableCell>
+                    <TableCell><StatusBadge status={d.status} /></TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {invoiceList.length > 0 && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-blue-600"
+                            title={`View Invoice (${invoiceList[0].invoiceNumber})`}
+                            onClick={() => navigate(`/sales/invoices/${invoiceList[0].id}`)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {d.status !== "delivered" && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-green-600"
+                            title="Mark Delivered"
+                            onClick={() => setCompleteId(d.id)}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

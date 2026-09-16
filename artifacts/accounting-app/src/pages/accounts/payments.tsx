@@ -43,6 +43,33 @@ export default function PaymentList() {
   const list = payments as any[];
   const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const formatLedgersSummary = (p: any) => {
+    let allocs: any[] = [];
+    if (p.ledgerAllocations) {
+      try {
+        allocs = typeof p.ledgerAllocations === "string" ? JSON.parse(p.ledgerAllocations) : p.ledgerAllocations;
+      } catch {}
+    }
+    if (allocs && allocs.length > 1) {
+      const first = ledgerName(Number(allocs[0].ledgerId));
+      return `${first} + ${allocs.length - 1} more`;
+    }
+    if (allocs && allocs.length === 1) {
+      return ledgerName(Number(allocs[0].ledgerId));
+    }
+    return ledgerName(p.ledgerId);
+  };
+
+  const getLedgerAllocations = (viewItem: any) => {
+    if (!viewItem || !viewItem.ledgerAllocations) return [];
+    try {
+      const allocs = typeof viewItem.ledgerAllocations === "string" ? JSON.parse(viewItem.ledgerAllocations) : viewItem.ledgerAllocations;
+      return Array.isArray(allocs) ? allocs : [];
+    } catch {
+      return [];
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -60,18 +87,19 @@ export default function PaymentList() {
         ) : list.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">No payments found</div>
         ) : paginated.map((p: any) => (
-          <Card key={p.id}>
+          <Card key={p.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setViewItem(p)}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-bold text-base">{p.partyName || "—"}</p>
                   <p className="text-xs text-muted-foreground font-mono">{p.voucherNumber} · {formatDate(p.date)}</p>
+                  <p className="text-xs text-muted-foreground">{formatLedgersSummary(p)}</p>
                   {p.narration && <p className="text-xs text-muted-foreground">{p.narration}</p>}
                   {isEdited(p.createdAt, p.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 mt-0.5">Edited</Badge>}
                 </div>
                 <p className="font-bold text-base text-red-600">{formatCurrency(p.amount)}</p>
               </div>
-              <div className="flex gap-2 border-t pt-3">
+              <div className="flex gap-2 border-t pt-3" onClick={e => e.stopPropagation()}>
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewItem(p)}>
                   <Eye className="h-3.5 w-3.5 mr-1" />View
                 </Button>
@@ -110,16 +138,16 @@ export default function PaymentList() {
               ) : list.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No payments</TableCell></TableRow>
               ) : paginated.map((p: any) => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setViewItem(p)}>
                   <TableCell className="font-mono text-sm">
                     {p.voucherNumber}
                     {isEdited(p.createdAt, p.updatedAt) && <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200 ml-1">Edited</Badge>}
                   </TableCell>
                   <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
                   <TableCell>{p.partyName || "-"}</TableCell>
-                  <TableCell className="text-sm">{ledgerName(p.ledgerId)}</TableCell>
+                  <TableCell className="text-sm">{formatLedgersSummary(p)}</TableCell>
                   <TableCell className="text-right font-medium text-red-600">{formatCurrency(p.amount)}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewItem(p)}><Eye className="h-3.5 w-3.5" /></Button>
                       <Link href={`/accounts/payments/${p.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
@@ -140,48 +168,65 @@ export default function PaymentList() {
           <DialogHeader>
             <DialogTitle>Payment Voucher — {viewItem?.voucherNumber}</DialogTitle>
           </DialogHeader>
-          {viewItem && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Voucher No.</p>
-                  <p className="font-mono font-medium">{viewItem.voucherNumber}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Date</p>
-                  <p className="font-medium">{formatDate(viewItem.date)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Party</p>
-                  <p className="font-medium">{viewItem.partyName || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Payment Ledger</p>
-                  <p className="font-medium">{ledgerName(viewItem.ledgerId)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Amount</p>
-                  <p className="font-bold text-red-600 text-base">{formatCurrency(viewItem.amount)}</p>
-                </div>
-                {viewItem.narration && (
-                  <div className="col-span-2">
-                    <p className="text-xs text-muted-foreground">Narration</p>
-                    <p className="font-medium">{viewItem.narration}</p>
+          {viewItem && (() => {
+            const allocs = getLedgerAllocations(viewItem);
+            return (
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Voucher No.</p>
+                    <p className="font-mono font-medium">{viewItem.voucherNumber}</p>
                   </div>
-                )}
-              </div>
-              <div className="flex gap-2 pt-2 border-t">
-                <Link href={`/accounts/payments/${viewItem.id}/edit`} className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setViewItem(null)}>
-                    <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+                  <div>
+                    <p className="text-xs text-muted-foreground">Date</p>
+                    <p className="font-medium">{formatDate(viewItem.date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Party</p>
+                    <p className="font-medium">{viewItem.partyName || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Amount</p>
+                    <p className="font-bold text-red-600 text-base">{formatCurrency(viewItem.amount)}</p>
+                  </div>
+                  {allocs.length > 0 ? (
+                    <div className="col-span-2 space-y-1.5 border-t pt-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ledger Allocations</p>
+                      <div className="rounded-md border bg-muted/30 p-2.5 space-y-1.5 divide-y divide-muted/50">
+                        {allocs.map((a: any, idx: number) => (
+                          <div key={idx} className={`flex justify-between items-center text-xs ${idx > 0 ? "pt-1.5" : ""}`}>
+                            <span className="font-medium text-foreground">{ledgerName(Number(a.ledgerId))}</span>
+                            <span className="font-semibold text-foreground">{formatCurrency(Number(a.amount))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Payment Ledger</p>
+                      <p className="font-medium">{ledgerName(viewItem.ledgerId)}</p>
+                    </div>
+                  )}
+                  {viewItem.narration && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Narration</p>
+                      <p className="font-medium">{viewItem.narration}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-2 border-t">
+                  <Link href={`/accounts/payments/${viewItem.id}/edit`} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => setViewItem(null)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={() => { setDeleteId(viewItem.id); setViewItem(null); }}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
                   </Button>
-                </Link>
-                <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={() => { setDeleteId(viewItem.id); setViewItem(null); }}>
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
-                </Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

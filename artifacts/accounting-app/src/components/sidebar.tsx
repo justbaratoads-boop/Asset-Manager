@@ -69,7 +69,7 @@ const navigation: NavItem[] = [
   {
     kind: "group", name: "Report", icon: BarChart2,
     items: [
-      { name: "Ledger Report",     href: "/reports/party-statement",    perm: "reports" },
+      { name: "Ledger",            href: "/accounts/ledgers",           perm: "reports" },
       { name: "Day Book",          href: "/reports/day-book",           perm: "reports" },
       { name: "Cash Book",         href: "/reports/cash-book",          perm: "reports" },
       { name: "Bank Book",         href: "/reports/bank-book",          perm: "reports" },

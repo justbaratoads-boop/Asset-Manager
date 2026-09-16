@@ -24,14 +24,30 @@ function LedgerSelect({ value, onChange, ledgers }: {
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  const [dropdownStyle, setDropdownStyle] = useState<{ top?: number; bottom?: number; left: number; width: number }>({ left: 0, width: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const updatePosition = useCallback(() => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setDropdownStyle({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 260) });
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = 250;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setDropdownStyle({
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 260),
+        });
+      } else {
+        setDropdownStyle({
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 260),
+        });
+      }
     }
   }, []);
 
@@ -84,7 +100,12 @@ function LedgerSelect({ value, onChange, ledgers }: {
         <div
           id="ledger-select-portal"
           className="fixed z-[9999] rounded-md border bg-popover shadow-lg overflow-hidden"
-          style={{ top: dropdownStyle.top, left: dropdownStyle.left, width: dropdownStyle.width }}
+          style={{
+            top: dropdownStyle.top !== undefined ? `${dropdownStyle.top}px` : "auto",
+            bottom: dropdownStyle.bottom !== undefined ? `${dropdownStyle.bottom}px` : "auto",
+            left: `${dropdownStyle.left}px`,
+            width: `${dropdownStyle.width}px`
+          }}
         >
           <div className="p-1.5 border-b">
             <input

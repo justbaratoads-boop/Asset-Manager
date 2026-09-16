@@ -103,15 +103,6 @@ router.put("/parties/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const data = req.body;
 
-  // Block edit if invoices exist for this party
-  const [saleInv] = await db.select({ id: saleInvoicesTable.id }).from(saleInvoicesTable)
-    .where(and(eq(saleInvoicesTable.partyId, Number(id)), eq(saleInvoicesTable.isDeleted, "false"))).limit(1);
-  const [purchInv] = await db.select({ id: purchaseInvoicesTable.id }).from(purchaseInvoicesTable)
-    .where(and(eq(purchaseInvoicesTable.partyId, Number(id)), eq(purchaseInvoicesTable.isDeleted, "false"))).limit(1);
-  if (saleInv || purchInv) {
-    return res.status(400).json({ error: "This ledger has invoices and cannot be edited.", code: "HAS_INVOICES" });
-  }
-
   if (data.name) {
     const existing = await db.select({ id: partiesTable.id }).from(partiesTable)
       .where(and(eq(partiesTable.name, data.name), eq(partiesTable.isDeleted, "false"), ne(partiesTable.id, Number(id)))).limit(1);
@@ -157,13 +148,22 @@ router.put("/parties/:id", authMiddleware, async (req, res) => {
 router.delete("/parties/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
 
-  // Block delete if invoices exist for this party
+  // Block delete if transactions exist for this party
   const [saleInv] = await db.select({ id: saleInvoicesTable.id }).from(saleInvoicesTable)
     .where(and(eq(saleInvoicesTable.partyId, Number(id)), eq(saleInvoicesTable.isDeleted, "false"))).limit(1);
   const [purchInv] = await db.select({ id: purchaseInvoicesTable.id }).from(purchaseInvoicesTable)
     .where(and(eq(purchaseInvoicesTable.partyId, Number(id)), eq(purchaseInvoicesTable.isDeleted, "false"))).limit(1);
-  if (saleInv || purchInv) {
-    return res.status(400).json({ error: "This ledger has invoices and cannot be deleted.", code: "HAS_INVOICES" });
+  const [pmt] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
+    .where(and(eq(paymentsTable.partyId, Number(id)), eq(paymentsTable.isDeleted, "false"))).limit(1);
+  const [rcpt] = await db.select({ id: receiptsTable.id }).from(receiptsTable)
+    .where(and(eq(receiptsTable.partyId, Number(id)), eq(receiptsTable.isDeleted, "false"))).limit(1);
+  const [cn] = await db.select({ id: creditNotesTable.id }).from(creditNotesTable)
+    .where(and(eq(creditNotesTable.partyId, Number(id)), eq(creditNotesTable.isDeleted, "false"))).limit(1);
+  const [dn] = await db.select({ id: debitNotesTable.id }).from(debitNotesTable)
+    .where(and(eq(debitNotesTable.partyId, Number(id)), eq(debitNotesTable.isDeleted, "false"))).limit(1);
+
+  if (saleInv || purchInv || pmt || rcpt || cn || dn) {
+    return res.status(400).json({ error: "This ledger has transactions and cannot be deleted.", code: "HAS_TRANSACTIONS" });
   }
 
   await db.update(partiesTable).set({ isDeleted: "true" }).where(eq(partiesTable.id, Number(id)));

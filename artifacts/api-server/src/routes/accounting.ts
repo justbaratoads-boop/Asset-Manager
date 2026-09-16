@@ -4,7 +4,7 @@ import {
   journalEntriesTable, journalLinesTable, partiesTable, paymentsTable, receiptsTable,
   creditNotesTable, creditNoteItemsTable, debitNotesTable, debitNoteItemsTable,
   ledgersTable, saleInvoicesTable, saleInvoicePaymentsTable,
-  purchaseInvoicesTable, purchaseInvoicePaymentsTable,
+  purchaseInvoicesTable, purchaseInvoicePaymentsTable, stockBatchesTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -310,6 +310,7 @@ router.post("/credit-notes", authMiddleware, async (req, res) => {
       await db.insert(creditNoteItemsTable).values({
         noteId: note.id,
         stockItemId: item.stockItemId,
+        batchId: item.batchId ? Number(item.batchId) : null,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
         quantity: String(Number(item.quantity) || 0),
@@ -338,7 +339,21 @@ router.get("/credit-notes/:id", authMiddleware, async (req, res) => {
   const [note] = await db.select().from(creditNotesTable).where(eq(creditNotesTable.id, Number(req.params.id))).limit(1);
   if (!note) return res.status(404).json({ error: "Not found" });
   const items = await db.select().from(creditNoteItemsTable).where(eq(creditNoteItemsTable.noteId, Number(req.params.id)));
-  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
+  const batches = await db.select().from(stockBatchesTable);
+  const batchMap = new Map(batches.map(b => [b.id, b.name]));
+  res.json({
+    ...note,
+    amount: Number(note.amount),
+    items: items.map(i => ({
+      ...i,
+      batchId: i.batchId ? Number(i.batchId) : undefined,
+      batchName: i.batchId ? batchMap.get(i.batchId) : undefined,
+      quantity: Number(i.quantity),
+      rate: Number(i.rate),
+      total: Number(i.total),
+      gstInclusive: i.gstInclusive === true || i.gstInclusive === "true"
+    }))
+  });
 });
 
 router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
@@ -368,6 +383,7 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
       await db.insert(creditNoteItemsTable).values({
         noteId: id,
         stockItemId: item.stockItemId,
+        batchId: item.batchId ? Number(item.batchId) : null,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
         quantity: String(Number(item.quantity) || 0),
@@ -390,7 +406,21 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
 
   const [note] = await db.select().from(creditNotesTable).where(eq(creditNotesTable.id, id)).limit(1);
   const items = await db.select().from(creditNoteItemsTable).where(eq(creditNoteItemsTable.noteId, id));
-  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
+  const batches = await db.select().from(stockBatchesTable);
+  const batchMap = new Map(batches.map(b => [b.id, b.name]));
+  res.json({
+    ...note,
+    amount: Number(note.amount),
+    items: items.map(i => ({
+      ...i,
+      batchId: i.batchId ? Number(i.batchId) : undefined,
+      batchName: i.batchId ? batchMap.get(i.batchId) : undefined,
+      quantity: Number(i.quantity),
+      rate: Number(i.rate),
+      total: Number(i.total),
+      gstInclusive: i.gstInclusive === true || i.gstInclusive === "true"
+    }))
+  });
 });
 
 router.delete("/credit-notes/:id", authMiddleware, async (req, res) => {
@@ -423,6 +453,7 @@ router.post("/debit-notes", authMiddleware, async (req, res) => {
       await db.insert(debitNoteItemsTable).values({
         noteId: note.id,
         stockItemId: item.stockItemId,
+        batchId: item.batchId ? Number(item.batchId) : null,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
         quantity: String(Number(item.quantity) || 0),
@@ -451,7 +482,21 @@ router.get("/debit-notes/:id", authMiddleware, async (req, res) => {
   const [note] = await db.select().from(debitNotesTable).where(eq(debitNotesTable.id, Number(req.params.id))).limit(1);
   if (!note) return res.status(404).json({ error: "Not found" });
   const items = await db.select().from(debitNoteItemsTable).where(eq(debitNoteItemsTable.noteId, Number(req.params.id)));
-  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
+  const batches = await db.select().from(stockBatchesTable);
+  const batchMap = new Map(batches.map(b => [b.id, b.name]));
+  res.json({
+    ...note,
+    amount: Number(note.amount),
+    items: items.map(i => ({
+      ...i,
+      batchId: i.batchId ? Number(i.batchId) : undefined,
+      batchName: i.batchId ? batchMap.get(i.batchId) : undefined,
+      quantity: Number(i.quantity),
+      rate: Number(i.rate),
+      total: Number(i.total),
+      gstInclusive: i.gstInclusive === true || i.gstInclusive === "true"
+    }))
+  });
 });
 
 router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
@@ -481,6 +526,7 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
       await db.insert(debitNoteItemsTable).values({
         noteId: id,
         stockItemId: item.stockItemId,
+        batchId: item.batchId ? Number(item.batchId) : null,
         itemName: item.itemName,
         hsnCode: item.hsnCode,
         quantity: String(Number(item.quantity) || 0),
@@ -503,7 +549,21 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
 
   const [note] = await db.select().from(debitNotesTable).where(eq(debitNotesTable.id, id)).limit(1);
   const items = await db.select().from(debitNoteItemsTable).where(eq(debitNoteItemsTable.noteId, id));
-  res.json({ ...note, amount: Number(note.amount), items: items.map(i => ({ ...i, quantity: Number(i.quantity), rate: Number(i.rate), total: Number(i.total), gstInclusive: i.gstInclusive === true || i.gstInclusive === "true" })) });
+  const batches = await db.select().from(stockBatchesTable);
+  const batchMap = new Map(batches.map(b => [b.id, b.name]));
+  res.json({
+    ...note,
+    amount: Number(note.amount),
+    items: items.map(i => ({
+      ...i,
+      batchId: i.batchId ? Number(i.batchId) : undefined,
+      batchName: i.batchId ? batchMap.get(i.batchId) : undefined,
+      quantity: Number(i.quantity),
+      rate: Number(i.rate),
+      total: Number(i.total),
+      gstInclusive: i.gstInclusive === true || i.gstInclusive === "true"
+    }))
+  });
 });
 
 router.delete("/debit-notes/:id", authMiddleware, async (req, res) => {

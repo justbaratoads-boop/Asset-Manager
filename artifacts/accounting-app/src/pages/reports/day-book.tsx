@@ -8,7 +8,7 @@ import { formatCurrency, today, formatDate } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { useLocation } from "wouter";
+import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
 
 const ALL_COLUMNS = [
   { header: "Type", key: "type" },
@@ -18,25 +18,22 @@ const ALL_COLUMNS = [
   { header: "Credit", key: "cr", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
 ];
 
-function navPath(type: string, id: number): string | null {
-  switch (type) {
-    case "Sale Invoice": return `/sales/invoices/${id}`;
-    case "Purchase Invoice": return `/purchase/invoices/${id}/edit`;
-    case "Payment": return `/accounts/payments/${id}/edit`;
-    case "Receipt": return `/accounts/receipts/${id}/edit`;
-    case "Credit Note": return `/accounts/credit-notes/${id}`;
-    case "Debit Note": return `/accounts/debit-notes/${id}`;
-    default: return null;
-  }
-}
-
 export default function DayBook() {
   const [date, setDate] = useState(today());
-  const [, setLocation] = useLocation();
+  const [selectedTx, setSelectedTx] = useState<TransactionTarget | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const { data, isLoading } = useGetDayBook({ date });
   const entries: any[] = (data as any)?.entries || [];
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("day-book", ALL_COLUMNS);
   const vis = visibleKeys;
+
+  const handleRowClick = (e: any) => {
+    if (e.id) {
+      setSelectedTx({ type: e.type, id: e.id, number: e.number });
+      setSheetOpen(true);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -48,10 +45,12 @@ export default function DayBook() {
           <ExportButtons data={entries} columns={visibleColumns} filename={`day-book-${date}`} title={`Day Book — ${formatDate(date)}`} />
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-4">
         <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Receipts / Income</p><p className="text-xl font-bold text-green-600">{formatCurrency((data as any)?.totalCr)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Payments / Expense</p><p className="text-xl font-bold text-red-600">{formatCurrency((data as any)?.totalDr)}</p></CardContent></Card>
       </div>
+
       <Card>
         <CardContent className="p-4">
           <Table>
@@ -69,22 +68,19 @@ export default function DayBook() {
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
                 : !entries.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No entries for {formatDate(date)}</TableCell></TableRow>
-                  : entries.map((e: any, i: number) => {
-                    const path = e.id ? navPath(e.type, e.id) : null;
-                    return (
+                  : entries.map((e: any, i: number) => (
                       <TableRow
                         key={i}
-                        className={path ? "cursor-pointer hover:bg-muted/50" : ""}
-                        onClick={() => { if (path) setLocation(path); }}
+                        className={e.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                        onClick={() => handleRowClick(e)}
                       >
-                        {vis.has("type") && <TableCell className="text-sm">{e.type}</TableCell>}
-                        {vis.has("number") && <TableCell className="font-mono text-xs">{e.number}</TableCell>}
+                        {vis.has("type") && <TableCell className="text-sm font-medium">{e.type}</TableCell>}
+                        {vis.has("number") && <TableCell className="font-mono text-xs text-primary">{e.number}</TableCell>}
                         {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
                         {vis.has("dr") && <TableCell className="text-right">{e.dr > 0 ? formatCurrency(e.dr) : ""}</TableCell>}
                         {vis.has("cr") && <TableCell className="text-right">{e.cr > 0 ? formatCurrency(e.cr) : ""}</TableCell>}
                       </TableRow>
-                    );
-                  })
+                    ))
               }
               {entries.length > 0 && (
                 <TableRow className="font-bold bg-muted/30">
@@ -97,6 +93,13 @@ export default function DayBook() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Side Slider View for clicked Transaction */}
+      <TransactionDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        transaction={selectedTx}
+      />
     </div>
   );
 }

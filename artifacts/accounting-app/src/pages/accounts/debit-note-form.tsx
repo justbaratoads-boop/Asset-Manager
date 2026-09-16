@@ -23,6 +23,7 @@ import { OtherChargesSection, type OtherCharge } from "@/components/other-charge
 
 interface NoteItem {
   stockItemId?: number;
+  batchId?: number;
   itemName: string;
   hsnCode: string;
   quantity: number | string;
@@ -39,8 +40,8 @@ interface NoteItem {
   sgst: number;
   igst: number;
   total: number;
-    isDecimalApplicable?: boolean;
-    decimalPlaces?: number;
+  isDecimalApplicable?: boolean;
+  decimalPlaces?: number;
 }
 
 function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
@@ -63,6 +64,7 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
 
   return {
     stockItemId: item.stockItemId,
+    batchId: item.batchId,
     itemName: item.itemName || "",
     hsnCode: item.hsnCode || "",
     quantity: typeof item.quantity === 'string' && item.quantity.endsWith('.') ? item.quantity : qty,
@@ -162,6 +164,7 @@ export default function DebitNoteForm() {
     if (n.items?.length) {
       setItems(n.items.map((i: any) => calcItem({
         stockItemId: i.stockItemId,
+        batchId: i.batchId ? Number(i.batchId) : undefined,
         itemName: i.itemName,
         hsnCode: i.hsnCode || "",
         quantity: Number(i.quantity),
@@ -217,7 +220,7 @@ export default function DebitNoteForm() {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? getGstRateForDate(si, date) : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }, isInterstate); return u; });
+      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }, isInterstate); return u; });
     }
   };
 
@@ -354,19 +357,22 @@ export default function DebitNoteForm() {
                       {` ${item.unit}`}
                     </p>
                   )}
-                  {item.stockItemId && (() => {
-                    const b = Array.isArray(batches) ? batches.find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId)) : undefined;
-                    if (!b) return null;
-                    const avail = Number(b.physicalStock) - Number(b.reservedStock);
-                    const warn = item.quantity > 0 && item.quantity > avail;
-                    return (
-                      <p className={`text-xs px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
-                        <span className="font-medium">Batch: {b.name}</span>
-                        <span className="text-muted-foreground">· avail: {avail}</span>
-                        {warn && <AlertTriangle className="h-3 w-3" />}
-                      </p>
-                    );
-                  })()}
+                  {item.stockItemId && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-xs text-muted-foreground shrink-0">Batch:</span>
+                      <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
+                        <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— none —{item.stockItemId && stockAvail[item.stockItemId] ? ` · avail: ${stockAvail[item.stockItemId].unbatchedAvailable}` : ""}</SelectItem>
+                          {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
+                            const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                            const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                            return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · avail: {avail}</SelectItem>;
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Qty</Label>
@@ -374,7 +380,11 @@ export default function DebitNoteForm() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Unit</Label>
-                      <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" disabled={true} />
+                      {item.stockItemId ? (
+                        <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
+                      ) : (
+                        <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-10" />
+                      )}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Rate</Label>
@@ -443,22 +453,29 @@ export default function DebitNoteForm() {
                             {` ${item.unit}`}
                           </p>
                         )}
-                        {item.stockItemId && (() => {
-                          const b = Array.isArray(batches) ? batches.find((bt: any) => bt.items?.some((bItem: any) => bItem.id === item.stockItemId)) : undefined;
-                          if (!b) return null;
-                          const avail = Number(b.physicalStock) - Number(b.reservedStock);
-                          const warn = item.quantity > 0 && item.quantity > avail;
-                          return (
-                            <p className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${warn ? "text-amber-600" : "text-sky-600"}`}>
-                              <span className="font-medium">Batch: {b.name}</span>
-                              <span className="text-muted-foreground">· avail: {avail}</span>
-                              {warn && <AlertTriangle className="h-3 w-3" />}
-                            </p>
-                          );
-                        })()}
+                        {item.stockItemId && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[11px] text-muted-foreground shrink-0">Batch:</span>
+                            <Select value={item.batchId ? String(item.batchId) : "none"} onValueChange={v => updateItem(i, "batchId", v === "none" ? undefined : Number(v))}>
+                              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="— none —" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">— none —{item.stockItemId && stockAvail[item.stockItemId] ? ` · avail: ${stockAvail[item.stockItemId].unbatchedAvailable}` : ""}</SelectItem>
+                                {(batches as any[]).filter((b: any) => !item.stockItemId || b.items?.some((bi: any) => bi.id === item.stockItemId)).map((b: any) => {
+                                  const avail = Number(b.physicalStock) - Number(b.reservedStock);
+                                  const isDefault = b.items?.some((bi: any) => bi.id === item.stockItemId);
+                                  return <SelectItem key={b.id} value={String(b.id)}>{b.name}{isDefault ? " (default)" : ""} · avail: {avail}</SelectItem>;
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
-                      <TableCell><UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" disabled={!!item.stockItemId && item.unit !== "n/a"} /></TableCell>
+                      <TableCell>{item.stockItemId ? (
+                        <div className="h-7 flex items-center gap-1 px-2 bg-muted rounded border text-xs text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
+                      ) : (
+                        <UnitSelect value={item.unit} onChange={v => updateItem(i, "unit", v)} className="h-7" />
+                      )}</TableCell>
                       <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.rate || ""} onChange={e => updateItem(i, "rate", e.target.value)} /></TableCell>
                       <TableCell>
                         <div className="space-y-1">

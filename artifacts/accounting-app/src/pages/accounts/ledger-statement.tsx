@@ -70,7 +70,7 @@ export default function LedgerStatement() {
               <p className="text-xs text-muted-foreground">Opening Balance</p>
               <p className="text-sm font-semibold">
                 {formatCurrency(Math.abs(s.openingBalance))}
-                <span className="text-xs text-muted-foreground ml-1">{s.nature === "dr" ? "Dr" : "Cr"}</span>
+                <span className="text-xs text-muted-foreground ml-1">{(s.openingNature || s.nature) === "cr" ? "Cr" : "Dr"}</span>
               </p>
             </div>
             <div className="text-right">

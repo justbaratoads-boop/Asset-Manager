@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import {
   ordersTable, orderItemsTable, saleInvoicesTable, saleInvoiceItemsTable,
-  stockItemsTable, stockTransactionsTable, companySettingsTable
+  stockItemsTable, stockTransactionsTable, companySettingsTable, ledgersTable
 } from "@workspace/db/schema";
 import { eq, and, ilike, sql } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -154,15 +154,38 @@ async function convertOrder(req: Request, res: Response) {
   const prefix = settings[0]?.invoicePrefix || "INV";
   const invoiceNumber = await makeInvoiceNumber(prefix);
 
+  const unroundedGrandTotal = Number(order.grandTotal) || 0;
+  const roundedGrandTotal = Math.round(unroundedGrandTotal);
+  const roundDiff = Number((roundedGrandTotal - unroundedGrandTotal).toFixed(2));
+
+  let otherChargesJson: string | null = null;
+  let finalGrandTotal = unroundedGrandTotal;
+
+  if (Math.abs(roundDiff) > 0.001) {
+    const [roundOffLedger] = await db.select().from(ledgersTable)
+      .where(sql`LOWER(name) LIKE '%round%off%' OR LOWER(name) = 'round off'`).limit(1);
+    const roundOffId = roundOffLedger?.id || 0;
+
+    const charges = [{
+      ledgerId: roundOffId,
+      ledgerName: roundOffLedger?.name || "Round Off",
+      amount: Math.abs(roundDiff),
+      type: roundDiff > 0 ? "add" : "deduct"
+    }];
+    otherChargesJson = JSON.stringify(charges);
+    finalGrandTotal = roundedGrandTotal;
+  }
+
   const [invoice] = await db.insert(saleInvoicesTable).values({
     invoiceNumber,
     date: new Date().toISOString().slice(0, 10),
     partyId: order.partyId,
     partyName: order.partyName,
-    grandTotal: order.grandTotal,
-    balanceDue: order.grandTotal,
+    grandTotal: String(finalGrandTotal.toFixed(2)),
+    balanceDue: String(finalGrandTotal.toFixed(2)),
     amountPaid: "0",
     status: "confirmed",
+    otherCharges: otherChargesJson,
   }).returning();
 
   for (const item of items) {
@@ -184,8 +207,6 @@ async function convertOrder(req: Request, res: Response) {
       total: item.total,
     });
   }
-
-  await db.update(ordersTable).set({ status: "dispatched", convertedInvoiceId: invoice.id }).where(eq(ordersTable.id, order.id));
 
   res.json({ invoiceId: invoice.id, invoiceNumber });
 }

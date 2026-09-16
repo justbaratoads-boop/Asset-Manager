@@ -45,8 +45,59 @@ export function FYProvider({ children, startMonth = 4 }: { children: ReactNode; 
   const defaultFrom = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-${pad(firstDay.getDate())}`;
   const defaultTo = `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`;
 
-  const [globalFrom, setGlobalFrom] = useState(defaultFrom);
-  const [globalTo, setGlobalTo] = useState(defaultTo);
+  const [globalFrom, setGlobalFromState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("accounting_app_date_from");
+      if (saved !== null) return saved;
+    }
+    return defaultFrom;
+  });
+
+  const [globalTo, setGlobalToState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("accounting_app_date_to");
+      if (saved !== null) return saved;
+    }
+    return defaultTo;
+  });
+
+  const setGlobalFrom = (date: string) => {
+    setGlobalFromState(date);
+    if (typeof window !== "undefined") {
+      if (date) {
+        localStorage.setItem("accounting_app_date_from", date);
+      } else {
+        localStorage.removeItem("accounting_app_date_from");
+      }
+    }
+  };
+
+  const setGlobalTo = (date: string) => {
+    setGlobalToState(date);
+    if (typeof window !== "undefined") {
+      if (date) {
+        localStorage.setItem("accounting_app_date_to", date);
+      } else {
+        localStorage.removeItem("accounting_app_date_to");
+      }
+    }
+  };
+
+  const clearGlobalDates = () => {
+    setGlobalFromState("");
+    setGlobalToState("");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accounting_app_date_from");
+      localStorage.removeItem("accounting_app_date_to");
+    }
+  };
+
+  const hasSavedDateFilter = useMemo(() => {
+    if (typeof window !== "undefined") {
+      return !!(localStorage.getItem("accounting_app_date_from") || localStorage.getItem("accounting_app_date_to"));
+    }
+    return false;
+  }, [globalFrom, globalTo]);
 
   const fy = useMemo(() => buildFY(fyStartYear, startMonth), [fyStartYear, startMonth]);
 
@@ -59,7 +110,7 @@ export function FYProvider({ children, startMonth = 4 }: { children: ReactNode; 
   }, [current, startMonth]);
 
   return (
-    <FYContext.Provider value={{ fy, setFYStart, availableFYs, startMonth, globalFrom, globalTo, setGlobalFrom, setGlobalTo }}>
+    <FYContext.Provider value={{ fy, setFYStart, availableFYs, startMonth, globalFrom, globalTo, setGlobalFrom, setGlobalTo, clearGlobalDates, hasSavedDateFilter }}>
       {children}
     </FYContext.Provider>
   );

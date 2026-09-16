@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { driversTable, vehiclesTable, deliveriesTable, deliveryInvoicesTable } from "@workspace/db/schema";
 import { saleInvoicesTable } from "@workspace/db/schema";
-import { eq, sql, isNull, or } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeVoucherNumber } from "../lib/counter";
 
@@ -116,33 +116,89 @@ router.get("/deliveries", authMiddleware, async (_req, res) => {
     .leftJoin(saleInvoicesTable, eq(deliveriesTable.saleInvoiceId, saleInvoicesTable.id))
     .orderBy(sql`${deliveriesTable.createdAt} DESC`);
 
-  res.json(rows.map(d => ({
-    ...d,
-    challanNumber: d.challanNumber || d.tripNumber,
-    totalAmount: Number(d.totalAmount),
-    // prefer joined invoice info over legacy text fields
-    invoiceNumber: d.invNumber || d.invoiceNumber,
-    partyName: d.invParty || d.partyName,
-  })));
+  const deliveryIds = rows.map(r => r.id);
+  let linkedInvoices: any[] = [];
+  if (deliveryIds.length > 0) {
+    linkedInvoices = await db
+      .select({
+        deliveryId: deliveryInvoicesTable.deliveryId,
+        invoiceId: deliveryInvoicesTable.invoiceId,
+        invoiceNumber: saleInvoicesTable.invoiceNumber,
+        partyName: saleInvoicesTable.partyName,
+        grandTotal: saleInvoicesTable.grandTotal,
+      })
+      .from(deliveryInvoicesTable)
+      .innerJoin(saleInvoicesTable, eq(deliveryInvoicesTable.invoiceId, saleInvoicesTable.id))
+      .where(inArray(deliveryInvoicesTable.deliveryId, deliveryIds));
+  }
+
+  const linkedMap = new Map<number, any[]>();
+  for (const item of linkedInvoices) {
+    if (!linkedMap.has(item.deliveryId)) linkedMap.set(item.deliveryId, []);
+    linkedMap.get(item.deliveryId)!.push(item);
+  }
+
+  res.json(rows.map(d => {
+    const attached = linkedMap.get(d.id) || [];
+    let invoiceNumber = d.invoiceNumber || d.invNumber || "-";
+    let partyName = d.partyName || d.invParty || "-";
+    let totalAmount = Number(d.totalAmount) || 0;
+    let invoiceIds: number[] = attached.map(a => a.invoiceId);
+
+    if (d.saleInvoiceId && !invoiceIds.includes(d.saleInvoiceId)) {
+      invoiceIds.push(d.saleInvoiceId);
+    }
+
+    if (attached.length > 0) {
+      invoiceNumber = attached.map(a => a.invoiceNumber).filter(Boolean).join(", ");
+      const parties = Array.from(new Set(attached.map(a => a.partyName).filter(Boolean)));
+      partyName = parties.join(", ");
+      totalAmount = attached.reduce((sum, a) => sum + Number(a.grandTotal || 0), 0);
+    }
+
+    return {
+      ...d,
+      challanNumber: d.challanNumber || d.tripNumber,
+      invoiceNumber,
+      partyName,
+      totalAmount,
+      invoiceIds,
+      invoices: attached.map(a => ({
+        id: a.invoiceId,
+        invoiceNumber: a.invoiceNumber,
+        partyName: a.partyName,
+        grandTotal: Number(a.grandTotal),
+      })),
+    };
+  }));
 });
 
 router.post("/deliveries", authMiddleware, async (req, res) => {
   const data = req.body;
   const challanNumber = await makeVoucherNumber("CH");
 
-  // If a saleInvoiceId is given, pull invoice info for denormalized fields
+  let invoiceIds: number[] = [];
+  if (Array.isArray(data.saleInvoiceIds) && data.saleInvoiceIds.length > 0) {
+    invoiceIds = data.saleInvoiceIds.map(Number);
+  } else if (data.saleInvoiceId) {
+    invoiceIds = [Number(data.saleInvoiceId)];
+  }
+
   let invoiceNumber = data.invoiceNumber || null;
   let partyName = data.partyName || null;
+  let totalAmount = Number(data.totalAmount || 0);
 
-  if (data.saleInvoiceId) {
-    const [inv] = await db
-      .select({ invoiceNumber: saleInvoicesTable.invoiceNumber, partyName: saleInvoicesTable.partyName, grandTotal: saleInvoicesTable.grandTotal })
+  if (invoiceIds.length > 0) {
+    const invs = await db
+      .select({ id: saleInvoicesTable.id, invoiceNumber: saleInvoicesTable.invoiceNumber, partyName: saleInvoicesTable.partyName, grandTotal: saleInvoicesTable.grandTotal })
       .from(saleInvoicesTable)
-      .where(eq(saleInvoicesTable.id, Number(data.saleInvoiceId)))
-      .limit(1);
-    if (inv) {
-      invoiceNumber = inv.invoiceNumber;
-      partyName = inv.partyName;
+      .where(inArray(saleInvoicesTable.id, invoiceIds));
+
+    if (invs.length > 0) {
+      invoiceNumber = invs.map(i => i.invoiceNumber).filter(Boolean).join(", ");
+      const uniqueParties = Array.from(new Set(invs.map(i => i.partyName).filter(Boolean)));
+      partyName = uniqueParties.join(", ");
+      totalAmount = invs.reduce((sum, i) => sum + Number(i.grandTotal || 0), 0);
     }
   }
 
@@ -150,25 +206,55 @@ router.post("/deliveries", authMiddleware, async (req, res) => {
     tripNumber: challanNumber,
     challanNumber,
     date: data.date || null,
-    saleInvoiceId: data.saleInvoiceId ? Number(data.saleInvoiceId) : null,
+    saleInvoiceId: invoiceIds.length > 0 ? invoiceIds[0] : null,
     vehicleId: data.vehicleId ? Number(data.vehicleId) : null,
     driverId: data.driverId ? Number(data.driverId) : null,
     invoiceNumber,
     partyName,
     destination: data.destination || null,
     status: "pending",
-    totalAmount: String(data.totalAmount || 0),
+    totalAmount: String(totalAmount),
     notes: data.notes || null,
   }).returning();
 
-  res.status(201).json({ ...delivery, challanNumber: delivery.challanNumber || delivery.tripNumber, totalAmount: Number(delivery.totalAmount) });
+  if (delivery && invoiceIds.length > 0) {
+    await db.insert(deliveryInvoicesTable).values(
+      invoiceIds.map(invId => ({
+        deliveryId: delivery.id,
+        invoiceId: invId,
+      }))
+    );
+  }
+
+  res.status(201).json({
+    ...delivery,
+    challanNumber: delivery.challanNumber || delivery.tripNumber,
+    totalAmount,
+    invoiceIds,
+  });
 });
 
 router.get("/deliveries/:id", authMiddleware, async (req, res) => {
   const [delivery] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.id, Number(req.params.id))).limit(1);
   if (!delivery) return res.status(404).json({ error: "Not found" });
-  const invoices = await db.select().from(deliveryInvoicesTable).where(eq(deliveryInvoicesTable.deliveryId, delivery.id));
-  res.json({ ...delivery, challanNumber: delivery.challanNumber || delivery.tripNumber, totalAmount: Number(delivery.totalAmount), invoiceIds: invoices.map(i => i.invoiceId) });
+  const invoices = await db
+    .select({
+      id: saleInvoicesTable.id,
+      invoiceNumber: saleInvoicesTable.invoiceNumber,
+      partyName: saleInvoicesTable.partyName,
+      grandTotal: saleInvoicesTable.grandTotal,
+    })
+    .from(deliveryInvoicesTable)
+    .innerJoin(saleInvoicesTable, eq(deliveryInvoicesTable.invoiceId, saleInvoicesTable.id))
+    .where(eq(deliveryInvoicesTable.deliveryId, delivery.id));
+
+  res.json({
+    ...delivery,
+    challanNumber: delivery.challanNumber || delivery.tripNumber,
+    totalAmount: Number(delivery.totalAmount),
+    invoiceIds: invoices.map(i => i.id),
+    invoices,
+  });
 });
 
 router.put("/deliveries/:id", authMiddleware, async (req, res) => {

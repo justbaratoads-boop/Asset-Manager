@@ -322,44 +322,47 @@ export default function PurchaseInvoiceForm() {
     }
   };
 
-  
+  const fromOrderId = new URLSearchParams(window.location.search).get("fromOrder");
+
   useEffect(() => {
-    if (!autoRoundOff) return;
+    const shouldAutoRoundOff = autoRoundOff || !!fromOrderId;
+    if (!shouldAutoRoundOff) return;
+
     const hasPakka = computedItems.some(i => enableDualLedger ? i.isTaxLiability : true);
-    const roundOffLedger = indirectLedgers.find(l => l.name === "Round Off");
+    const roundOffLedger = indirectLedgers.find(l => (l.name || "").toLowerCase() === "round off" || (l.name || "").toLowerCase().includes("round off") || (l.name || "").toLowerCase().includes("round"));
     const roundOffId = roundOffLedger ? roundOffLedger.id : 0;
     
     // Auto round off Pakka
-    const roundOffCharge = charges.find(c => (c.ledgerName || c.name) === "Round Off");
+    const roundOffCharge = charges.find(c => (c.ledgerName || c.name)?.toLowerCase() === "round off" || (c.ledgerName || c.name)?.toLowerCase().includes("round"));
     const roundOffAmt = roundOffCharge ? ((roundOffCharge.type ?? "add") === "deduct" ? -Number(roundOffCharge.amount) : Number(roundOffCharge.amount)) : 0;
     const pakkaTotalBeforeRoundOff = pakkaGrandTotal - roundOffAmt;
     const roundedPakka = Math.round(pakkaTotalBeforeRoundOff);
-    const diffPakka = roundedPakka - pakkaTotalBeforeRoundOff;
+    const diffPakka = Number((roundedPakka - pakkaTotalBeforeRoundOff).toFixed(2));
     
     setCharges(prev => {
-      const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
+      const filtered = prev.filter(c => (c.ledgerName || c.name)?.toLowerCase() !== "round off" && !(c.ledgerName || c.name)?.toLowerCase().includes("round"));
       if (hasPakka && Math.abs(diffPakka) > 0.001) {
-        filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffPakka).toFixed(2)) as any, type: diffPakka > 0 ? "add" : "deduct" });
+        filtered.push({ ledgerId: roundOffId, ledgerName: roundOffLedger?.name || "Round Off", amount: Number(Math.abs(diffPakka).toFixed(2)) as any, type: diffPakka > 0 ? "add" : "deduct" });
       }
       return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
     });
 
     if (enableDualLedger) {
-      const kacchaRoundOffCharge = kacchaCharges.find(c => (c.ledgerName || c.name) === "Round Off");
+      const kacchaRoundOffCharge = kacchaCharges.find(c => (c.ledgerName || c.name)?.toLowerCase() === "round off" || (c.ledgerName || c.name)?.toLowerCase().includes("round"));
       const kacchaRoundOffAmt = kacchaRoundOffCharge ? ((kacchaRoundOffCharge.type ?? "add") === "deduct" ? -Number(kacchaRoundOffCharge.amount) : Number(kacchaRoundOffCharge.amount)) : 0;
       const kacchaTotalBeforeRoundOff = kacchaGrandTotal - kacchaRoundOffAmt;
       const roundedKaccha = Math.round(kacchaTotalBeforeRoundOff);
-      const diffKaccha = roundedKaccha - kacchaTotalBeforeRoundOff;
+      const diffKaccha = Number((roundedKaccha - kacchaTotalBeforeRoundOff).toFixed(2));
       
       setKacchaCharges(prev => {
-        const filtered = prev.filter(c => (c.ledgerName || c.name) !== "Round Off");
+        const filtered = prev.filter(c => (c.ledgerName || c.name)?.toLowerCase() !== "round off" && !(c.ledgerName || c.name)?.toLowerCase().includes("round"));
         if (Math.abs(diffKaccha) > 0.001) {
-          filtered.push({ ledgerId: roundOffId, ledgerName: "Round Off", amount: Number(Math.abs(diffKaccha).toFixed(2)) as any, type: diffKaccha > 0 ? "add" : "deduct" });
+          filtered.push({ ledgerId: roundOffId, ledgerName: roundOffLedger?.name || "Round Off", amount: Number(Math.abs(diffKaccha).toFixed(2)) as any, type: diffKaccha > 0 ? "add" : "deduct" });
         }
         return JSON.stringify(prev) === JSON.stringify(filtered) ? prev : filtered;
       });
     }
-  }, [autoRoundOff, computedItems, pakkaGrandTotal, kacchaGrandTotal, charges, kacchaCharges, enableDualLedger, indirectLedgers]);
+  }, [autoRoundOff, fromOrderId, computedItems, pakkaGrandTotal, kacchaGrandTotal, charges, kacchaCharges, enableDualLedger, indirectLedgers]);
 
   
   return (

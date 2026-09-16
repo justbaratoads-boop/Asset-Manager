@@ -122,9 +122,9 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
 
     return `
     <tr>
-      <td>${i + 1}</td>
-      <td>${item.itemName || ""}${item.batchId ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${getBatchName(item.batchId, batches)}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
-      ${showHsn ? `<td>${item.hsnCode || ""}</td>` : ""}
+      <td class="tc">${i + 1}</td>
+      <td class="tl">${item.itemName || ""}${item.batchId ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${getBatchName(item.batchId, batches)}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
+      ${showHsn ? `<td class="tc">${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
       <td class="tr">${fmtN(itemBaseRate(item))}</td>
       ${hasDiscount ? `<td class="tr">${item.discountPct || 0}%</td>` : ""}
@@ -193,9 +193,14 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
   </div>
   <table class="items-tbl">
     <thead><tr>
-      <th>#</th><th>Item</th>
-      ${showHsn ? "<th>HSN</th>" : ""}
-      <th class="tr">Qty</th><th class="tr">Rate</th>${hasDiscount ? '<th class="tr">Disc%</th>' : ""}${showGstInfo ? '<th class="tr">GST%</th>' : ""}<th class="tr">Amount</th>
+      <th class="tc" style="width: 36px;">#</th>
+      <th class="tl">Item</th>
+      ${showHsn ? '<th class="tc" style="width: 80px;">HSN</th>' : ""}
+      <th class="tr" style="width: 75px;">Qty</th>
+      <th class="tr" style="width: 90px;">Rate</th>
+      ${hasDiscount ? '<th class="tr" style="width: 65px;">Disc%</th>' : ""}
+      ${showGstInfo ? '<th class="tr" style="width: 65px;">GST%</th>' : ""}
+      <th class="tr" style="width: 100px;">Amount</th>
     </tr></thead>
     <tbody>${itemRows}</tbody>
   </table>
@@ -206,7 +211,9 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
 
 const BASE_CSS = `
   *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .tr{text-align:right}
+  .tr{text-align:right !important;white-space:nowrap;}
+  .tl{text-align:left !important;}
+  .tc{text-align:center !important;white-space:nowrap;}
   .co-info{display:flex;align-items:flex-start;gap:10px}
   .co-logo{height:52px;width:auto;object-fit:contain;flex-shrink:0}
   .inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
@@ -217,7 +224,11 @@ const BASE_CSS = `
   .bt-label{font-size:.75em;text-transform:uppercase;color:#6b7280;margin-bottom:2px}
   .bt-name{font-weight:700;font-size:1.05em}
   .bt-gstin,.bt-addr{font-size:.85em;color:#555;margin-top:2px}
-  .items-tbl{width:100%;border-collapse:collapse;margin-bottom:14px}
+  .items-tbl{width:100%;border-collapse:collapse;margin-bottom:14px;table-layout:auto;}
+  .items-tbl th, .items-tbl td{vertical-align:top;word-break:normal;overflow-wrap:break-word;}
+  .items-tbl th.tr, .items-tbl td.tr{text-align:right !important;}
+  .items-tbl th.tl, .items-tbl td.tl{text-align:left !important;}
+  .items-tbl th.tc, .items-tbl td.tc{text-align:center !important;}
   .inv-footer{display:flex;justify-content:flex-end;margin-bottom:14px}
   .bank{font-size:.83em;color:#444;margin-bottom:12px;padding-top:12px;border-top:1px solid #e5e7eb}
   .sec-label{font-weight:600;font-size:.75em;text-transform:uppercase;color:#6b7280;margin-bottom:4px;letter-spacing:.04em}
@@ -241,7 +252,7 @@ const PRINT_CSS: Record<string, string> = {
     .co-name{font-size:1.2em;font-weight:700}
     .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#444;margin-top:1px}
     .inv-title{font-size:1.6em;font-weight:700;color:#4f46e5}
-    .items-tbl th{background:#f3f4f6;padding:6px 8px;text-align:left;border:1px solid #d1d5db;font-size:.82em}
+    .items-tbl th{background:#f3f4f6;padding:6px 8px;border:1px solid #d1d5db;font-size:.82em}
     .items-tbl td{padding:5px 8px;border:1px solid #e5e7eb;font-size:.9em}
     @page{size:A4 portrait;margin:0}`,
 
@@ -254,7 +265,7 @@ const PRINT_CSS: Record<string, string> = {
     .inv-num,.inv-date{color:rgba(255,255,255,.8)}
     .bill-to{margin:0 16mm 10px;border-top:2px solid #4f46e5;border-bottom:none;padding:8px 0}
     .items-tbl{margin:0 16mm;width:calc(100% - 32mm)}
-    .items-tbl th{padding:7px 8px;text-align:left;border-bottom:2px solid #4f46e5;color:#4f46e5;font-size:.82em;background:none}
+    .items-tbl th{padding:7px 8px;border-bottom:2px solid #4f46e5;color:#4f46e5;font-size:.82em;background:none}
     .items-tbl td{padding:6px 8px;border-bottom:1px solid #f3f4f6;font-size:.9em}
     .items-tbl tbody tr:nth-child(even) td{background:#f5f3ff}
     .tot-row.grand{color:#4f46e5}
@@ -268,7 +279,7 @@ const PRINT_CSS: Record<string, string> = {
     .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#555;margin-top:1px}
     .inv-title{font-size:1.4em;font-weight:400;letter-spacing:.12em;text-transform:uppercase}
     .bill-to{border-top:2px solid #111;border-bottom:1px solid #ccc;padding:8px 0}
-    .items-tbl th{padding:6px 4px;text-align:left;border-bottom:2px solid #111;font-size:.8em;text-transform:uppercase;letter-spacing:.05em;background:none}
+    .items-tbl th{padding:6px 4px;border-bottom:2px solid #111;font-size:.8em;text-transform:uppercase;letter-spacing:.05em;background:none}
     .items-tbl td{padding:5px 4px;border-bottom:1px solid #e5e7eb;font-size:.9em}
     .tot-row.grand{border-top:2px solid #111}
     @page{size:A4 portrait;margin:0}`,
@@ -279,7 +290,7 @@ const PRINT_CSS: Record<string, string> = {
     .co-name{font-size:1.15em;font-weight:700}
     .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#555;margin-top:1px}
     .inv-title{font-size:1.3em;font-weight:700;color:#4f46e5}
-    .items-tbl th{background:#f3f4f6;padding:4px 6px;text-align:left;border:1px solid #d1d5db;font-size:.8em}
+    .items-tbl th{background:#f3f4f6;padding:4px 6px;border:1px solid #d1d5db;font-size:.8em}
     .items-tbl td{padding:3px 6px;border:1px solid #e5e7eb;font-size:.88em}
     .tot-row{font-size:.88em}
     .sigs{margin-top:24px}.sig-line{width:120px;height:34px}
@@ -293,7 +304,7 @@ const PRINT_CSS: Record<string, string> = {
     .inv-title{font-size:1.2em;font-weight:700;color:#374151}
     .inv-header{margin-bottom:10px}
     .bill-to{padding:5px 0;margin-bottom:8px}
-    .items-tbl th{background:#374151;color:#fff;padding:3px 5px;text-align:left;border:none;font-size:.8em}
+    .items-tbl th{background:#374151;color:#fff;padding:3px 5px;border:none;font-size:.8em}
     .items-tbl td{padding:3px 5px;border-bottom:1px solid #f3f4f6;font-size:.88em}
     .items-tbl tbody tr:nth-child(even) td{background:#f9fafb}
     .tot-row{padding:1.5px 0;font-size:.88em}
@@ -310,7 +321,7 @@ const PRINT_CSS: Record<string, string> = {
     .inv-num,.inv-date{color:rgba(255,255,255,.75)}
     .bill-to{margin:0 9mm 8px;border-top:2px solid #1e293b;border-bottom:none;padding:6px 0}
     .items-tbl{margin:0 9mm;width:calc(100% - 18mm)}
-    .items-tbl th{padding:4px 5px;text-align:left;border-bottom:2px solid #1e293b;color:#1e293b;font-size:.8em;background:none}
+    .items-tbl th{padding:4px 5px;border-bottom:2px solid #1e293b;color:#1e293b;font-size:.8em;background:none}
     .items-tbl td{padding:3px 5px;border-bottom:1px solid #f1f5f9;font-size:.88em}
     .tot-row{font-size:.88em}.tot-row.grand{color:#1e293b}
     .inv-footer,.terms,.sigs,.bill-ftr{padding:0 9mm}
@@ -329,7 +340,7 @@ const PRINT_CSS: Record<string, string> = {
     .inv-title{font-weight:700;text-transform:uppercase;font-size:1em}
     .bill-to{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:5px 0;margin-bottom:6px}
     .bt-label{font-size:.78em}
-    .items-tbl th{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:2px 2px;font-size:.85em;background:none;text-align:left}
+    .items-tbl th{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:2px 2px;font-size:.85em;background:none}
     .items-tbl td{padding:2px 2px;border:none;font-size:.9em}
     .inv-footer{display:block;border-top:1px dashed #000;padding-top:6px;margin-top:4px}
     .bank{margin-bottom:6px;border-bottom:1px dashed #000;padding-bottom:5px;font-size:.85em}
@@ -353,7 +364,7 @@ const PRINT_CSS: Record<string, string> = {
     .inv-meta{text-align:center;margin-top:4px}
     .inv-title{font-weight:700;text-transform:uppercase}
     .bill-to{border-top:1px solid #000;border-bottom:1px solid #000;padding:4px 0;margin-bottom:5px}
-    .items-tbl th{border-top:1px solid #000;border-bottom:1px solid #000;padding:2px;font-size:.85em;background:none;text-align:left}
+    .items-tbl th{border-top:1px solid #000;border-bottom:1px solid #000;padding:2px;font-size:.85em;background:none}
     .items-tbl td{padding:2px;border:none;font-size:.9em}
     .inv-footer{display:block;border-top:1px solid #000;padding-top:5px;margin-top:3px}
     .bank{display:none}
@@ -377,7 +388,7 @@ const PRINT_CSS: Record<string, string> = {
     .inv-title{font-weight:700;text-transform:uppercase}
     .bill-to{padding:3px 0;margin-bottom:4px;border-top:1px dashed #000;border-bottom:none}
     .bt-gstin,.bt-addr{display:none}
-    .items-tbl th{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:2px;background:none;font-size:.85em;text-align:left}
+    .items-tbl th{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:2px;background:none;font-size:.85em}
     .items-tbl td{padding:1px 2px;border:none;font-size:.9em}
     .inv-footer{display:block;border-top:1px dashed #000;padding-top:3px}
     .bank{display:none}
@@ -502,14 +513,14 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
         <table className="w-full text-sm mb-6 min-w-[500px] px-4 sm:px-0">
           <thead>
             <tr className="border-b">
-              <th className="text-left py-2 pl-4 sm:pl-0 font-semibold w-6">#</th>
+              <th className="text-center py-2 pl-4 sm:pl-0 font-semibold w-8">#</th>
               <th className="text-left py-2 font-semibold">Item</th>
-              {showHsnCode && <th className="text-left py-2 font-semibold">HSN</th>}
-              <th className="text-right py-2 font-semibold">Qty</th>
-              <th className="text-right py-2 font-semibold">Rate</th>
-              {hasDiscount && <th className="text-right py-2 font-semibold">Disc%</th>}
-              {showGstInfo && <th className="text-right py-2 font-semibold">GST%</th>}
-              <th className="text-right py-2 pr-4 sm:pr-0 font-semibold">Total</th>
+              {showHsnCode && <th className="text-center py-2 font-semibold w-20">HSN</th>}
+              <th className="text-right py-2 font-semibold whitespace-nowrap">Qty</th>
+              <th className="text-right py-2 font-semibold whitespace-nowrap">Rate</th>
+              {hasDiscount && <th className="text-right py-2 font-semibold whitespace-nowrap">Disc%</th>}
+              {showGstInfo && <th className="text-right py-2 font-semibold whitespace-nowrap">GST%</th>}
+              <th className="text-right py-2 pr-4 sm:pr-0 font-semibold whitespace-nowrap">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -525,19 +536,19 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
               const baseAmount = qty * baseRate * factor;
 
               return (
-                <tr key={i} className="border-b">
-                  <td className="py-2 pl-4 sm:pl-0">{i + 1}</td>
-                  <td className="py-2">
+                <tr key={i} className="border-b align-top">
+                  <td className="py-2 pl-4 sm:pl-0 text-center">{i + 1}</td>
+                  <td className="py-2 text-left">
                     <div>{item.itemName}</div>
                       {item.batchId && <div className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</div>}
                       {item.description && <div className="text-xs text-gray-500 italic mt-0.5">{item.description}</div>}
                   </td>
-                  {showHsnCode && <td className="py-2 text-gray-500">{item.hsnCode}</td>}
-                  <td className="py-2 text-right">{item.quantity} {item.unit}</td>
-                  <td className="py-2 text-right">{formatCurrency(itemBaseRate(item))}</td>
-                  {hasDiscount && <td className="py-2 text-right">{item.discountPct}%</td>}
-                  {showGstInfo && <td className="py-2 text-right">{item.gstPct}%</td>}
-                  <td className="py-2 text-right pr-4 sm:pr-0 font-medium">{formatCurrency(baseAmount)}</td>
+                  {showHsnCode && <td className="py-2 text-center text-gray-500 whitespace-nowrap">{item.hsnCode}</td>}
+                  <td className="py-2 text-right whitespace-nowrap">{item.quantity} {item.unit}</td>
+                  <td className="py-2 text-right whitespace-nowrap">{formatCurrency(itemBaseRate(item))}</td>
+                  {hasDiscount && <td className="py-2 text-right whitespace-nowrap">{item.discountPct}%</td>}
+                  {showGstInfo && <td className="py-2 text-right whitespace-nowrap">{item.gstPct}%</td>}
+                  <td className="py-2 text-right pr-4 sm:pr-0 font-medium whitespace-nowrap">{formatCurrency(baseAmount)}</td>
                 </tr>
               );
             })}

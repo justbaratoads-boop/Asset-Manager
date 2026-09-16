@@ -598,6 +598,9 @@ router.get("/reports/sale-register", authMiddleware, async (req, res) => {
   const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
   const conditions: any[] = [and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
+  const enableDualLedger = await getEnableDualLedger();
+  const { from, to } = req.query;
+  const conditions: any[] = [and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
   if (from) conditions.push(gte(saleInvoicesTable.date, from as string));
   if (to) conditions.push(lte(saleInvoicesTable.date, to as string));
 
@@ -740,20 +743,26 @@ router.get("/reports/cash-book", authMiddleware, async (req, res) => {
 router.get("/reports/bank-book", authMiddleware, async (req, res) => {
   const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
-  
-  const bankLedgers = await db.select({ id: ledgersTable.id }).from(ledgersTable).where(ilike(ledgersTable.group, "%bank%"));
-  const bankLedgerIds = bankLedgers.map(l => l.id);
-  
-  if (bankLedgerIds.length === 0) {
-    return res.json({ entries: [], totalOut: 0, totalIn: 0 });
+
+  // 1. Fetch all bank ledgers from ledgersTable under Bank Accounts group (or matching %bank%)
+  const bankLedgers = await db.select()
+    .from(ledgersTable)
+    .where(and(eq(ledgersTable.isDeleted, "false"), ilike(ledgersTable.group, "%bank%")))
+    .orderBy(ledgersTable.name);
+
+  if (bankLedgers.length === 0) {
+    return res.json({ banks: [], entries: [], totalOut: 0, totalIn: 0, summary: { totalBanks: 0, totalIn: 0, totalOut: 0, netBalance: 0 } });
   }
 
-  const pmtCond: any[] = [and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false)), inArray(paymentsTable.ledgerId, bankLedgerIds)];
-  const rctCond: any[] = [and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false)), inArray(receiptsTable.ledgerId, bankLedgerIds)];
+  const bankLedgerIds = bankLedgers.map(l => l.id);
+
+  // 2. Fetch all raw transactions linked to bank ledgers
+  const pmtCond: any[] = [and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false))];
+  const rctCond: any[] = [and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false))];
   const saleInvPmtCond: any[] = [sql`${saleInvoicePaymentsTable.mode} != 'cash'`, and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))];
   const purInvPmtCond: any[] = [sql`${purchaseInvoicePaymentsTable.mode} != 'cash'`, and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))];
   const jeCond: any[] = [and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false)), inArray(journalLinesTable.ledgerId, bankLedgerIds)];
-  
+
   if (from) {
     pmtCond.push(gte(paymentsTable.date, from as string));
     rctCond.push(gte(receiptsTable.date, from as string));
@@ -799,71 +808,174 @@ router.get("/reports/bank-book", authMiddleware, async (req, res) => {
       description: journalEntriesTable.narration,
       amount: journalLinesTable.amount,
       type: journalLinesTable.type,
+      ledgerId: journalLinesTable.ledgerId,
     }).from(journalLinesTable)
       .innerJoin(journalEntriesTable, eq(journalLinesTable.entryId, journalEntriesTable.id))
       .where(and(...jeCond)),
   ]);
 
-  const out = pmts.map(p => ({ id: p.id, date: p.date, type: "payment" as const, ref: p.voucherNumber, party: p.partyName || "", description: p.narration || `Payment to ${p.partyName || ""} (${p.paymentMode})`, cashIn: 0, cashOut: Number(p.amount) }));
-  const inc = rcts.map(r => ({ id: r.id, date: r.date, type: "receipt" as const, ref: r.voucherNumber, party: r.partyName || "", description: r.narration || `Receipt from ${r.partyName || ""} (${r.paymentMode})`, cashIn: Number(r.amount), cashOut: 0 }));
-  const saleInvInc = saleInvPmts.map(p => ({ id: p.id, date: p.date, type: "sale-invoice" as const, ref: p.ref, party: p.party || "", description: `Bank collection (${p.mode}) — ${p.ref}`, cashIn: Number(p.amount), cashOut: 0 }));
-  const purInvOut = purInvPmts.map(p => ({ id: p.id, date: p.date, type: "purchase-invoice" as const, ref: p.ref, party: p.party || "", description: `Bank payment (${p.mode}) — ${p.ref}`, cashIn: 0, cashOut: Number(p.amount) }));
-  const jeEntries = journalLines.map(j => ({ id: j.id, date: j.date, type: "journal" as const, ref: j.ref, party: "", description: j.description || `Journal Entry — ${j.ref}`, cashIn: j.type === "dr" ? Number(j.amount) : 0, cashOut: j.type === "cr" ? Number(j.amount) : 0 }));
+  // Helper to extract bank ledger allocations or fallback to single ledgerId
+  function getPaymentAllocations(p: any): { ledgerId: number; amount: number }[] {
+    if (p.ledgerAllocations) {
+      try {
+        const allocs = JSON.parse(p.ledgerAllocations);
+        if (Array.isArray(allocs) && allocs.length > 0) {
+          return allocs.map((a: any) => ({ ledgerId: Number(a.ledgerId), amount: Number(a.amount || 0) }));
+        }
+      } catch {}
+    }
+    return p.ledgerId ? [{ ledgerId: Number(p.ledgerId), amount: Number(p.amount || 0) }] : [];
+  }
 
-  const sorted = [...out, ...inc, ...saleInvInc, ...purInvOut, ...jeEntries].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+  function getReceiptAllocations(r: any): { ledgerId: number; amount: number }[] {
+    if (r.ledgerAllocations) {
+      try {
+        const allocs = JSON.parse(r.ledgerAllocations);
+        if (Array.isArray(allocs) && allocs.length > 0) {
+          return allocs.map((a: any) => ({ ledgerId: Number(a.ledgerId), amount: Number(a.amount || 0) }));
+        }
+      } catch {}
+    }
+    return r.ledgerId ? [{ ledgerId: Number(r.ledgerId), amount: Number(r.amount || 0) }] : [];
+  }
 
-  let balance = 0;
-  const entries = sorted.map(e => {
-    balance += e.cashIn - e.cashOut;
-    return { ...e, balance };
+  // 3. Process data per bank ledger
+  const defaultBankId = bankLedgerIds[0];
+
+  const banksResult = bankLedgers.map(l => {
+    const rawOpening = Number(l.openingBalance || 0);
+    const openingBalance = l.nature === "cr" ? -rawOpening : rawOpening;
+    const txns: any[] = [];
+
+    // Payments
+    for (const p of pmts) {
+      const allocs = getPaymentAllocations(p);
+      const myAlloc = allocs.find(a => a.ledgerId === l.id);
+      if (myAlloc) {
+        txns.push({
+          id: p.id,
+          date: p.date,
+          type: "payment",
+          ref: p.voucherNumber,
+          party: p.partyName || "",
+          description: p.narration || `Payment to ${p.partyName || ""} (${p.paymentMode || "Bank"})`,
+          cashIn: 0,
+          cashOut: myAlloc.amount,
+        });
+      }
+    }
+
+    // Receipts
+    for (const r of rcts) {
+      const allocs = getReceiptAllocations(r);
+      const myAlloc = allocs.find(a => a.ledgerId === l.id);
+      if (myAlloc) {
+        txns.push({
+          id: r.id,
+          date: r.date,
+          type: "receipt",
+          ref: r.voucherNumber,
+          party: r.partyName || "",
+          description: r.narration || `Receipt from ${r.partyName || ""} (${r.paymentMode || "Bank"})`,
+          cashIn: myAlloc.amount,
+          cashOut: 0,
+        });
+      }
+    }
+
+    // Sale Invoice Payments (assign to default bank if unassigned)
+    if (l.id === defaultBankId) {
+      for (const p of saleInvPmts) {
+        txns.push({
+          id: p.id,
+          date: p.date,
+          type: "sale-invoice",
+          ref: p.ref,
+          party: p.party || "",
+          description: `Bank collection (${p.mode}) — ${p.ref}`,
+          cashIn: Number(p.amount),
+          cashOut: 0,
+        });
+      }
+      for (const p of purInvPmts) {
+        txns.push({
+          id: p.id,
+          date: p.date,
+          type: "purchase-invoice",
+          ref: p.ref,
+          party: p.party || "",
+          description: `Bank payment (${p.mode}) — ${p.ref}`,
+          cashIn: 0,
+          cashOut: Number(p.amount),
+        });
+      }
+    }
+
+    // Journal Lines
+    for (const j of journalLines) {
+      if (j.ledgerId === l.id) {
+        txns.push({
+          id: j.id,
+          date: j.date,
+          type: "journal",
+          ref: j.ref,
+          party: "",
+          description: j.description || `Journal Entry — ${j.ref}`,
+          cashIn: j.type === "dr" ? Number(j.amount) : 0,
+          cashOut: j.type === "cr" ? Number(j.amount) : 0,
+        });
+      }
+    }
+
+    // Sort chronologically
+    txns.sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+
+    let runningBal = openingBalance;
+    const entries = txns.map(t => {
+      runningBal += (t.cashIn - t.cashOut);
+      return { ...t, balance: runningBal };
+    });
+
+    const totalIn = entries.reduce((s, e) => s + e.cashIn, 0);
+    const totalOut = entries.reduce((s, e) => s + e.cashOut, 0);
+    const closingBalance = runningBal;
+
+    return {
+      id: l.id,
+      name: l.name,
+      group: l.group,
+      bankName: l.bankName || l.name,
+      bankBranch: l.bankBranch || "",
+      accountNumber: l.accountNumber || "",
+      ifscCode: l.ifscCode || "",
+      upiId: l.upiId || "",
+      openingBalance,
+      totalIn,
+      totalOut,
+      closingBalance,
+      balanceType: closingBalance >= 0 ? "Dr" : "Cr",
+      entries,
+    };
   });
 
-  const totalIn = inc.reduce((s, r) => s + r.cashIn, 0) + saleInvInc.reduce((s, r) => s + r.cashIn, 0) + jeEntries.reduce((s, j) => s + j.cashIn, 0);
-  const totalOut2 = out.reduce((s, r) => s + r.cashOut, 0) + purInvOut.reduce((s, r) => s + r.cashOut, 0) + jeEntries.reduce((s, j) => s + j.cashOut, 0);
-  res.json({ entries, totalOut: totalOut2, totalIn });
-});
+  // Flat entries for backward compatibility
+  const allEntries = banksResult.flatMap(b => b.entries).sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+  const totalIn = banksResult.reduce((s, b) => s + b.totalIn, 0);
+  const totalOut = banksResult.reduce((s, b) => s + b.totalOut, 0);
+  const netBalance = banksResult.reduce((s, b) => s + b.closingBalance, 0);
 
-router.get("/reports/all-transactions", authMiddleware, async (req, res) => {
-  const { from, to } = req.query;
-
-  const addCond = (conditions: any[], dateField: any) => {
-    if (from) conditions.push(gte(dateField, from as string));
-    if (to) conditions.push(lte(dateField, to as string));
-    return conditions;
-  };
-
-  const saleCond = addCond([and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false))], saleInvoicesTable.date);
-  const purCond = addCond([and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false))], purchaseInvoicesTable.date);
-  const pmtCond = addCond([and(eq(paymentsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(paymentsTable.isKaccha, false))], paymentsTable.date);
-  const rctCond = addCond([and(eq(receiptsTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(receiptsTable.isKaccha, false))], receiptsTable.date);
-  const jeCond = addCond([and(eq(journalEntriesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(journalEntriesTable.isKaccha, false))], journalEntriesTable.date);
-  const orderCond = addCond([and(eq(ordersTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(ordersTable.isKaccha, false))], ordersTable.date);
-  const cnCond = addCond([and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false))], creditNotesTable.date);
-  const dnCond = addCond([and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false))], debitNotesTable.date);
-
-  const [sales, purchases, payments, receipts, journals, orders, creditNotes, debitNotes] = await Promise.all([
-    db.select().from(saleInvoicesTable).where(and(...saleCond)),
-    db.select().from(purchaseInvoicesTable).where(and(...purCond)),
-    db.select().from(paymentsTable).where(and(...pmtCond)),
-    db.select().from(receiptsTable).where(and(...rctCond)),
-    db.select().from(journalEntriesTable).where(and(...jeCond)),
-    db.select().from(ordersTable).where(and(...orderCond)),
-    db.select().from(creditNotesTable).where(and(...cnCond)),
-    db.select().from(debitNotesTable).where(and(...dnCond)),
-  ]);
-
-  const all = [
-    ...sales.map(i => ({ id: i.id, date: i.date, type: "Sale Invoice", number: i.invoiceNumber, party: i.partyName, amount: Number(i.grandTotal), debit: Number(i.grandTotal), credit: 0 })),
-    ...purchases.map(i => ({ id: i.id, date: i.date, type: "Purchase Invoice", number: i.invoiceNumber, party: i.partyName, amount: Number(i.grandTotal), debit: 0, credit: Number(i.grandTotal) })),
-    ...payments.map(p => ({ id: p.id, date: p.date, type: "Payment", number: p.voucherNumber, party: p.partyName || "", amount: Number(p.amount), debit: Number(p.amount), credit: 0 })),
-    ...receipts.map(r => ({ id: r.id, date: r.date, type: "Receipt", number: r.voucherNumber, party: r.partyName || "", amount: Number(r.amount), debit: 0, credit: Number(r.amount) })),
-    ...journals.map(j => ({ id: j.id, date: j.date, type: "Journal", number: j.voucherNumber, party: j.narration || "", amount: Number(j.totalDebit), debit: Number(j.totalDebit), credit: Number(j.totalCredit) })),
-    ...orders.map(o => ({ id: o.id, date: o.date, type: "Order", number: o.orderNumber, party: o.partyName, amount: Number(o.grandTotal), debit: 0, credit: 0 })),
-    ...creditNotes.map(c => ({ id: c.id, date: c.date, type: "Credit Note", number: c.noteNumber, party: c.partyName, amount: Number(c.amount), debit: 0, credit: Number(c.amount) })),
-    ...debitNotes.map(d => ({ id: d.id, date: d.date, type: "Debit Note", number: d.noteNumber, party: d.partyName, amount: Number(d.amount), debit: Number(d.amount), credit: 0 })),
-  ].sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
-
-  res.json({ transactions: all, count: all.length });
+  res.json({
+    banks: banksResult,
+    entries: allEntries,
+    totalIn,
+    totalOut,
+    summary: {
+      totalBanks: banksResult.length,
+      totalIn,
+      totalOut,
+      netBalance,
+    },
+  });
 });
 
 router.get("/reports/party-statement", authMiddleware, async (req, res) => {
@@ -1714,6 +1826,219 @@ router.get("/reports/stock-batch-ledger", authMiddleware, async (req, res) => {
     transactions,
     period: { from: from || null, to: to || null },
   });
+});
+
+router.get("/reports/all-transactions", authMiddleware, async (req, res) => {
+  const enableDualLedger = await getEnableDualLedger();
+  const { from, to } = req.query;
+
+  const makeCond = (dateField: any, isDeletedField: any, isKacchaField?: any) => {
+    const conds: any[] = [
+      eq(isDeletedField, "false"),
+      enableDualLedger ? sql`true` : isKacchaField ? eq(isKacchaField, false) : sql`true`,
+    ];
+    if (from) conds.push(gte(dateField, from as string));
+    if (to) conds.push(lte(dateField, to as string));
+    return and(...conds);
+  };
+
+  const [
+    sales,
+    purchases,
+    pmts,
+    rcts,
+    journals,
+    orders,
+    crNotes,
+    dbNotes,
+  ] = await Promise.all([
+    db.select({
+      id: saleInvoicesTable.id,
+      date: saleInvoicesTable.date,
+      number: saleInvoicesTable.invoiceNumber,
+      party: saleInvoicesTable.partyName,
+      grandTotal: saleInvoicesTable.grandTotal,
+    }).from(saleInvoicesTable).where(makeCond(saleInvoicesTable.date, saleInvoicesTable.isDeleted, saleInvoicesTable.isKaccha)),
+
+    db.select({
+      id: purchaseInvoicesTable.id,
+      date: purchaseInvoicesTable.date,
+      number: purchaseInvoicesTable.invoiceNumber,
+      party: purchaseInvoicesTable.partyName,
+      grandTotal: purchaseInvoicesTable.grandTotal,
+    }).from(purchaseInvoicesTable).where(makeCond(purchaseInvoicesTable.date, purchaseInvoicesTable.isDeleted, purchaseInvoicesTable.isKaccha)),
+
+    db.select({
+      id: paymentsTable.id,
+      date: paymentsTable.date,
+      number: paymentsTable.voucherNumber,
+      party: paymentsTable.partyName,
+      narration: paymentsTable.narration,
+      amount: paymentsTable.amount,
+    }).from(paymentsTable).where(makeCond(paymentsTable.date, paymentsTable.isDeleted, paymentsTable.isKaccha)),
+
+    db.select({
+      id: receiptsTable.id,
+      date: receiptsTable.date,
+      number: receiptsTable.voucherNumber,
+      party: receiptsTable.partyName,
+      narration: receiptsTable.narration,
+      amount: receiptsTable.amount,
+    }).from(receiptsTable).where(makeCond(receiptsTable.date, receiptsTable.isDeleted, receiptsTable.isKaccha)),
+
+    db.select({
+      id: journalEntriesTable.id,
+      date: journalEntriesTable.date,
+      number: journalEntriesTable.voucherNumber,
+      narration: journalEntriesTable.narration,
+      totalDebit: journalEntriesTable.totalDebit,
+      totalCredit: journalEntriesTable.totalCredit,
+    }).from(journalEntriesTable).where(makeCond(journalEntriesTable.date, journalEntriesTable.isDeleted, journalEntriesTable.isKaccha)),
+
+    db.select({
+      id: ordersTable.id,
+      date: ordersTable.date,
+      number: ordersTable.orderNumber,
+      party: ordersTable.partyName,
+      grandTotal: ordersTable.grandTotal,
+    }).from(ordersTable).where(makeCond(ordersTable.date, ordersTable.isDeleted, ordersTable.isKaccha)),
+
+    db.select({
+      id: creditNotesTable.id,
+      date: creditNotesTable.date,
+      number: creditNotesTable.noteNumber,
+      party: creditNotesTable.partyName,
+      amount: creditNotesTable.amount,
+    }).from(creditNotesTable).where(makeCond(creditNotesTable.date, creditNotesTable.isDeleted)),
+
+    db.select({
+      id: debitNotesTable.id,
+      date: debitNotesTable.date,
+      number: debitNotesTable.noteNumber,
+      party: debitNotesTable.partyName,
+      amount: debitNotesTable.amount,
+    }).from(debitNotesTable).where(makeCond(debitNotesTable.date, debitNotesTable.isDeleted)),
+  ]);
+
+  const transactions: any[] = [];
+
+  for (const s of sales) {
+    const amt = Number(s.grandTotal) || 0;
+    transactions.push({
+      id: s.id,
+      type: "Sale Invoice",
+      date: s.date,
+      number: s.number,
+      party: s.party || "-",
+      amount: amt,
+      debit: amt,
+      credit: 0,
+    });
+  }
+
+  for (const p of purchases) {
+    const amt = Number(p.grandTotal) || 0;
+    transactions.push({
+      id: p.id,
+      type: "Purchase Invoice",
+      date: p.date,
+      number: p.number,
+      party: p.party || "-",
+      amount: amt,
+      debit: 0,
+      credit: amt,
+    });
+  }
+
+  for (const p of pmts) {
+    const amt = Number(p.amount) || 0;
+    transactions.push({
+      id: p.id,
+      type: "Payment",
+      date: p.date,
+      number: p.number,
+      party: p.party || p.narration || "-",
+      amount: amt,
+      debit: amt,
+      credit: 0,
+    });
+  }
+
+  for (const r of rcts) {
+    const amt = Number(r.amount) || 0;
+    transactions.push({
+      id: r.id,
+      type: "Receipt",
+      date: r.date,
+      number: r.number,
+      party: r.party || r.narration || "-",
+      amount: amt,
+      debit: 0,
+      credit: amt,
+    });
+  }
+
+  for (const j of journals) {
+    const dr = Number(j.totalDebit) || 0;
+    const cr = Number(j.totalCredit) || 0;
+    const amt = Math.max(dr, cr);
+    transactions.push({
+      id: j.id,
+      type: "Journal",
+      date: j.date,
+      number: j.number,
+      party: j.narration || "-",
+      amount: amt,
+      debit: dr,
+      credit: cr,
+    });
+  }
+
+  for (const o of orders) {
+    const amt = Number(o.grandTotal) || 0;
+    transactions.push({
+      id: o.id,
+      type: "Order",
+      date: o.date,
+      number: o.number,
+      party: o.party || "-",
+      amount: amt,
+      debit: amt,
+      credit: 0,
+    });
+  }
+
+  for (const c of crNotes) {
+    const amt = Number(c.amount) || 0;
+    transactions.push({
+      id: c.id,
+      type: "Credit Note",
+      date: c.date,
+      number: c.number,
+      party: c.party || "-",
+      amount: amt,
+      debit: 0,
+      credit: amt,
+    });
+  }
+
+  for (const d of dbNotes) {
+    const amt = Number(d.amount) || 0;
+    transactions.push({
+      id: d.id,
+      type: "Debit Note",
+      date: d.date,
+      number: d.number,
+      party: d.party || "-",
+      amount: amt,
+      debit: amt,
+      credit: 0,
+    });
+  }
+
+  transactions.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
+
+  res.json({ transactions, count: transactions.length });
 });
 
 export default router;

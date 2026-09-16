@@ -78,25 +78,28 @@ export default function DebitNoteView() {
         <table className="w-full text-sm border-collapse mb-4">
           <thead>
             <tr className="border-y-2 border-black">
-              <th className="text-left py-2 pr-2">#</th>
+              <th className="text-center py-2 px-1 w-8">#</th>
               <th className="text-left py-2">Item</th>
-              <th className="text-right py-2">Qty</th>
-              <th className="text-right py-2">Unit</th>
-              <th className="text-right py-2">Rate</th>
-              <th className="text-right py-2">GST%</th>
-              <th className="text-right py-2">Amount</th>
+              <th className="text-right py-2 whitespace-nowrap">Qty</th>
+              <th className="text-center py-2 whitespace-nowrap">Unit</th>
+              <th className="text-right py-2 whitespace-nowrap">Rate</th>
+              <th className="text-right py-2 whitespace-nowrap">GST%</th>
+              <th className="text-right py-2 whitespace-nowrap">Amount</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, i) => (
-              <tr key={i} className="border-b border-gray-200">
-                <td className="py-1.5 pr-2">{i + 1}</td>
-                <td className="py-1.5">{item.itemName}</td>
-                <td className="py-1.5 text-right">{Number(item.quantity)}</td>
-                <td className="py-1.5 text-right">{item.unit}</td>
-                <td className="py-1.5 text-right">{formatCurrency(Number(item.rate))}</td>
-                <td className="py-1.5 text-right">{Number(item.gstPct)}%</td>
-                <td className="py-1.5 text-right font-medium">{formatCurrency(Number(item.total))}</td>
+              <tr key={i} className="border-b border-gray-200 align-top">
+                <td className="py-1.5 px-1 text-center">{i + 1}</td>
+                <td className="py-1.5 text-left">
+                  {item.itemName}
+                  {item.batchName && <span className="block text-xs text-muted-foreground font-mono">Batch: {item.batchName}</span>}
+                </td>
+                <td className="py-1.5 text-right whitespace-nowrap">{Number(item.quantity)}</td>
+                <td className="py-1.5 text-center whitespace-nowrap">{item.unit}</td>
+                <td className="py-1.5 text-right whitespace-nowrap">{formatCurrency(Number(item.rate))}</td>
+                <td className="py-1.5 text-right whitespace-nowrap">{Number(item.gstPct)}%</td>
+                <td className="py-1.5 text-right font-medium whitespace-nowrap">{formatCurrency(Number(item.total))}</td>
               </tr>
             ))}
           </tbody>

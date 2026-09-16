@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -28,6 +30,22 @@ export function ConfirmDialog({
   loading,
   confirmLabel,
 }: ConfirmDialogProps) {
+  const [typedText, setTypedText] = useState("");
+
+  const isDeleteAction =
+    !confirmLabel ||
+    confirmLabel.toLowerCase().includes("delete") ||
+    title.toLowerCase().includes("delete") ||
+    title.toLowerCase().includes("remove");
+
+  useEffect(() => {
+    if (!open) {
+      setTypedText("");
+    }
+  }, [open]);
+
+  const isValid = !isDeleteAction || typedText.trim().toLowerCase() === "delete";
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -35,9 +53,35 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+
+        {isDeleteAction && (
+          <div className="space-y-1.5 py-1">
+            <p className="text-xs font-medium text-muted-foreground">
+              Please type <span className="font-mono font-bold text-destructive">delete</span> to confirm deletion:
+            </p>
+            <Input
+              value={typedText}
+              onChange={e => setTypedText(e.target.value)}
+              placeholder="type 'delete' here"
+              className="h-9 text-sm"
+              autoFocus
+            />
+          </div>
+        )}
+
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+          <AlertDialogAction
+            onClick={e => {
+              if (!isValid) {
+                e.preventDefault();
+                return;
+              }
+              onConfirm();
+            }}
+            disabled={loading || !isValid}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {loading ? "Processing..." : confirmLabel ?? "Delete"}
           </AlertDialogAction>
         </AlertDialogFooter>

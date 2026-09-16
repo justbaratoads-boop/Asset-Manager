@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,11 +38,37 @@ interface UnitSelectProps {
 export function UnitSelect({ value, onChange, className }: UnitSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [dropdownStyle, setDropdownStyle] = useState<{ top?: number; bottom?: number; left: number; width: number }>({ left: 0, width: 240 });
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (wrapRef.current) {
+      const rect = wrapRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = 280;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setDropdownStyle({
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 240),
+        });
+      } else {
+        setDropdownStyle({
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 240),
+        });
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        const portal = document.getElementById("unit-select-portal");
+        if (portal && portal.contains(e.target as Node)) return;
         setOpen(false);
         setQuery("");
       }
@@ -49,6 +76,17 @@ export function UnitSelect({ value, onChange, className }: UnitSelectProps) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, updatePosition]);
 
   const filtered = UNITS.filter(u =>
     u.label.toLowerCase().includes(query.toLowerCase()) ||
@@ -61,7 +99,7 @@ export function UnitSelect({ value, onChange, className }: UnitSelectProps) {
     <div ref={wrapRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { setOpen(o => !o); updatePosition(); }}
         className={cn(
           "flex items-center justify-between gap-1 w-full border rounded-md px-2 text-sm bg-background hover:bg-muted/50 transition-colors",
           className
@@ -73,8 +111,17 @@ export function UnitSelect({ value, onChange, className }: UnitSelectProps) {
         <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
       </button>
 
-      {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 bg-background border rounded-md shadow-lg w-60 flex flex-col">
+      {open && createPortal(
+        <div
+          id="unit-select-portal"
+          className="fixed z-[9999] bg-background border rounded-md shadow-lg w-60 flex flex-col overflow-hidden"
+          style={{
+            top: dropdownStyle.top !== undefined ? `${dropdownStyle.top}px` : "auto",
+            bottom: dropdownStyle.bottom !== undefined ? `${dropdownStyle.bottom}px` : "auto",
+            left: `${dropdownStyle.left}px`,
+            width: `${dropdownStyle.width}px`
+          }}
+        >
           <div className="p-2 border-b">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -111,7 +158,8 @@ export function UnitSelect({ value, onChange, className }: UnitSelectProps) {
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

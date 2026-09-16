@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
@@ -17,15 +18,54 @@ interface Props {
 export function PartySelect({ value, onChange, parties, placeholder = "Select party", hasError }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [dropdownStyle, setDropdownStyle] = useState<{ top?: number; bottom?: number; left: number; width: number }>({ left: 0, width: 0 });
   const ref = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = 250;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setDropdownStyle({
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 240),
+        });
+      } else {
+        setDropdownStyle({
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 240),
+        });
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        const portal = document.getElementById("party-select-portal");
+        if (portal && portal.contains(e.target as Node)) return;
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, updatePosition]);
 
   const selected = parties.find(p => p.id === value);
   const shouldFetch = !!(value && selected && selected.closingBalance === undefined);
@@ -39,7 +79,7 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => { setOpen(o => !o); setSearch(""); }}
+        onClick={() => { setOpen(o => !o); setSearch(""); updatePosition(); }}
         className={cn(
           "w-full h-9 flex items-center justify-between rounded-md border bg-background px-3 text-sm text-left focus:outline-none focus:ring-1 focus:ring-ring",
           hasError ? "border-destructive" : "border-input hover:border-primary/50"
@@ -60,8 +100,17 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
         <ChevronDown className="h-4 w-4 text-muted-foreground ml-1 shrink-0 opacity-50" />
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[220px] rounded-md border bg-popover shadow-lg">
+      {open && createPortal(
+        <div
+          id="party-select-portal"
+          className="fixed z-[9999] rounded-md border bg-popover shadow-lg overflow-hidden"
+          style={{
+            top: dropdownStyle.top !== undefined ? `${dropdownStyle.top}px` : "auto",
+            bottom: dropdownStyle.bottom !== undefined ? `${dropdownStyle.bottom}px` : "auto",
+            left: `${dropdownStyle.left}px`,
+            width: `${dropdownStyle.width}px`
+          }}
+        >
           <div className="p-1.5 border-b">
             <input
               autoFocus
@@ -95,7 +144,8 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
