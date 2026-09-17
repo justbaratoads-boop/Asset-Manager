@@ -234,41 +234,33 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
 
   const pmts = await db.select().from(paymentsTable).where(and(...pmtConds));
   for (const p of pmts) {
-    let hasAllocatedThisLedger = false;
-    if (p.ledgerAllocations) {
+    const hasMultipleAllocations = (() => {
+      if (!p.ledgerAllocations) return false;
       try {
         const allocs = JSON.parse(p.ledgerAllocations);
-        if (Array.isArray(allocs) && allocs.length > 0) {
-          for (const a of allocs) {
-            if (Number(a.ledgerId) === Number(id) && Number(a.amount) > 0) {
-              hasAllocatedThisLedger = true;
-              allTransactions.push({
-                date: p.date,
-                type: "payment",
-                description: p.narration || (p.partyName ? `Payment to ${p.partyName}` : `Payment ${p.voucherNumber}`),
-                ref: p.voucherNumber,
-                dr: 0,
-                cr: Number(a.amount),
-              });
-            }
-          }
-        }
-      } catch {}
+        return Array.isArray(allocs) && allocs.length > 0;
+      } catch { return false; }
+    })();
+
+    // For multi-ledger payments, journal entries handle the cash/bank ledger amounts.
+    // Only use the direct payment record for:
+    //   1. Single-ledger fallback (old records without allocations)
+    //   2. Party ledger (always uses full amount regardless)
+    if (!hasMultipleAllocations) {
+      // Single ledger: match by ledgerId (cash/bank side, CR for payment)
+      if (Number(p.ledgerId) === Number(id)) {
+        allTransactions.push({
+          date: p.date,
+          type: "payment",
+          description: p.narration || (p.partyName ? `Payment to ${p.partyName}` : `Payment ${p.voucherNumber}`),
+          ref: p.voucherNumber,
+          dr: 0,
+          cr: Number(p.amount),
+        });
+      }
     }
 
-    // Fallback: If no ledgerAllocations processed for this ledger, match single ledgerId
-    if (!hasAllocatedThisLedger && Number(p.ledgerId) === Number(id)) {
-      allTransactions.push({
-        date: p.date,
-        type: "payment",
-        description: p.narration || (p.partyName ? `Payment to ${p.partyName}` : `Payment ${p.voucherNumber}`),
-        ref: p.voucherNumber,
-        dr: 0,
-        cr: Number(p.amount),
-      });
-    }
-
-    // Party ledger matches
+    // Party ledger: always show full amount (DR the party — reducing liability)
     if (matchingPartyId && Number(p.partyId) === Number(matchingPartyId)) {
       allTransactions.push({
         date: p.date,
@@ -287,41 +279,33 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
 
   const rcpts = await db.select().from(receiptsTable).where(and(...rcptConds));
   for (const r of rcpts) {
-    let hasAllocatedThisLedger = false;
-    if (r.ledgerAllocations) {
+    const hasMultipleAllocations = (() => {
+      if (!r.ledgerAllocations) return false;
       try {
         const allocs = JSON.parse(r.ledgerAllocations);
-        if (Array.isArray(allocs) && allocs.length > 0) {
-          for (const a of allocs) {
-            if (Number(a.ledgerId) === Number(id) && Number(a.amount) > 0) {
-              hasAllocatedThisLedger = true;
-              allTransactions.push({
-                date: r.date,
-                type: "receipt",
-                description: r.narration || (r.partyName ? `Receipt from ${r.partyName}` : `Receipt ${r.voucherNumber}`),
-                ref: r.voucherNumber,
-                dr: Number(a.amount),
-                cr: 0,
-              });
-            }
-          }
-        }
-      } catch {}
+        return Array.isArray(allocs) && allocs.length > 0;
+      } catch { return false; }
+    })();
+
+    // For multi-ledger receipts, journal entries handle the cash/bank ledger amounts.
+    // Only use the direct receipt record for:
+    //   1. Single-ledger fallback (old records without allocations)
+    //   2. Party ledger (always uses full amount)
+    if (!hasMultipleAllocations) {
+      // Single ledger: match by ledgerId (cash/bank side, DR for receipt)
+      if (Number(r.ledgerId) === Number(id)) {
+        allTransactions.push({
+          date: r.date,
+          type: "receipt",
+          description: r.narration || (r.partyName ? `Receipt from ${r.partyName}` : `Receipt ${r.voucherNumber}`),
+          ref: r.voucherNumber,
+          dr: Number(r.amount),
+          cr: 0,
+        });
+      }
     }
 
-    // Fallback: If no ledgerAllocations processed for this ledger, match single ledgerId
-    if (!hasAllocatedThisLedger && Number(r.ledgerId) === Number(id)) {
-      allTransactions.push({
-        date: r.date,
-        type: "receipt",
-        description: r.narration || (r.partyName ? `Receipt from ${r.partyName}` : `Receipt ${r.voucherNumber}`),
-        ref: r.voucherNumber,
-        dr: Number(r.amount),
-        cr: 0,
-      });
-    }
-
-    // Party ledger matches
+    // Party ledger: always show full amount (CR the party — reducing receivable)
     if (matchingPartyId && Number(r.partyId) === Number(matchingPartyId)) {
       allTransactions.push({
         date: r.date,

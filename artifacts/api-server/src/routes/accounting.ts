@@ -150,6 +150,47 @@ router.post("/payments", authMiddleware, async (req, res) => {
     ledgerAllocations: data.ledgerAllocations ? JSON.stringify(data.ledgerAllocations) : null,
   }).returning();
 
+  // Create journal entry lines for ledger allocations so each cash/bank ledger
+  // shows the correct split amount (not the full total) in its statement.
+  const allocations: { ledgerId: number; amount: number }[] = data.ledgerAllocations || [];
+  if (allocations.length > 0) {
+    const totalDebit = allocations.reduce((s, a) => s + Number(a.amount), 0);
+    // For payment: cash/bank ledgers are CR (money going out), party is DR (reducing liability)
+    const [jEntry] = await db.insert(journalEntriesTable).values({
+      date: data.date,
+      voucherNumber,
+      voucherType: "payment",
+      narration: data.narration || `Payment ${voucherNumber}`,
+      totalDebit: String(totalDebit),
+      totalCredit: String(totalDebit),
+    }).returning();
+
+    // CR each cash/bank ledger with its split amount
+    for (const alloc of allocations) {
+      if (Number(alloc.amount) > 0) {
+        await db.insert(journalLinesTable).values({
+          entryId: jEntry.id,
+          ledgerId: Number(alloc.ledgerId),
+          partyId: null,
+          type: "cr",
+          amount: String(Number(alloc.amount)),
+        });
+      }
+    }
+
+    // DR party ledger with full amount (if party exists)
+    if (data.partyId) {
+      // Find party's ledger (or use partyId directly as virtual ledger)
+      await db.insert(journalLinesTable).values({
+        entryId: jEntry.id,
+        ledgerId: 1000000 + Number(data.partyId), // virtual party ledger id
+        partyId: Number(data.partyId),
+        type: "dr",
+        amount: String(data.amount),
+      });
+    }
+  }
+
   // Bill-wise: apply each entry as a payment against the respective purchase invoice
   if (data.billWiseEntries?.length) {
     for (const entry of data.billWiseEntries) {
@@ -177,6 +218,7 @@ router.post("/payments", authMiddleware, async (req, res) => {
 
   res.status(201).json({ ...payment, amount: Number(payment.amount) });
 });
+
 
 router.get("/payments/:id", authMiddleware, async (req, res) => {
   const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.id, Number(req.params.id))).limit(1);
@@ -230,6 +272,46 @@ router.post("/receipts", authMiddleware, async (req, res) => {
     ledgerAllocations: data.ledgerAllocations ? JSON.stringify(data.ledgerAllocations) : null,
   }).returning();
 
+  // Create journal entry lines for ledger allocations so each cash/bank ledger
+  // shows the correct split amount (not the full total) in its statement.
+  const rcptAllocations: { ledgerId: number; amount: number }[] = data.ledgerAllocations || [];
+  if (rcptAllocations.length > 0) {
+    const totalCredit = rcptAllocations.reduce((s, a) => s + Number(a.amount), 0);
+    // For receipt: cash/bank ledgers are DR (money coming in), party is CR (reducing receivable)
+    const [jEntry] = await db.insert(journalEntriesTable).values({
+      date: data.date,
+      voucherNumber,
+      voucherType: "receipt",
+      narration: data.narration || `Receipt ${voucherNumber}`,
+      totalDebit: String(totalCredit),
+      totalCredit: String(totalCredit),
+    }).returning();
+
+    // DR each cash/bank ledger with its split amount
+    for (const alloc of rcptAllocations) {
+      if (Number(alloc.amount) > 0) {
+        await db.insert(journalLinesTable).values({
+          entryId: jEntry.id,
+          ledgerId: Number(alloc.ledgerId),
+          partyId: null,
+          type: "dr",
+          amount: String(Number(alloc.amount)),
+        });
+      }
+    }
+
+    // CR party ledger with full amount (if party exists)
+    if (data.partyId) {
+      await db.insert(journalLinesTable).values({
+        entryId: jEntry.id,
+        ledgerId: 1000000 + Number(data.partyId), // virtual party ledger id
+        partyId: Number(data.partyId),
+        type: "cr",
+        amount: String(data.amount),
+      });
+    }
+  }
+
   // Bill-wise: apply each entry as a payment against the respective sale invoice
   if (data.billWiseEntries?.length) {
     for (const entry of data.billWiseEntries) {
@@ -257,6 +339,7 @@ router.post("/receipts", authMiddleware, async (req, res) => {
 
   res.status(201).json({ ...receipt, amount: Number(receipt.amount) });
 });
+
 
 router.get("/receipts/:id", authMiddleware, async (req, res) => {
   const [receipt] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, Number(req.params.id))).limit(1);
