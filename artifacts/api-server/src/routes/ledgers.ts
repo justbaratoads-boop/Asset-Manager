@@ -606,7 +606,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     });
   }
 
-  // ── 10. Sort chronologically and process opening/closing balances ───────
+  // ── 10. Sort chronologically (ASC) to compute running balances correctly ──
   const sorted = allTransactions.sort((a, b) => a.date.localeCompare(b.date));
 
   // Split into prior period vs current date-filtered period
@@ -623,6 +623,9 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     return { ...t, balance: Math.abs(runningNet), balanceNature: runningNet >= 0 ? "dr" : "cr" };
   });
 
+  // Reverse so the latest entry appears first (most recent at top)
+  const rowsDesc = [...rows].reverse();
+
   const totalDr = rows.reduce((s: number, t: any) => s + t.dr, 0);
   const totalCr = rows.reduce((s: number, t: any) => s + t.cr, 0);
 
@@ -634,7 +637,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     isSystem: ledger.isSystem,
     openingBalance: Math.abs(periodOpeningNet),
     openingNature: periodOpeningNet >= 0 ? "dr" : "cr",
-    transactions: rows,
+    transactions: rowsDesc,
     totalDr,
     totalCr,
     closingBalance: runningNet,
