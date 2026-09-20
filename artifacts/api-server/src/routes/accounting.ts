@@ -150,22 +150,23 @@ router.post("/payments", authMiddleware, async (req, res) => {
     ledgerAllocations: data.ledgerAllocations ? JSON.stringify(data.ledgerAllocations) : null,
   }).returning();
 
-  // Create journal entry lines for ledger allocations so each cash/bank ledger
-  // shows the correct split amount (not the full total) in its statement.
+  // Create journal entry lines for each cash/bank ledger allocation so each ledger
+  // shows its correct split amount (not the full total) in its statement.
+  // NOTE: Do NOT add a party journal line — the party ledger already gets the full
+  // amount from the direct paymentsTable match in the ledger statement query.
   const allocations: { ledgerId: number; amount: number }[] = data.ledgerAllocations || [];
   if (allocations.length > 0) {
-    const totalDebit = allocations.reduce((s, a) => s + Number(a.amount), 0);
-    // For payment: cash/bank ledgers are CR (money going out), party is DR (reducing liability)
+    const totalAmount = allocations.reduce((s, a) => s + Number(a.amount), 0);
     const [jEntry] = await db.insert(journalEntriesTable).values({
       date: data.date,
       voucherNumber,
       voucherType: "payment",
       narration: data.narration || `Payment ${voucherNumber}`,
-      totalDebit: String(totalDebit),
-      totalCredit: String(totalDebit),
+      totalDebit: String(totalAmount),
+      totalCredit: String(totalAmount),
     }).returning();
 
-    // CR each cash/bank ledger with its split amount
+    // CR each cash/bank ledger with its split amount only
     for (const alloc of allocations) {
       if (Number(alloc.amount) > 0) {
         await db.insert(journalLinesTable).values({
@@ -176,18 +177,6 @@ router.post("/payments", authMiddleware, async (req, res) => {
           amount: String(Number(alloc.amount)),
         });
       }
-    }
-
-    // DR party ledger with full amount (if party exists)
-    if (data.partyId) {
-      // Find party's ledger (or use partyId directly as virtual ledger)
-      await db.insert(journalLinesTable).values({
-        entryId: jEntry.id,
-        ledgerId: 1000000 + Number(data.partyId), // virtual party ledger id
-        partyId: Number(data.partyId),
-        type: "dr",
-        amount: String(data.amount),
-      });
     }
   }
 
@@ -287,7 +276,9 @@ router.post("/receipts", authMiddleware, async (req, res) => {
       totalCredit: String(totalCredit),
     }).returning();
 
-    // DR each cash/bank ledger with its split amount
+    // DR each cash/bank ledger with its split amount only
+    // NOTE: Do NOT add a party journal line — the party ledger already gets the full
+    // amount from the direct receiptsTable match in the ledger statement query.
     for (const alloc of rcptAllocations) {
       if (Number(alloc.amount) > 0) {
         await db.insert(journalLinesTable).values({
@@ -298,17 +289,6 @@ router.post("/receipts", authMiddleware, async (req, res) => {
           amount: String(Number(alloc.amount)),
         });
       }
-    }
-
-    // CR party ledger with full amount (if party exists)
-    if (data.partyId) {
-      await db.insert(journalLinesTable).values({
-        entryId: jEntry.id,
-        ledgerId: 1000000 + Number(data.partyId), // virtual party ledger id
-        partyId: Number(data.partyId),
-        type: "cr",
-        amount: String(data.amount),
-      });
     }
   }
 
