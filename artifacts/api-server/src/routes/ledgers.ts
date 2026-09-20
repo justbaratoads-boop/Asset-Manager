@@ -210,6 +210,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     date: journalEntriesTable.date,
     narration: journalEntriesTable.narration,
     ref: journalEntriesTable.voucherNumber,
+    voucherType: journalEntriesTable.voucherType,
     lineType: journalLinesTable.type,
     amount: journalLinesTable.amount,
   }).from(journalLinesTable)
@@ -218,11 +219,15 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
 
   for (const jl of jLines) {
     const amt = Number(jl.amount);
+    // JL- prefixed entries are auto-generated from payment/receipt multi-ledger splits
+    const isPaymentAlloc = (jl.voucherType === "payment");
+    const isReceiptAlloc = (jl.voucherType === "receipt");
+    const realRef = jl.ref.startsWith("JL-") ? jl.ref.slice(3) : jl.ref;
     allTransactions.push({
       date: jl.date,
-      type: "journal",
-      description: jl.narration || `Journal ${jl.ref}`,
-      ref: jl.ref,
+      type: isPaymentAlloc ? "payment" : isReceiptAlloc ? "receipt" : "journal",
+      description: jl.narration || `Journal ${realRef}`,
+      ref: realRef,
       dr: jl.lineType === "dr" ? amt : 0,
       cr: jl.lineType === "cr" ? amt : 0,
     });

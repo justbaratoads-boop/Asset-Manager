@@ -156,27 +156,33 @@ router.post("/payments", authMiddleware, async (req, res) => {
   // amount from the direct paymentsTable match in the ledger statement query.
   const allocations: { ledgerId: number; amount: number }[] = data.ledgerAllocations || [];
   if (allocations.length > 0) {
-    const totalAmount = allocations.reduce((s, a) => s + Number(a.amount), 0);
-    const [jEntry] = await db.insert(journalEntriesTable).values({
-      date: data.date,
-      voucherNumber,
-      voucherType: "payment",
-      narration: data.narration || `Payment ${voucherNumber}`,
-      totalDebit: String(totalAmount),
-      totalCredit: String(totalAmount),
-    }).returning();
+    try {
+      const totalAmount = allocations.reduce((s, a) => s + Number(a.amount), 0);
+      // Use JL- prefix to avoid unique constraint collision with the PMT voucherNumber
+      const jVoucherNumber = `JL-${voucherNumber}`;
+      const [jEntry] = await db.insert(journalEntriesTable).values({
+        date: data.date,
+        voucherNumber: jVoucherNumber,
+        voucherType: "payment",
+        narration: data.narration || `Payment ${voucherNumber}`,
+        totalDebit: String(totalAmount),
+        totalCredit: String(totalAmount),
+      }).returning();
 
-    // CR each cash/bank ledger with its split amount only
-    for (const alloc of allocations) {
-      if (Number(alloc.amount) > 0) {
-        await db.insert(journalLinesTable).values({
-          entryId: jEntry.id,
-          ledgerId: Number(alloc.ledgerId),
-          partyId: null,
-          type: "cr",
-          amount: String(Number(alloc.amount)),
-        });
+      // CR each cash/bank ledger with its individual split amount
+      for (const alloc of allocations) {
+        if (Number(alloc.amount) > 0) {
+          await db.insert(journalLinesTable).values({
+            entryId: jEntry.id,
+            ledgerId: Number(alloc.ledgerId),
+            partyId: null,
+            type: "cr",
+            amount: String(Number(alloc.amount)),
+          });
+        }
       }
+    } catch (err) {
+      console.error("Failed to create journal lines for payment allocation:", err);
     }
   }
 
@@ -265,30 +271,35 @@ router.post("/receipts", authMiddleware, async (req, res) => {
   // shows the correct split amount (not the full total) in its statement.
   const rcptAllocations: { ledgerId: number; amount: number }[] = data.ledgerAllocations || [];
   if (rcptAllocations.length > 0) {
-    const totalCredit = rcptAllocations.reduce((s, a) => s + Number(a.amount), 0);
-    // For receipt: cash/bank ledgers are DR (money coming in), party is CR (reducing receivable)
-    const [jEntry] = await db.insert(journalEntriesTable).values({
-      date: data.date,
-      voucherNumber,
-      voucherType: "receipt",
-      narration: data.narration || `Receipt ${voucherNumber}`,
-      totalDebit: String(totalCredit),
-      totalCredit: String(totalCredit),
-    }).returning();
+    try {
+      const totalAmount = rcptAllocations.reduce((s, a) => s + Number(a.amount), 0);
+      // Use JL- prefix to avoid unique constraint collision with the RCT voucherNumber
+      const jVoucherNumber = `JL-${voucherNumber}`;
+      const [jEntry] = await db.insert(journalEntriesTable).values({
+        date: data.date,
+        voucherNumber: jVoucherNumber,
+        voucherType: "receipt",
+        narration: data.narration || `Receipt ${voucherNumber}`,
+        totalDebit: String(totalAmount),
+        totalCredit: String(totalAmount),
+      }).returning();
 
-    // DR each cash/bank ledger with its split amount only
-    // NOTE: Do NOT add a party journal line — the party ledger already gets the full
-    // amount from the direct receiptsTable match in the ledger statement query.
-    for (const alloc of rcptAllocations) {
-      if (Number(alloc.amount) > 0) {
-        await db.insert(journalLinesTable).values({
-          entryId: jEntry.id,
-          ledgerId: Number(alloc.ledgerId),
-          partyId: null,
-          type: "dr",
-          amount: String(Number(alloc.amount)),
-        });
+      // DR each cash/bank ledger with its individual split amount
+      // NOTE: Do NOT add a party journal line — the party ledger already gets the full
+      // amount from the direct receiptsTable match in the ledger statement query.
+      for (const alloc of rcptAllocations) {
+        if (Number(alloc.amount) > 0) {
+          await db.insert(journalLinesTable).values({
+            entryId: jEntry.id,
+            ledgerId: Number(alloc.ledgerId),
+            partyId: null,
+            type: "dr",
+            amount: String(Number(alloc.amount)),
+          });
+        }
       }
+    } catch (err) {
+      console.error("Failed to create journal lines for receipt allocation:", err);
     }
   }
 
