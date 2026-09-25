@@ -143,9 +143,19 @@ export default function LedgerAccounts() {
   const { data: parties = [], isLoading: partiesLoading } = useListParties();
   const { data: accountGroups = [] } = useAccountGroups();
   const { data: companySettings } = useGetCompanySettings();
+  const { data: trialBalance } = useQuery({
+    queryKey: ["trial-balance-closing"],
+    queryFn: () => customFetch<{ rows: any[] }>("/api/reports/trial-balance").catch(() => ({ rows: [] })),
+  });
   const deleteMutation = useDeleteLedger();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Build a map: ledgerId -> closing balance (signed: positive = Dr, negative = Cr)
+  const closingMap = new Map<number, number>();
+  for (const row of (trialBalance?.rows || [])) {
+    closingMap.set(row.id, row.closing);
+  }
 
   const isLoading = ledgersLoading || partiesLoading;
   const companyState = (companySettings as any)?.state || "";
@@ -164,6 +174,7 @@ export default function LedgerAccounts() {
       gstType: p.gstType, openingBalance: Number(p.openingBalance), balanceType: p.balanceType, raw: p,
     })),
   ];
+
 
   const q = search.toLowerCase();
   const filtered = unified.filter(u => {
@@ -370,7 +381,12 @@ export default function LedgerAccounts() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{u.group}</p>
                   </div>
-                  <p className="font-bold text-sm shrink-0">{formatCurrency(u.openingBalance)}</p>
+                  <p className="font-bold text-sm shrink-0">
+                    {u.kind === "ledger" ? (() => {
+                      const closing = closingMap.has(u.id) ? closingMap.get(u.id)! : u.openingBalance;
+                      return <>{formatCurrency(Math.abs(closing))} <span className="text-xs font-normal text-muted-foreground">{closing >= 0 ? "Dr" : "Cr"}</span></>;
+                    })() : <>{formatCurrency(u.openingBalance)} <span className="text-xs font-normal text-muted-foreground uppercase">{u.balanceType}</span></>}
+                  </p>
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t">
                   {u.kind === "ledger" ? (
@@ -415,7 +431,7 @@ export default function LedgerAccounts() {
                   <TableHead>Source</TableHead>
                   <TableHead>Group</TableHead>
                   <TableHead>Type / GST</TableHead>
-                  <TableHead className="text-right">Opening Balance</TableHead>
+                  <TableHead className="text-right">Closing Balance</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -458,9 +474,21 @@ export default function LedgerAccounts() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(u.openingBalance)}
-                      {u.kind === "party" && (
-                        <span className="text-muted-foreground text-xs ml-1 uppercase">{u.balanceType}</span>
+                      {u.kind === "ledger" ? (() => {
+                        const closing = closingMap.has(u.id) ? closingMap.get(u.id)! : u.openingBalance;
+                        const absVal = Math.abs(closing);
+                        const nature = closing >= 0 ? "Dr" : "Cr";
+                        return (
+                          <>
+                            <span className="font-medium">{formatCurrency(absVal)}</span>
+                            <span className="text-muted-foreground text-xs ml-1 uppercase">{nature}</span>
+                          </>
+                        );
+                      })() : (
+                        <>
+                          {formatCurrency(u.openingBalance)}
+                          <span className="text-muted-foreground text-xs ml-1 uppercase">{u.balanceType}</span>
+                        </>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
