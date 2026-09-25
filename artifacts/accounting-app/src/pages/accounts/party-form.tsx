@@ -137,7 +137,7 @@ export default function PartyForm() {
       gstType: e.gstType || "unregistered",
       address: e.address || "",
       city: e.city || "",
-      state: e.state || "",
+      state: e.state || companyState || "",
       pincode: e.pincode || "",
       gstin: e.gstin || "",
       pan: e.pan || "",
@@ -165,7 +165,7 @@ export default function PartyForm() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Name is required";
     if (!form.accountGroup) e.accountGroup = "Account group is required";
-    if (!form.state) e.state = "State is required";
+    // State is optional
     if (form.phone && !/^\d{10}$/.test(form.phone)) e.phone = "Phone must be exactly 10 digits";
     if (form.gstType !== "unregistered") {
       if (!form.gstin) e.gstin = "GSTIN is required";
@@ -325,7 +325,7 @@ export default function PartyForm() {
             <Input value={form.city} onChange={e => set("city", e.target.value)} disabled={hasInvoices} />
           </div>
           <div className="space-y-1">
-            <Label>State *</Label>
+            <Label>State <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
             <Select value={form.state} onValueChange={v => set("state", v)} disabled={hasInvoices}>
               <SelectTrigger className={errors.state ? "border-destructive" : ""}>
                 <SelectValue placeholder="Select state" />

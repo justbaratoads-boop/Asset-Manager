@@ -220,7 +220,7 @@ export default function LedgerAccounts() {
     setEditItem(null);
     setDialogType("ledger");
     setLedgerForm({ ...BLANK_LEDGER, group: (accountGroups as any[])[0]?.name || "" });
-    setPartyForm(BLANK_PARTY);
+    setPartyForm({ ...BLANK_PARTY, state: companyState || "" });
     setPartyErrors({});
     setLedgerNameError("");
     setDialogOpen(true);
@@ -823,7 +823,7 @@ export default function LedgerAccounts() {
                     <Input value={partyForm.city} onChange={e => setParty("city", e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label>State {(partyForm.accountGroup === "Sundry Debtors" || partyForm.accountGroup === "Sundry Creditors") ? "*" : ""}</Label>
+                    <Label>State <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
                     <Select value={partyForm.state} onValueChange={v => setParty("state", v)}>
                       <SelectTrigger className={partyErrors.state ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select state" />

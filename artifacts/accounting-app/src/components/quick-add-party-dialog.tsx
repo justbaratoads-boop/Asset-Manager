@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { customFetch, getListPartiesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useGetCompanySettings } from "@workspace/api-client-react";
 import { INDIAN_STATES } from "@/lib/format";
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -44,6 +45,8 @@ export function QuickAddPartyDialog({ open, onOpenChange, defaultAccountGroup, o
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: accountGroups = [] } = useAccountGroups();
+  const { data: companySettings } = useGetCompanySettings();
+  const companyState = (companySettings as any)?.state || "";
 
   const set = (k: string, v: string | boolean) => {
     setForm(p => ({ ...p, [k]: v }));
@@ -55,7 +58,7 @@ export function QuickAddPartyDialog({ open, onOpenChange, defaultAccountGroup, o
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Name is required";
-    if (!form.state) e.state = "State is required";
+    // State is optional
     if (form.phone && !/^\d{10}$/.test(form.phone)) e.phone = "Must be 10 digits";
     if (needsGstin) {
       if (!form.gstin) e.gstin = "GSTIN is required";
@@ -67,7 +70,7 @@ export function QuickAddPartyDialog({ open, onOpenChange, defaultAccountGroup, o
   const handleClose = () => {
     if (saving) return;
     onOpenChange(false);
-    setForm({ ...BLANK, accountGroup: defaultAccountGroup || "Sundry Debtors" });
+    setForm({ ...BLANK, accountGroup: defaultAccountGroup || "Sundry Debtors", state: companyState || "" });
     setErrors({});
   };
 
@@ -190,7 +193,7 @@ export function QuickAddPartyDialog({ open, onOpenChange, defaultAccountGroup, o
             </div>
 
             <div className="space-y-1">
-              <Label>State *</Label>
+              <Label>State <span className="text-xs text-muted-foreground font-normal">(Optional)</span></Label>
               <Select value={form.state} onValueChange={v => set("state", v)}>
                 <SelectTrigger className={errors.state ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select state" />
