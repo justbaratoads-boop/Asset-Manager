@@ -207,6 +207,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   if (to) jConds.push(lte(journalEntriesTable.date, to));
 
   const jLines = await db.select({
+    id: journalEntriesTable.id,
     date: journalEntriesTable.date,
     narration: journalEntriesTable.narration,
     ref: journalEntriesTable.voucherNumber,
@@ -217,13 +218,29 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     .innerJoin(journalEntriesTable, eq(journalLinesTable.entryId, journalEntriesTable.id))
     .where(and(...jConds));
 
+  // Query payments and receipts upfront to correlate JL- allocations with the voucher IDs
+  const pmtConds: any[] = [eq(paymentsTable.isDeleted, "false")];
+  if (to) pmtConds.push(lte(paymentsTable.date, to));
+  const pmts = await db.select().from(paymentsTable).where(and(...pmtConds));
+  const paymentByVoucher = new Map<string, number>();
+  pmts.forEach(p => paymentByVoucher.set(p.voucherNumber, p.id));
+
+  const rcptConds: any[] = [eq(receiptsTable.isDeleted, "false")];
+  if (to) rcptConds.push(lte(receiptsTable.date, to));
+  const rcpts = await db.select().from(receiptsTable).where(and(...rcptConds));
+  const receiptByVoucher = new Map<string, number>();
+  rcpts.forEach(r => receiptByVoucher.set(r.voucherNumber, r.id));
+
   for (const jl of jLines) {
     const amt = Number(jl.amount);
     // JL- prefixed entries are auto-generated from payment/receipt multi-ledger splits
     const isPaymentAlloc = (jl.voucherType === "payment");
     const isReceiptAlloc = (jl.voucherType === "receipt");
     const realRef = jl.ref.startsWith("JL-") ? jl.ref.slice(3) : jl.ref;
+    const pmtId = isPaymentAlloc ? paymentByVoucher.get(realRef) : undefined;
+    const rcptId = isReceiptAlloc ? receiptByVoucher.get(realRef) : undefined;
     allTransactions.push({
+      id: pmtId || rcptId || jl.id,
       date: jl.date,
       type: isPaymentAlloc ? "payment" : isReceiptAlloc ? "receipt" : "journal",
       description: jl.narration || '',
@@ -234,10 +251,6 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   }
 
   // ── 2. Payment vouchers ──────────────────────────────────────────────────────
-  const pmtConds: any[] = [eq(paymentsTable.isDeleted, "false")];
-  if (to) pmtConds.push(lte(paymentsTable.date, to));
-
-  const pmts = await db.select().from(paymentsTable).where(and(...pmtConds));
   for (const p of pmts) {
     const hasMultipleAllocations = (() => {
       if (!p.ledgerAllocations) return false;
@@ -255,6 +268,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       // Single ledger: match by ledgerId (cash/bank side, CR for payment)
       if (Number(p.ledgerId) === Number(id)) {
         allTransactions.push({
+          id: p.id,
           date: p.date,
           type: "payment",
           description: p.narration || '',
@@ -268,6 +282,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     // Party ledger: always show full amount (DR the party — reducing liability)
     if (matchingPartyId && Number(p.partyId) === Number(matchingPartyId)) {
       allTransactions.push({
+        id: p.id,
         date: p.date,
         type: "payment",
         description: p.narration || '',
@@ -279,10 +294,6 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   }
 
   // ── 3. Receipt vouchers ──────────────────────────────────────────────────────
-  const rcptConds: any[] = [eq(receiptsTable.isDeleted, "false")];
-  if (to) rcptConds.push(lte(receiptsTable.date, to));
-
-  const rcpts = await db.select().from(receiptsTable).where(and(...rcptConds));
   for (const r of rcpts) {
     const hasMultipleAllocations = (() => {
       if (!r.ledgerAllocations) return false;
@@ -300,6 +311,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       // Single ledger: match by ledgerId (cash/bank side, DR for receipt)
       if (Number(r.ledgerId) === Number(id)) {
         allTransactions.push({
+          id: r.id,
           date: r.date,
           type: "receipt",
           description: r.narration || '',
@@ -313,6 +325,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     // Party ledger: always show full amount (CR the party — reducing receivable)
     if (matchingPartyId && Number(r.partyId) === Number(matchingPartyId)) {
       allTransactions.push({
+        id: r.id,
         date: r.date,
         type: "receipt",
         description: r.narration || '',
@@ -328,6 +341,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   if (to) saleConds.push(lte(saleInvoicesTable.date, to));
 
   const saleInvs = await db.select({
+    id: saleInvoicesTable.id,
     date: saleInvoicesTable.date,
     invoiceNumber: saleInvoicesTable.invoiceNumber,
     partyId: saleInvoicesTable.partyId,
@@ -348,6 +362,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     // 1. If party ledger matches (Customer receivable)
     if (matchingPartyId && Number(inv.partyId) === Number(matchingPartyId)) {
       allTransactions.push({
+        id: inv.id,
         date: inv.date,
         type: "sale_invoice",
         description: inv.notes || '',
@@ -360,6 +375,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     // 2. Sales Account ledger (Sales Income)
     if (isSalesLedger) {
       allTransactions.push({
+        id: inv.id,
         date: inv.date,
         type: "sale_invoice",
         description: inv.notes || '',
@@ -377,6 +393,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         for (const charge of charges) {
           if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
             allTransactions.push({
+              id: inv.id,
               date: inv.date,
               type: "sale_invoice",
               description: inv.notes || '',
@@ -395,6 +412,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
   if (to) purchConds.push(lte(purchaseInvoicesTable.date, to));
 
   const purchInvs = await db.select({
+    id: purchaseInvoicesTable.id,
     date: purchaseInvoicesTable.date,
     invoiceNumber: purchaseInvoicesTable.invoiceNumber,
     partyId: purchaseInvoicesTable.partyId,
@@ -415,6 +433,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     // 1. If party ledger matches (Supplier payable)
     if (matchingPartyId && Number(inv.partyId) === Number(matchingPartyId)) {
       allTransactions.push({
+        id: inv.id,
         date: inv.date,
         type: "purchase_invoice",
         description: inv.notes || '',
@@ -427,6 +446,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     // 2. Purchase Account ledger (Purchase Expense)
     if (isPurchaseLedger) {
       allTransactions.push({
+        id: inv.id,
         date: inv.date,
         type: "purchase_invoice",
         description: inv.notes || '',
@@ -444,6 +464,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         for (const charge of charges) {
           if (Number(charge.ledgerId) === Number(id) && Number(charge.amount) > 0) {
             allTransactions.push({
+              id: inv.id,
               date: inv.date,
               type: "purchase_invoice",
               description: inv.notes || '',
@@ -467,6 +488,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     if (amt > 0) {
       if (matchingPartyId && Number(cn.partyId) === Number(matchingPartyId)) {
         allTransactions.push({
+          id: cn.id,
           date: cn.date,
           type: "credit_note",
           description: cn.reason || '',
@@ -477,6 +499,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       }
       if (isSalesLedger) {
         allTransactions.push({
+          id: cn.id,
           date: cn.date,
           type: "credit_note",
           description: cn.reason || '',
@@ -498,6 +521,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     if (amt > 0) {
       if (matchingPartyId && Number(dn.partyId) === Number(matchingPartyId)) {
         allTransactions.push({
+          id: dn.id,
           date: dn.date,
           type: "debit_note",
           description: dn.reason || '',
@@ -508,6 +532,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       }
       if (isPurchaseLedger) {
         allTransactions.push({
+          id: dn.id,
           date: dn.date,
           type: "debit_note",
           description: dn.reason || '',

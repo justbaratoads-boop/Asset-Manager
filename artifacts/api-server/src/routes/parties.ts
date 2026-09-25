@@ -179,6 +179,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const transactions: any[] = [];
 
   const saleInvoices = await db.select({
+    id: saleInvoicesTable.id,
     date: saleInvoicesTable.date,
     type: sql<string>`'sale_invoice'`,
     description: sql<string>`COALESCE(${saleInvoicesTable.notes}, '')`,
@@ -190,6 +191,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   transactions.push(...saleInvoices);
 
   const purchaseInvoices = await db.select({
+    id: purchaseInvoicesTable.id,
     date: purchaseInvoicesTable.date,
     type: sql<string>`'purchase_invoice'`,
     description: sql<string>`COALESCE(${purchaseInvoicesTable.notes}, '')`,
@@ -201,6 +203,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   transactions.push(...purchaseInvoices);
 
   const rcpts = await db.select({
+    id: receiptsTable.id,
     date: receiptsTable.date,
     type: sql<string>`'receipt'`,
     description: sql<string>`COALESCE(${receiptsTable.narration}, '')`,
@@ -212,6 +215,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   transactions.push(...rcpts);
 
   const pmts = await db.select({
+    id: paymentsTable.id,
     date: paymentsTable.date,
     type: sql<string>`'payment'`,
     description: sql<string>`COALESCE(${paymentsTable.narration}, '')`,
@@ -224,6 +228,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
 
   // Inline sale-invoice payments for this party (recorded at invoice level, not as standalone receipts)
   const saleInvPayments = await db.select({
+    id: saleInvoicesTable.id,
     date: saleInvoicesTable.date,
     invoiceNumber: saleInvoicesTable.invoiceNumber,
     mode: saleInvoicePaymentsTable.mode,
@@ -238,8 +243,9 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     ));
   for (const p of saleInvPayments) {
     transactions.push({
+      id: p.id,
       date: p.date,
-      type: "invoice_payment",
+      type: "sale_invoice",
       description: '',
       dr: 0,
       cr: Number(p.amount),
@@ -249,6 +255,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
 
   // Inline purchase-invoice payments for this party
   const purchInvPayments = await db.select({
+    id: purchaseInvoicesTable.id,
     date: purchaseInvoicesTable.date,
     invoiceNumber: purchaseInvoicesTable.invoiceNumber,
     mode: purchaseInvoicePaymentsTable.mode,
@@ -262,8 +269,9 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     ));
   for (const p of purchInvPayments) {
     transactions.push({
+      id: p.id,
       date: p.date,
-      type: "invoice_payment",
+      type: "purchase_invoice",
       description: '',
       dr: Number(p.amount),
       cr: 0,
@@ -272,6 +280,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   }
 
   const crNotes = await db.select({
+    id: creditNotesTable.id,
     date: creditNotesTable.date,
     type: sql<string>`'credit_note'`,
     description: sql<string>`COALESCE(${creditNotesTable.reason}, '')`,
@@ -283,6 +292,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   transactions.push(...crNotes);
 
   const dbNotes = await db.select({
+    id: debitNotesTable.id,
     date: debitNotesTable.date,
     type: sql<string>`'debit_note'`,
     description: sql<string>`COALESCE(${debitNotesTable.reason}, '')`,
@@ -294,6 +304,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   transactions.push(...dbNotes);
 
   const jLines = await db.select({
+    id: journalEntriesTable.id,
     date: journalEntriesTable.date,
     type: sql<string>`'journal'`,
     narration: journalEntriesTable.narration,
@@ -310,6 +321,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   for (const jl of jLines) {
     const amt = Number(jl.amount);
     transactions.push({
+      id: jl.id,
       date: jl.date,
       type: "journal",
       description: jl.narration || '',

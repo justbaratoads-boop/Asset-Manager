@@ -10,6 +10,8 @@ import { ArrowLeft, Pencil, Phone, Mail, MapPin, Building2, ShieldCheck, ShieldO
 import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
+import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
+import { useState } from "react";
 
 const gstBadge: Record<string, { label: string; cls: string }> = {
   registered:   { label: "Registered",   cls: "bg-green-100 text-green-800 border-green-300" },
@@ -55,6 +57,15 @@ export default function PartyView() {
   const rawTxs = l?.transactions || [];
   const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(rawTxs, "date", "desc");
   const vis = visibleKeys;
+  const [selectedTx, setSelectedTx] = useState<TransactionTarget | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const handleRowClick = (t: any) => {
+    if (t.id) {
+      setSelectedTx({ type: t.type, id: t.id, number: t.ref });
+      setSheetOpen(true);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -224,7 +235,7 @@ export default function PartyView() {
                 </TableHeader>
                 <TableBody>
                   {sortedData.map((t: any, i: number) => (
-                    <TableRow key={i}>
+                    <TableRow key={i} className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""} onClick={() => handleRowClick(t)}>
                       <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs whitespace-nowrap">
@@ -246,6 +257,12 @@ export default function PartyView() {
           </CardContent>
         </Card>
       </div>
+      {/* Side Tray View for clicked Transaction */}
+      <TransactionDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        transaction={selectedTx}
+      />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
+import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
 
@@ -184,13 +185,12 @@ export default function PartyStatement() {
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                   : !sortedData.length
                     ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions found in selected period</TableCell></TableRow>
-                    : transactions.map((t: any, i: number) => {
-                      const path = t.id ? navPath(t.type, t.id) : null;
+                    : sortedData.map((t: any, i: number) => {
                       return (
                         <TableRow
                           key={i}
-                          className={path ? "cursor-pointer hover:bg-muted/50" : ""}
-                          onClick={() => { if (path) setLocation(path); }}
+                          className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                          onClick={() => handleRowClick(t)}
                         >
                           {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
                           {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
@@ -220,6 +220,12 @@ export default function PartyStatement() {
           </CardContent>
         </Card>
       )}
+      {/* Side Tray View for clicked Transaction */}
+      <TransactionDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        transaction={selectedTx}
+      />
     </div>
   );
 }

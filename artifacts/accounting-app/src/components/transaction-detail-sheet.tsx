@@ -99,6 +99,12 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; endpoint: stri
     endpoint: "/api/debit-notes",
     fullPath: (id) => `/accounts/debit-notes/${id}`,
   },
+  "invoice_payment": {
+    label: "Invoice Payment",
+    color: "bg-teal-100 text-teal-800 border-teal-300",
+    endpoint: "/api/sale-invoices",
+    fullPath: (id) => `/sales/invoices/${id}`,
+  },
   "debit_note": {
     label: "Debit Note",
     color: "bg-pink-100 text-pink-800 border-pink-300",
@@ -283,7 +289,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction }: Prop
                 {(() => {
                   let allocs: any[] = [];
                   if (d.ledgerAllocations) {
-                    try { allocs = JSON.parse(d.ledgerAllocations); } catch {}
+                    try { allocs = typeof d.ledgerAllocations === "string" ? JSON.parse(d.ledgerAllocations) : (Array.isArray(d.ledgerAllocations) ? d.ledgerAllocations : []); } catch {}
                   }
                   if (!allocs.length) return null;
                   return (
@@ -337,7 +343,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction }: Prop
                         <TableBody>
                           {d.lines.map((l: any, i: number) => (
                             <TableRow key={i}>
-                              <TableCell className="font-medium text-sm">{l.ledgerName || l.ledger?.name || `Ledger #${l.ledgerId}`}</TableCell>
+                              <TableCell className="font-medium text-sm">{l.ledgerName || l.partyName || l.ledger?.name || `Ledger #${l.ledgerId}`}</TableCell>
                               <TableCell className="text-right font-medium text-sm">{l.type === "dr" ? formatCurrency(l.amount) : ""}</TableCell>
                               <TableCell className="text-right font-medium text-sm">{l.type === "cr" ? formatCurrency(l.amount) : ""}</TableCell>
                             </TableRow>

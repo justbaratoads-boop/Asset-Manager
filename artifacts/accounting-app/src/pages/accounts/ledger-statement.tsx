@@ -14,6 +14,7 @@ import { ArrowLeft } from "lucide-react";
 import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
+import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
 import { useFY } from "@/lib/financial-year";
 
 const txTypeLabel: Record<string, string> = {
@@ -67,6 +68,15 @@ export default function LedgerStatement() {
   const rawTxs = s?.transactions || [];
   const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(rawTxs, "date", "desc");
   const vis = visibleKeys;
+  const [selectedTx, setSelectedTx] = useState<TransactionTarget | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const handleRowClick = (t: any) => {
+    if (t.id) {
+      setSelectedTx({ type: t.type, id: t.id, number: t.ref });
+      setSheetOpen(true);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -175,7 +185,7 @@ export default function LedgerStatement() {
               </TableHeader>
               <TableBody>
                 {sortedData.map((t: any, i: number) => (
-                  <TableRow key={i}>
+                  <TableRow key={i} className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""} onClick={() => handleRowClick(t)}>
                     <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
                     <TableCell>
                       <Badge
@@ -203,6 +213,13 @@ export default function LedgerStatement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Side Tray View for clicked Transaction */}
+      <TransactionDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        transaction={selectedTx}
+      />
 
       {/* Footer totals */}
       {s?.transactions?.length > 0 && (
