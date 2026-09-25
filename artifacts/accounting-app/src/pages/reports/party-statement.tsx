@@ -195,7 +195,7 @@ export default function PartyStatement() {
                           {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
                           {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
                           {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
-                          {vis.has("narration") && <TableCell className="text-sm text-muted-foreground">{t.narration || "-"}</TableCell>}
+                          {vis.has("narration") && <TableCell className="text-sm text-muted-foreground">{t.narration || ""}</TableCell>}
                           {vis.has("debit") && <TableCell className="text-right text-red-600">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
                           {vis.has("credit") && <TableCell className="text-right text-green-600">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
                           {vis.has("balance") && <TableCell className={`text-right font-medium ${t.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}</TableCell>}

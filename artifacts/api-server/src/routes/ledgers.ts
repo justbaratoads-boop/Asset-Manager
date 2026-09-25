@@ -226,7 +226,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     allTransactions.push({
       date: jl.date,
       type: isPaymentAlloc ? "payment" : isReceiptAlloc ? "receipt" : "journal",
-      description: jl.narration || `Journal ${realRef}`,
+      description: jl.narration || '',
       ref: realRef,
       dr: jl.lineType === "dr" ? amt : 0,
       cr: jl.lineType === "cr" ? amt : 0,
@@ -257,7 +257,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: p.date,
           type: "payment",
-          description: p.narration || (p.partyName ? `Payment to ${p.partyName}` : `Payment ${p.voucherNumber}`),
+          description: p.narration || '',
           ref: p.voucherNumber,
           dr: 0,
           cr: Number(p.amount),
@@ -270,7 +270,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       allTransactions.push({
         date: p.date,
         type: "payment",
-        description: p.narration || `Payment to party ${p.partyName}`,
+        description: p.narration || '',
         ref: p.voucherNumber,
         dr: Number(p.amount),
         cr: 0,
@@ -302,7 +302,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: r.date,
           type: "receipt",
-          description: r.narration || (r.partyName ? `Receipt from ${r.partyName}` : `Receipt ${r.voucherNumber}`),
+          description: r.narration || '',
           ref: r.voucherNumber,
           dr: Number(r.amount),
           cr: 0,
@@ -315,7 +315,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       allTransactions.push({
         date: r.date,
         type: "receipt",
-        description: r.narration || `Receipt from party ${r.partyName}`,
+        description: r.narration || '',
         ref: r.voucherNumber,
         dr: 0,
         cr: Number(r.amount),
@@ -332,6 +332,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     invoiceNumber: saleInvoicesTable.invoiceNumber,
     partyId: saleInvoicesTable.partyId,
     partyName: saleInvoicesTable.partyName,
+    notes: saleInvoicesTable.notes,
     otherCharges: saleInvoicesTable.otherCharges,
     grandTotal: saleInvoicesTable.grandTotal,
     totalCgst: saleInvoicesTable.totalCgst,
@@ -349,7 +350,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       allTransactions.push({
         date: inv.date,
         type: "sale_invoice",
-        description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+        description: inv.notes || '',
         ref: inv.invoiceNumber,
         dr: Number(inv.grandTotal),
         cr: 0,
@@ -361,7 +362,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       allTransactions.push({
         date: inv.date,
         type: "sale_invoice",
-        description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+        description: inv.notes || '',
         ref: inv.invoiceNumber,
         dr: 0,
         cr: taxableAmt,
@@ -378,7 +379,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
             allTransactions.push({
               date: inv.date,
               type: "sale_invoice",
-              description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""} (Charge: ${charge.name || charge.ledgerName})`,
+              description: inv.notes || '',
               ref: inv.invoiceNumber,
               dr: 0,
               cr: Number(charge.amount),
@@ -398,6 +399,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     invoiceNumber: purchaseInvoicesTable.invoiceNumber,
     partyId: purchaseInvoicesTable.partyId,
     partyName: purchaseInvoicesTable.partyName,
+    notes: purchaseInvoicesTable.notes,
     otherCharges: purchaseInvoicesTable.otherCharges,
     grandTotal: purchaseInvoicesTable.grandTotal,
     totalCgst: purchaseInvoicesTable.totalCgst,
@@ -415,7 +417,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       allTransactions.push({
         date: inv.date,
         type: "purchase_invoice",
-        description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+        description: inv.notes || '',
         ref: inv.invoiceNumber,
         dr: 0,
         cr: Number(inv.grandTotal),
@@ -427,7 +429,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
       allTransactions.push({
         date: inv.date,
         type: "purchase_invoice",
-        description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+        description: inv.notes || '',
         ref: inv.invoiceNumber,
         dr: taxableAmt,
         cr: 0,
@@ -444,7 +446,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
             allTransactions.push({
               date: inv.date,
               type: "purchase_invoice",
-              description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""} (Charge: ${charge.name || charge.ledgerName})`,
+              description: inv.notes || '',
               ref: inv.invoiceNumber,
               dr: Number(charge.amount),
               cr: 0,
@@ -467,7 +469,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: cn.date,
           type: "credit_note",
-          description: `Credit Note ${cn.noteNumber}${cn.partyName ? ` – ${cn.partyName}` : ""}`,
+          description: cn.reason || '',
           ref: cn.noteNumber,
           dr: 0,
           cr: amt,
@@ -477,7 +479,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: cn.date,
           type: "credit_note",
-          description: `Credit Note ${cn.noteNumber}${cn.partyName ? ` – ${cn.partyName}` : ""}`,
+          description: cn.reason || '',
           ref: cn.noteNumber,
           dr: amt,
           cr: 0,
@@ -498,7 +500,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: dn.date,
           type: "debit_note",
-          description: `Debit Note ${dn.noteNumber}${dn.partyName ? ` – ${dn.partyName}` : ""}`,
+          description: dn.reason || '',
           ref: dn.noteNumber,
           dr: amt,
           cr: 0,
@@ -508,7 +510,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: dn.date,
           type: "debit_note",
-          description: `Debit Note ${dn.noteNumber}${dn.partyName ? ` – ${dn.partyName}` : ""}`,
+          description: dn.reason || '',
           ref: dn.noteNumber,
           dr: 0,
           cr: amt,
@@ -530,7 +532,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: inv.date,
           type: "sale_invoice",
-          description: `Sale Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+          description: inv.notes || '',
           ref: inv.invoiceNumber,
           dr: 0,
           cr: amt,
@@ -543,7 +545,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
         allTransactions.push({
           date: inv.date,
           type: "purchase_invoice",
-          description: `Purchase Invoice ${inv.invoiceNumber}${inv.partyName ? ` – ${inv.partyName}` : ""}`,
+          description: inv.notes || '',
           ref: inv.invoiceNumber,
           dr: amt,
           cr: 0,
@@ -576,7 +578,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     allTransactions.push({
       date: p.date,
       type: "sale_invoice",
-      description: `Sale Invoice ${p.invoiceNumber}${p.partyName ? ` – ${p.partyName}` : ""}`,
+      description: '',
       ref: p.invoiceNumber,
       dr: Number(p.amount),
       cr: 0,
@@ -604,7 +606,7 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     allTransactions.push({
       date: p.date,
       type: "purchase_invoice",
-      description: `Purchase Invoice ${p.invoiceNumber}${p.partyName ? ` – ${p.partyName}` : ""}`,
+      description: '',
       ref: p.invoiceNumber,
       dr: 0,
       cr: Number(p.amount),

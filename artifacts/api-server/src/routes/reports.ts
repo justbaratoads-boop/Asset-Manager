@@ -1067,7 +1067,7 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
     const sgst = Number(inv.totalSgst);
     const igst = Number(inv.totalIgst);
     const taxable = grandTotal - cgst - sgst - igst;
-    const baseTx = { id: inv.id, date: inv.date, type: "Sale Invoice", number: inv.invoiceNumber, narration: `Sale to ${inv.partyName}` };
+    const baseTx = { id: inv.id, date: inv.date, type: "Sale Invoice", number: inv.invoiceNumber, narration: inv.notes || '' };
     addTx(inv.partyId ? 1000000 + inv.partyId : LEDGER.cash, "dr", grandTotal, baseTx);
     addTx(LEDGER.sales, "cr", taxable, baseTx);
     addTx(LEDGER.cgstPayable, "cr", cgst, baseTx);
@@ -1081,7 +1081,7 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
     const sgst = Number(inv.totalSgst);
     const igst = Number(inv.totalIgst);
     const taxable = grandTotal - cgst - sgst - igst;
-    const baseTx = { id: inv.id, date: inv.date, type: "Purchase Invoice", number: inv.invoiceNumber, narration: `Purchase from ${inv.partyName}` };
+    const baseTx = { id: inv.id, date: inv.date, type: "Purchase Invoice", number: inv.invoiceNumber, narration: inv.notes || '' };
     addTx(LEDGER.purchase, "dr", taxable, baseTx);
     addTx(LEDGER.cgstPayable, "dr", cgst, baseTx);
     addTx(LEDGER.sgstPayable, "dr", sgst, baseTx);
@@ -1090,25 +1090,25 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
   }
 
   for (const r of receipts) {
-    const baseTx = { id: r.id, date: r.date, type: "Receipt", number: r.voucherNumber, narration: r.narration || `Receipt from ${r.partyName || "Cash/Bank"}` };
+    const baseTx = { id: r.id, date: r.date, type: "Receipt", number: r.voucherNumber, narration: r.narration || '' };
     addTx(r.ledgerId, "dr", Number(r.amount), baseTx);
     addTx(r.partyId ? 1000000 + r.partyId : LEDGER.ar, "cr", Number(r.amount), baseTx);
   }
 
   for (const p of payments) {
-    const baseTx = { id: p.id, date: p.date, type: "Payment", number: p.voucherNumber, narration: p.narration || `Payment to ${p.partyName || "Cash/Bank"}` };
+    const baseTx = { id: p.id, date: p.date, type: "Payment", number: p.voucherNumber, narration: p.narration || '' };
     addTx(p.partyId ? 1000000 + p.partyId : LEDGER.ap, "dr", Number(p.amount), baseTx);
     addTx(p.ledgerId, "cr", Number(p.amount), baseTx);
   }
 
   for (const cn of creditNotes) {
-    const baseTx = { id: cn.id, date: cn.date, type: "Credit Note", number: cn.noteNumber, narration: cn.narration || `Sale Return` };
+    const baseTx = { id: cn.id, date: cn.date, type: "Credit Note", number: cn.noteNumber, narration: cn.reason || '' };
     addTx(LEDGER.sales, "dr", Number(cn.amount), baseTx);
     addTx(cn.partyId ? 1000000 + cn.partyId : LEDGER.ar, "cr", Number(cn.amount), baseTx);
   }
 
   for (const dn of debitNotes) {
-    const baseTx = { id: dn.id, date: dn.date, type: "Debit Note", number: dn.noteNumber, narration: dn.narration || `Purchase Return` };
+    const baseTx = { id: dn.id, date: dn.date, type: "Debit Note", number: dn.noteNumber, narration: dn.reason || '' };
     addTx(dn.partyId ? 1000000 + dn.partyId : LEDGER.ap, "dr", Number(dn.amount), baseTx);
     addTx(LEDGER.purchase, "cr", Number(dn.amount), baseTx);
   }
@@ -1123,7 +1123,7 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
     };
 
   for (const p of saleInvoicePayments) {
-    const baseTx = { id: null, date: p.date, type: "Receipt", number: p.ref, narration: `Collection for ${p.ref}` };
+    const baseTx = { id: null, date: p.date, type: "Receipt", number: p.ref, narration: '' };
     addTx(modeToLedgerId(p.mode), "dr", Number(p.amount), baseTx);
     addTx(p.partyId ? 1000000 + p.partyId : LEDGER.ar, "cr", Number(p.amount), baseTx);
   }

@@ -181,7 +181,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const saleInvoices = await db.select({
     date: saleInvoicesTable.date,
     type: sql<string>`'sale_invoice'`,
-    description: sql<string>`'Sale Invoice #' || invoice_number`,
+    description: sql<string>`COALESCE(${saleInvoicesTable.notes}, '')`,
     dr: saleInvoicesTable.grandTotal,
     cr: sql<string>`'0'`,
     ref: saleInvoicesTable.invoiceNumber,
@@ -192,7 +192,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const purchaseInvoices = await db.select({
     date: purchaseInvoicesTable.date,
     type: sql<string>`'purchase_invoice'`,
-    description: sql<string>`'Purchase Invoice #' || invoice_number`,
+    description: sql<string>`COALESCE(${purchaseInvoicesTable.notes}, '')`,
     dr: sql<string>`'0'`,
     cr: purchaseInvoicesTable.grandTotal,
     ref: purchaseInvoicesTable.invoiceNumber,
@@ -203,7 +203,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const rcpts = await db.select({
     date: receiptsTable.date,
     type: sql<string>`'receipt'`,
-    description: sql<string>`'Receipt #' || voucher_number`,
+    description: sql<string>`COALESCE(${receiptsTable.narration}, '')`,
     dr: sql<string>`'0'`,
     cr: receiptsTable.amount,
     ref: receiptsTable.voucherNumber,
@@ -214,7 +214,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const pmts = await db.select({
     date: paymentsTable.date,
     type: sql<string>`'payment'`,
-    description: sql<string>`'Payment #' || voucher_number`,
+    description: sql<string>`COALESCE(${paymentsTable.narration}, '')`,
     dr: paymentsTable.amount,
     cr: sql<string>`'0'`,
     ref: paymentsTable.voucherNumber,
@@ -240,7 +240,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     transactions.push({
       date: p.date,
       type: "invoice_payment",
-      description: `Payment (${p.mode}) against Invoice #${p.invoiceNumber}`,
+      description: '',
       dr: 0,
       cr: Number(p.amount),
       ref: p.invoiceNumber,
@@ -264,7 +264,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     transactions.push({
       date: p.date,
       type: "invoice_payment",
-      description: `Payment (${p.mode}) against Purchase Invoice #${p.invoiceNumber}`,
+      description: '',
       dr: Number(p.amount),
       cr: 0,
       ref: p.invoiceNumber,
@@ -274,7 +274,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const crNotes = await db.select({
     date: creditNotesTable.date,
     type: sql<string>`'credit_note'`,
-    description: sql<string>`'Credit Note #' || note_number`,
+    description: sql<string>`COALESCE(${creditNotesTable.reason}, '')`,
     dr: sql<string>`'0'`,
     cr: creditNotesTable.amount,
     ref: creditNotesTable.noteNumber,
@@ -285,7 +285,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
   const dbNotes = await db.select({
     date: debitNotesTable.date,
     type: sql<string>`'debit_note'`,
-    description: sql<string>`'Debit Note #' || note_number`,
+    description: sql<string>`COALESCE(${debitNotesTable.reason}, '')`,
     dr: debitNotesTable.amount,
     cr: sql<string>`'0'`,
     ref: debitNotesTable.noteNumber,
@@ -312,7 +312,7 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     transactions.push({
       date: jl.date,
       type: "journal",
-      description: jl.narration || `Journal ${jl.voucherNumber}`,
+      description: jl.narration || '',
       dr: jl.lineType === "dr" ? amt : 0,
       cr: jl.lineType === "cr" ? amt : 0,
       ref: jl.voucherNumber,
