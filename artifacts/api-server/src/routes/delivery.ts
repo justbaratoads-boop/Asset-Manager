@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { driversTable, vehiclesTable, deliveriesTable, deliveryInvoicesTable } from "@workspace/db/schema";
-import { saleInvoicesTable } from "@workspace/db/schema";
+import { saleInvoicesTable, saleInvoiceItemsTable } from "@workspace/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 import { makeVoucherNumber } from "../lib/counter";
@@ -235,25 +235,98 @@ router.post("/deliveries", authMiddleware, async (req, res) => {
 });
 
 router.get("/deliveries/:id", authMiddleware, async (req, res) => {
-  const [delivery] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.id, Number(req.params.id))).limit(1);
-  if (!delivery) return res.status(404).json({ error: "Not found" });
-  const invoices = await db
+  const [delivery] = await db
     .select({
-      id: saleInvoicesTable.id,
-      invoiceNumber: saleInvoicesTable.invoiceNumber,
-      partyName: saleInvoicesTable.partyName,
-      grandTotal: saleInvoicesTable.grandTotal,
+      id: deliveriesTable.id,
+      challanNumber: deliveriesTable.challanNumber,
+      tripNumber: deliveriesTable.tripNumber,
+      date: deliveriesTable.date,
+      saleInvoiceId: deliveriesTable.saleInvoiceId,
+      invoiceNumber: deliveriesTable.invoiceNumber,
+      partyName: deliveriesTable.partyName,
+      destination: deliveriesTable.destination,
+      status: deliveriesTable.status,
+      totalAmount: deliveriesTable.totalAmount,
+      notes: deliveriesTable.notes,
+      createdAt: deliveriesTable.createdAt,
+      vehicleId: deliveriesTable.vehicleId,
+      driverId: deliveriesTable.driverId,
+      vehicleNumber: vehiclesTable.vehicleNumber,
+      vehicleType: vehiclesTable.type,
+      driverName: driversTable.name,
+      driverPhone: driversTable.phone,
     })
+    .from(deliveriesTable)
+    .leftJoin(vehiclesTable, eq(deliveriesTable.vehicleId, vehiclesTable.id))
+    .leftJoin(driversTable, eq(deliveriesTable.driverId, driversTable.id))
+    .where(eq(deliveriesTable.id, Number(req.params.id)))
+    .limit(1);
+
+  if (!delivery) return res.status(404).json({ error: "Not found" });
+
+  const linkedRecords = await db
+    .select({ invoiceId: deliveryInvoicesTable.invoiceId })
     .from(deliveryInvoicesTable)
-    .innerJoin(saleInvoicesTable, eq(deliveryInvoicesTable.invoiceId, saleInvoicesTable.id))
     .where(eq(deliveryInvoicesTable.deliveryId, delivery.id));
+
+  let allInvoiceIds = linkedRecords.map(r => r.invoiceId);
+  if (delivery.saleInvoiceId && !allInvoiceIds.includes(delivery.saleInvoiceId)) {
+    allInvoiceIds.push(delivery.saleInvoiceId);
+  }
+
+  let invoicesWithItems: any[] = [];
+  if (allInvoiceIds.length > 0) {
+    const invRows = await db
+      .select({
+        id: saleInvoicesTable.id,
+        invoiceNumber: saleInvoicesTable.invoiceNumber,
+        partyName: saleInvoicesTable.partyName,
+        partyId: saleInvoicesTable.partyId,
+        date: saleInvoicesTable.date,
+        grandTotal: saleInvoicesTable.grandTotal,
+        amountPaid: saleInvoicesTable.amountPaid,
+        balanceDue: saleInvoicesTable.balanceDue,
+        notes: saleInvoicesTable.notes,
+      })
+      .from(saleInvoicesTable)
+      .where(inArray(saleInvoicesTable.id, allInvoiceIds));
+
+    for (const inv of invRows) {
+      const items = await db
+        .select({
+          id: saleInvoiceItemsTable.id,
+          itemName: saleInvoiceItemsTable.itemName,
+          quantity: saleInvoiceItemsTable.quantity,
+          unit: saleInvoiceItemsTable.unit,
+          rate: saleInvoiceItemsTable.rate,
+          total: saleInvoiceItemsTable.total,
+          discountPct: saleInvoiceItemsTable.discountPct,
+          gstPct: saleInvoiceItemsTable.gstPct,
+        })
+        .from(saleInvoiceItemsTable)
+        .where(eq(saleInvoiceItemsTable.invoiceId, inv.id));
+
+      invoicesWithItems.push({
+        ...inv,
+        grandTotal: Number(inv.grandTotal),
+        amountPaid: Number(inv.amountPaid),
+        balanceDue: Number(inv.balanceDue),
+        items: items.map(i => ({
+          ...i,
+          quantity: Number(i.quantity) || 0,
+          rate: Number(i.rate) || 0,
+          total: Number(i.total) || 0,
+        })),
+      });
+    }
+  }
 
   res.json({
     ...delivery,
     challanNumber: delivery.challanNumber || delivery.tripNumber,
     totalAmount: Number(delivery.totalAmount),
-    invoiceIds: invoices.map(i => i.id),
-    invoices,
+    invoiceIds: allInvoiceIds,
+    invoices: invoicesWithItems,
   });
 });
 

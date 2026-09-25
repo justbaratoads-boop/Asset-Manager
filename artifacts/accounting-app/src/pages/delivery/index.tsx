@@ -6,18 +6,20 @@ import {
   useListSaleInvoices,
   getListDeliveriesQueryKey, getListVehiclesQueryKey, getListDriversQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, today } from "@/lib/format";
-import { Plus, Trash2, Eye, CheckCircle2, Truck, UserRound, FileText, Search } from "lucide-react";
+import { Plus, Trash2, Eye, CheckCircle2, Truck, UserRound, FileText, Search, Calendar, Phone, MapPin, Printer, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useLocation } from "wouter";
@@ -259,9 +261,271 @@ function AssignBillDialog({ deliveries = [] }: { deliveries?: any[] }) {
   );
 }
 
+
+// ── DELIVERY DETAIL SIDE TRAY ──────────────────────────────
+function DeliveryDetailSheet({
+  deliveryId,
+  open,
+  onOpenChange,
+  onMarkDelivered,
+}: {
+  deliveryId: number | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMarkDelivered: (id: number) => void;
+}) {
+  const { data: delivery, isLoading } = useQuery({
+    queryKey: ["delivery-detail", deliveryId],
+    queryFn: () => customFetch<any>(`/api/deliveries/${deliveryId}`),
+    enabled: !!open && !!deliveryId,
+  });
+  const [, navigate] = useLocation();
+
+  const d = delivery as any;
+  const invoices: any[] = d?.invoices || [];
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl overflow-y-auto p-6">
+        {!d ? (
+          <div className="py-12 text-center text-muted-foreground">
+            {isLoading ? "Loading delivery details..." : "No delivery selected"}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Header / Title */}
+            <div className="border-b pb-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                <StatusBadge status={d.status} />
+                <span className="text-xs text-muted-foreground font-mono">ID #{d.id}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    <Truck className="h-5 w-5 text-primary" />
+                    Challan #{d.challanNumber || d.tripNumber}
+                  </h2>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
+                    <Calendar className="h-4 w-4 shrink-0" />
+                    <span>Date: <strong className="text-foreground">{d.date ? formatDate(d.date) : "-"}</strong></span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground block">Total Amount</span>
+                  <span className="text-2xl font-bold text-primary">₹{Number(d.totalAmount || 0).toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Transport & Driver Information */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Driver info */}
+              <div className="bg-muted/40 border rounded-lg p-3.5 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <UserRound className="h-4 w-4 text-primary" /> Driver
+                </div>
+                {d.driverName ? (
+                  <div>
+                    <div className="font-medium text-base">{d.driverName}</div>
+                    {d.driverPhone && (
+                      <a href={`tel:${d.driverPhone}`} className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1">
+                        <Phone className="h-3 w-3" /> {d.driverPhone}
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">No driver assigned</p>
+                )}
+              </div>
+
+              {/* Vehicle info */}
+              <div className="bg-muted/40 border rounded-lg p-3.5 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <Truck className="h-4 w-4 text-primary" /> Vehicle
+                </div>
+                {d.vehicleNumber ? (
+                  <div>
+                    <div className="font-mono font-medium text-base">{d.vehicleNumber}</div>
+                    {d.vehicleType && <div className="text-xs text-muted-foreground capitalize">{d.vehicleType}</div>}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">No vehicle assigned</p>
+                )}
+              </div>
+            </div>
+
+            {/* Destination & Notes */}
+            {(d.destination || d.notes) && (
+              <div className="bg-muted/20 border rounded-lg p-3.5 space-y-2 text-sm">
+                {d.destination && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-xs font-semibold text-muted-foreground block">Destination / Delivery Address</span>
+                      <span className="font-medium">{d.destination}</span>
+                    </div>
+                  </div>
+                )}
+                {d.notes && (
+                  <div className="pt-2 border-t text-xs">
+                    <span className="font-semibold text-muted-foreground block">Notes</span>
+                    <p className="italic text-slate-700">{d.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Assigned Bills / Sales Invoices with all item entries */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  Assigned Bills
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {invoices.length} {invoices.length === 1 ? "Bill" : "Bills"}
+                  </Badge>
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  All entries and items shown below
+                </span>
+              </div>
+
+              {invoices.length === 0 ? (
+                <div className="border rounded-lg p-6 text-center text-muted-foreground text-sm">
+                  {d.invoiceNumber ? (
+                    <div>
+                      <p>Attached Invoice: <strong className="font-mono text-foreground">{d.invoiceNumber}</strong></p>
+                      <p className="text-xs mt-1">Party: {d.partyName || "-"}</p>
+                    </div>
+                  ) : (
+                    "No bills attached to this delivery"
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {invoices.map((inv: any, idx: number) => {
+                    const items: any[] = inv.items || [];
+                    return (
+                      <div key={inv.id || idx} className="border rounded-lg bg-card overflow-hidden shadow-sm">
+                        {/* Bill Card Header */}
+                        <div className="bg-muted/50 p-3.5 border-b flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-sm text-primary">
+                                {inv.invoiceNumber}
+                              </span>
+                              {inv.date && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({formatDate(inv.date)})
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <UserRound className="h-3 w-3" />
+                              <strong className="text-foreground">{inv.partyName || "-"}</strong>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="text-xs text-muted-foreground block">Bill Total</span>
+                              <span className="font-bold text-sm text-primary">
+                                ₹{Number(inv.grandTotal || 0).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1 text-xs"
+                              onClick={() => {
+                                onOpenChange(false);
+                                navigate(`/sales/invoices/${inv.id}`);
+                              }}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Open Bill
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Items Table for this Bill */}
+                        <div className="p-0 overflow-x-auto">
+                          {items.length === 0 ? (
+                            <p className="text-xs text-muted-foreground p-3 italic">
+                              No items listed in invoice
+                            </p>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/20 text-xs">
+                                  <TableHead className="w-8">#</TableHead>
+                                  <TableHead>Item Name</TableHead>
+                                  <TableHead className="text-right">Qty</TableHead>
+                                  <TableHead className="text-right">Rate</TableHead>
+                                  <TableHead className="text-right">Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {items.map((it: any, itemIdx: number) => (
+                                  <TableRow key={it.id || itemIdx} className="text-xs">
+                                    <TableCell className="text-muted-foreground">{itemIdx + 1}</TableCell>
+                                    <TableCell className="font-medium">{it.itemName}</TableCell>
+                                    <TableCell className="text-right font-mono">
+                                      {it.quantity} {it.unit || ""}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono">
+                                      ₹{Number(it.rate || 0).toLocaleString("en-IN")}
+                                    </TableCell>
+                                    <TableCell className="text-right font-semibold">
+                                      ₹{Number(it.total || 0).toLocaleString("en-IN")}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Actions Footer */}
+            <div className="border-t pt-4 flex items-center justify-between gap-2 flex-wrap">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" className="gap-1.5" onClick={() => window.print()}>
+                  <Printer className="h-4 w-4" /> Print Challan
+                </Button>
+                {d.status !== "delivered" && (
+                  <Button
+                    className="gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onMarkDelivered(d.id);
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4" /> Mark as Delivered
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // ── DELIVERIES TAB ─────────────────────────────────────────
 function DeliveriesTab() {
   const [completeId, setCompleteId] = useState<number | null>(null);
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState<number | null>(null);
   const { data: deliveries = [], isLoading } = useListDeliveries({});
   const updateMutation = useUpdateDelivery();
   const queryClient = useQueryClient();
@@ -313,7 +577,7 @@ function DeliveriesTab() {
               {list.map((d: any) => {
                 const invoiceList = d.invoices && d.invoices.length > 0 ? d.invoices : (d.saleInvoiceId ? [{ id: d.saleInvoiceId, invoiceNumber: d.invoiceNumber, partyName: d.partyName, grandTotal: d.totalAmount }] : []);
                 return (
-                  <TableRow key={d.id}>
+                  <TableRow key={d.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setSelectedDeliveryId(d.id)}>
                     <TableCell className="font-mono text-sm font-medium">{d.challanNumber}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{d.date ? formatDate(d.date) : "-"}</TableCell>
                     <TableCell className="text-sm">
@@ -373,24 +637,25 @@ function DeliveriesTab() {
                     <TableCell><StatusBadge status={d.status} /></TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        {invoiceList.length > 0 && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-blue-600"
-                            title={`View Invoice (${invoiceList[0].invoiceNumber})`}
-                            onClick={() => navigate(`/sales/invoices/${invoiceList[0].id}`)}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-primary"
+                          title="View Delivery Details & Bills"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDeliveryId(d.id);
+                          }}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
                         {d.status !== "delivered" && (
                           <Button
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7 text-green-600"
                             title="Mark Delivered"
-                            onClick={() => setCompleteId(d.id)}
+                            onClick={(e) => { e.stopPropagation(); setCompleteId(d.id); }}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
                           </Button>
@@ -413,6 +678,14 @@ function DeliveriesTab() {
         title="Mark as Delivered?"
         description="This will mark the delivery as completed. This action cannot be undone."
         confirmLabel="Complete Delivery"
+      />
+
+      {/* Delivery Side Tray */}
+      <DeliveryDetailSheet
+        deliveryId={selectedDeliveryId}
+        open={!!selectedDeliveryId}
+        onOpenChange={v => !v && setSelectedDeliveryId(null)}
+        onMarkDelivered={id => setCompleteId(id)}
       />
     </>
   );
