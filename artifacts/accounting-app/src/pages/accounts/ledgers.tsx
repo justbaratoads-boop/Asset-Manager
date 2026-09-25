@@ -155,7 +155,32 @@ export default function LedgerAccounts() {
   const closingMap = new Map<number, number>();
   for (const row of (trialBalance?.rows || [])) {
     closingMap.set(row.id, row.closing);
+    if (row.id >= 1000000) {
+      closingMap.set(row.id - 1000000, row.closing);
+    }
   }
+
+  const getClosingDisplay = (u: UnifiedAccount) => {
+    let rawVal: number;
+    if (u.kind === "party") {
+      if (closingMap.has(1000000 + u.id)) {
+        rawVal = closingMap.get(1000000 + u.id)!;
+      } else if (closingMap.has(u.id)) {
+        rawVal = closingMap.get(u.id)!;
+      } else {
+        rawVal = u.openingBalance * (u.balanceType === "cr" ? -1 : 1);
+      }
+    } else {
+      if (closingMap.has(u.id)) {
+        rawVal = closingMap.get(u.id)!;
+      } else {
+        rawVal = u.openingBalance * (u.nature === "cr" ? -1 : 1);
+      }
+    }
+    const absVal = Math.abs(rawVal);
+    const nature = rawVal >= 0 ? "Dr" : "Cr";
+    return { absVal, nature };
+  };
 
   const isLoading = ledgersLoading || partiesLoading;
   const companyState = (companySettings as any)?.state || "";
@@ -382,11 +407,17 @@ export default function LedgerAccounts() {
                     <p className="text-xs text-muted-foreground mt-0.5">{u.group}</p>
                   </div>
                   <p className="font-bold text-sm shrink-0">
-                    {u.kind === "ledger" ? (() => {
-                      const closing = closingMap.has(u.id) ? closingMap.get(u.id)! : u.openingBalance;
-                      return <>{formatCurrency(Math.abs(closing))} <span className="text-xs font-normal text-muted-foreground">{closing >= 0 ? "Dr" : "Cr"}</span></>;
-                    })() : <>{formatCurrency(u.openingBalance)} <span className="text-xs font-normal text-muted-foreground uppercase">{u.balanceType}</span></>}
+                    {(() => {
+                      const { absVal, nature } = getClosingDisplay(u);
+                      return (
+                        <>
+                          {formatCurrency(absVal)}{" "}
+                          <span className="text-xs font-normal text-muted-foreground uppercase">{nature}</span>
+                        </>
+                      );
+                    })()}
                   </p>
+
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t">
                   {u.kind === "ledger" ? (
@@ -474,23 +505,17 @@ export default function LedgerAccounts() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {u.kind === "ledger" ? (() => {
-                        const closing = closingMap.has(u.id) ? closingMap.get(u.id)! : u.openingBalance;
-                        const absVal = Math.abs(closing);
-                        const nature = closing >= 0 ? "Dr" : "Cr";
+                      {(() => {
+                        const { absVal, nature } = getClosingDisplay(u);
                         return (
                           <>
                             <span className="font-medium">{formatCurrency(absVal)}</span>
                             <span className="text-muted-foreground text-xs ml-1 uppercase">{nature}</span>
                           </>
                         );
-                      })() : (
-                        <>
-                          {formatCurrency(u.openingBalance)}
-                          <span className="text-muted-foreground text-xs ml-1 uppercase">{u.balanceType}</span>
-                        </>
-                      )}
+                      })()}
                     </TableCell>
+
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {u.kind === "ledger" ? (

@@ -166,7 +166,8 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
 
   // 1. Manual journal entries (only from non-deleted entries)
   for (const { line } of journalLines) {
-    add(line.ledgerId, line.type as "dr" | "cr", Number(line.amount));
+    const targetId = line.partyId ? 1000000 + line.partyId : line.ledgerId;
+    add(targetId, line.type as "dr" | "cr", Number(line.amount));
   }
 
   // 2. Sale invoices — double-entry synthesis
@@ -207,7 +208,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   for (const r of receipts) {
     const amount = Number(r.amount);
     add(r.ledgerId, "dr", amount);
-    add((typeof r !== "undefined" && r.partyId) ? 1000000 + r.partyId : ((typeof cn !== "undefined" && cn.partyId) ? 1000000 + cn.partyId : ((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : LEDGER.ar)), "cr", amount);
+    add(r.partyId ? 1000000 + r.partyId : LEDGER.ar, "cr", amount);
   }
 
   // 5. Payments (money paid to suppliers)
@@ -215,7 +216,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   //    Cr: ledger_id (cash/bank account from which money went out)
   for (const p of payments) {
     const amount = Number(p.amount);
-    add((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : ((typeof dn !== "undefined" && dn.partyId) ? 1000000 + dn.partyId : LEDGER.ap), "dr", amount);
+    add(p.partyId ? 1000000 + p.partyId : LEDGER.ap, "dr", amount);
     add(p.ledgerId, "cr", amount);
   }
 
@@ -225,7 +226,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   for (const cn of creditNotes) {
     const amount = Number(cn.amount);
     add(LEDGER.sales, "dr", amount);
-    add((typeof r !== "undefined" && r.partyId) ? 1000000 + r.partyId : ((typeof cn !== "undefined" && cn.partyId) ? 1000000 + cn.partyId : ((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : LEDGER.ar)), "cr", amount);
+    add(cn.partyId ? 1000000 + cn.partyId : LEDGER.ar, "cr", amount);
   }
 
   // 7. Debit notes (purchase returns) — reversal of a purchase
@@ -233,7 +234,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   //    Cr: Purchase (reduces purchase expense)
   for (const dn of debitNotes) {
     const amount = Number(dn.amount);
-    add((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : ((typeof dn !== "undefined" && dn.partyId) ? 1000000 + dn.partyId : LEDGER.ap), "dr", amount);
+    add(dn.partyId ? 1000000 + dn.partyId : LEDGER.ap, "dr", amount);
     add(LEDGER.purchase, "cr", amount);
   }
 
@@ -257,7 +258,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   for (const p of saleInvoicePayments) {
     const amount = Number(p.amount);
     add(modeToLedgerId(p.mode), "dr", amount);
-    add((typeof r !== "undefined" && r.partyId) ? 1000000 + r.partyId : ((typeof cn !== "undefined" && cn.partyId) ? 1000000 + cn.partyId : ((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : LEDGER.ar)), "cr", amount);
+    add(p.partyId ? 1000000 + p.partyId : LEDGER.ar, "cr", amount);
   }
 
   // 9. Inline purchase-invoice payments (recorded on purchase invoice form)
@@ -266,7 +267,7 @@ router.get("/reports/trial-balance", authMiddleware, async (req, res) => {
   //    Cr: Cash / Bank (mode-mapped)
   for (const p of purchaseInvoicePayments) {
     const amount = Number(p.amount);
-    add((typeof p !== "undefined" && p.partyId) ? 1000000 + p.partyId : ((typeof dn !== "undefined" && dn.partyId) ? 1000000 + dn.partyId : LEDGER.ap), "dr", amount);
+    add(p.partyId ? 1000000 + p.partyId : LEDGER.ap, "dr", amount);
     add(modeToLedgerId(p.mode), "cr", amount);
   }
 

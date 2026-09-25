@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useListParties, useDeleteParty, getListPartiesQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useListParties, useDeleteParty, getListPartiesQueryKey, customFetch } from "@workspace/api-client-react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,9 +33,35 @@ export default function PartiesList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const { data: parties = [], isLoading } = useListParties({ search: search || undefined });
+  const { data: trialBalance } = useQuery({
+    queryKey: ["trial-balance-closing"],
+    queryFn: () => customFetch<{ rows: any[] }>("/api/reports/trial-balance").catch(() => ({ rows: [] })),
+  });
   const deleteMutation = useDeleteParty();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const closingMap = new Map<number, number>();
+  for (const row of (trialBalance?.rows || [])) {
+    closingMap.set(row.id, row.closing);
+    if (row.id >= 1000000) {
+      closingMap.set(row.id - 1000000, row.closing);
+    }
+  }
+
+  const getPartyClosing = (party: any) => {
+    let rawVal: number;
+    if (closingMap.has(1000000 + party.id)) {
+      rawVal = closingMap.get(1000000 + party.id)!;
+    } else if (closingMap.has(party.id)) {
+      rawVal = closingMap.get(party.id)!;
+    } else {
+      rawVal = Number(party.openingBalance || 0) * (party.balanceType === "cr" ? -1 : 1);
+    }
+    const absVal = Math.abs(rawVal);
+    const nature = rawVal >= 0 ? "Dr" : "Cr";
+    return { absVal, nature };
+  };
 
   useEffect(() => { setPage(1); }, [search, type]);
 
@@ -106,9 +132,17 @@ export default function PartiesList() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-semibold text-sm">{formatCurrency(party.openingBalance)}</p>
-                  <p className="text-xs text-muted-foreground uppercase">{party.balanceType}</p>
+                  {(() => {
+                    const { absVal, nature } = getPartyClosing(party);
+                    return (
+                      <>
+                        <p className="font-semibold text-sm">{formatCurrency(absVal)}</p>
+                        <p className="text-xs text-muted-foreground uppercase">{nature}</p>
+                      </>
+                    );
+                  })()}
                 </div>
+
               </div>
               {(party.phone || party.gstin) && (
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
@@ -155,7 +189,7 @@ export default function PartiesList() {
                 <TableHead>State</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Credit Limit</TableHead>
-                <TableHead className="text-right">Bal.</TableHead>
+                <TableHead className="text-right">Closing Bal.</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -187,8 +221,15 @@ export default function PartiesList() {
                     ) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="text-right text-sm whitespace-nowrap">
-                    {formatCurrency(party.openingBalance)}
-                    <span className="text-muted-foreground uppercase text-xs ml-1">{party.balanceType}</span>
+                    {(() => {
+                      const { absVal, nature } = getPartyClosing(party);
+                      return (
+                        <>
+                          {formatCurrency(absVal)}
+                          <span className="text-muted-foreground uppercase text-xs ml-1">{nature}</span>
+                        </>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
