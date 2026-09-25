@@ -1142,6 +1142,20 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
   all.sort((a, b) => a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
 
   const transactions: any[] = [];
+  const opRaw = targetLedger ? Number(targetLedger.openingBalance) : 0;
+  if (Math.abs(opRaw) > 0 || all.length === 0) {
+    const opDate = from ? String(from) : "2026-04-01";
+    transactions.push({
+      id: null,
+      date: opDate,
+      type: "Opening Balance",
+      number: "-",
+      narration: "Opening Balance",
+      debit: !isCrNature ? Math.abs(opRaw) : 0,
+      credit: isCrNature ? Math.abs(opRaw) : 0,
+      balance: runningBalance,
+    });
+  }
   for (const t of all) {
     if (from && t.date < from) {
       runningBalance += t.debit - t.credit;

@@ -35,6 +35,11 @@ const TYPE_COLORS: Record<string, string> = {
   "Purchase Invoice": "bg-blue-100 text-blue-700",
   "Payment": "bg-red-100 text-red-700",
   "Receipt": "bg-emerald-100 text-emerald-700",
+  "Opening Balance": "bg-amber-100 text-amber-800 font-semibold",
+  opening_balance: "bg-amber-100 text-amber-800 font-semibold",
+  "Credit Note": "bg-orange-100 text-orange-700",
+  "Debit Note": "bg-pink-100 text-pink-700",
+  "Journal": "bg-purple-100 text-purple-700",
 };
 
 function navPath(type: string, id: number): string | null {

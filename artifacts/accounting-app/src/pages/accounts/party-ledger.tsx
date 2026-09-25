@@ -27,6 +27,8 @@ const txTypeLabel: Record<string, string> = {
   credit_note: "Credit Note",
   debit_note: "Debit Note",
   journal: "Journal",
+  opening_balance: "Opening Balance",
+  "Opening Balance": "Opening Balance",
 };
 
 export default function PartyView() {

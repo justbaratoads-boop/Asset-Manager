@@ -31,6 +31,8 @@ const txTypeColors: Record<string, string> = {
   receipt: "bg-green-50 text-green-700 border-green-200",
   sale_invoice: "bg-sky-50 text-sky-700 border-sky-200",
   purchase_invoice: "bg-orange-50 text-orange-700 border-orange-200",
+  opening_balance: "bg-amber-50 text-amber-800 border-amber-300 font-semibold",
+  "Opening Balance": "bg-amber-50 text-amber-800 border-amber-300 font-semibold",
 };
 
 function fyStart(): string {

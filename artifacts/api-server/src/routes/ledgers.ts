@@ -655,8 +655,27 @@ router.get("/ledgers/:id/statement", authMiddleware, async (req, res) => {
     return { ...t, balance: Math.abs(runningNet), balanceNature: runningNet >= 0 ? "dr" : "cr" };
   });
 
+  const allRows: any[] = [];
+  // Include Opening Balance row in the statement table if opening balance exists or if there are no other transactions
+  if (Math.abs(periodOpeningNet) > 0 || periodTxs.length === 0) {
+    const opDate = from || (ledger.createdAt ? String(ledger.createdAt).split('T')[0] : '2026-04-01');
+    const isDr = periodOpeningNet >= 0;
+    allRows.push({
+      id: null,
+      date: opDate,
+      type: "opening_balance",
+      description: "Opening Balance",
+      ref: "-",
+      dr: isDr ? Math.abs(periodOpeningNet) : 0,
+      cr: !isDr ? Math.abs(periodOpeningNet) : 0,
+      balance: Math.abs(periodOpeningNet),
+      balanceNature: isDr ? "dr" : "cr",
+    });
+  }
+  allRows.push(...rows);
+
   // Reverse so the latest entry appears first (most recent at top)
-  const rowsDesc = [...rows].reverse();
+  const rowsDesc = [...allRows].reverse();
 
   const totalDr = rows.reduce((s: number, t: any) => s + t.dr, 0);
   const totalCr = rows.reduce((s: number, t: any) => s + t.cr, 0);

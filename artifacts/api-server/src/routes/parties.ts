@@ -335,18 +335,44 @@ router.get("/parties/:id/ledger", authMiddleware, async (req, res) => {
     .map(t => ({ ...t, dr: Number(t.dr), cr: Number(t.cr) }))
     .sort((a, b) => (a.date > b.date ? 1 : -1));
 
-  let balance = Number(party.openingBalance) * (party.balanceType === "dr" ? 1 : -1);
-  const rows = sorted.map(t => {
+  const opAmt = Number(party.openingBalance) || 0;
+  const isDr = party.balanceType === "dr";
+  let balance = opAmt * (isDr ? 1 : -1);
+
+  const allRows: any[] = [];
+  // Include Opening Balance row in the statement table
+  if (Math.abs(opAmt) > 0 || sorted.length === 0) {
+    const opDate = party.createdAt ? String(party.createdAt).split('T')[0] : '2026-04-01';
+    allRows.push({
+      id: null,
+      date: opDate,
+      type: "opening_balance",
+      description: "Opening Balance",
+      dr: isDr ? Math.abs(opAmt) : 0,
+      cr: !isDr ? Math.abs(opAmt) : 0,
+      ref: "-",
+      balance: balance,
+      balanceNature: isDr ? "dr" : "cr",
+    });
+  }
+
+  for (const t of sorted) {
     balance += t.dr - t.cr;
-    return { ...t, balance };
-  });
+    allRows.push({
+      ...t,
+      balance: balance,
+      balanceNature: balance >= 0 ? "dr" : "cr",
+    });
+  }
+
+  const rowsDesc = [...allRows].reverse();
 
   res.json({
     partyId: party.id,
     partyName: party.name,
-    openingBalance: Number(party.openingBalance),
+    openingBalance: Math.abs(opAmt),
     balanceType: party.balanceType,
-    transactions: rows,
+    transactions: rowsDesc,
     closingBalance: balance,
   });
 });
