@@ -5,9 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, today, formatDate } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
 
 const ALL_COLUMNS = [
@@ -26,6 +26,7 @@ export default function DayBook() {
   const { data, isLoading } = useGetDayBook({ date });
   const entries: any[] = (data as any)?.entries || [];
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("day-book", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(entries, "number", "asc");
   const vis = visibleKeys;
 
   const handleRowClick = (e: any) => {
@@ -41,8 +42,22 @@ export default function DayBook() {
         <h1 className="text-xl font-bold">Day Book</h1>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2"><Label>Date</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-40" /></div>
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={entries} columns={visibleColumns} filename={`day-book-${date}`} title={`Day Book — ${formatDate(date)}`} />
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`day-book-${date}`}
+            title={`Day Book — ${formatDate(date)}`}
+            shareSummary={`Day Book (${formatDate(date)}): Total Receipts ${formatCurrency((data as any)?.totalCr || 0)}, Total Payments ${formatCurrency((data as any)?.totalDr || 0)}`}
+          />
         </div>
       </div>
 
@@ -56,17 +71,17 @@ export default function DayBook() {
           <Table>
             <TableHeader>
               <TableRow>
-                {vis.has("type") && <TableHead>Type</TableHead>}
-                {vis.has("number") && <TableHead>Ref#</TableHead>}
-                {vis.has("party") && <TableHead>Party / Narration</TableHead>}
-                {vis.has("dr") && <TableHead className="text-right">Debit</TableHead>}
-                {vis.has("cr") && <TableHead className="text-right">Credit</TableHead>}
+                {vis.has("type") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")}>Type {sortKey === "type" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("number") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("number")}>Ref# {sortKey === "number" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("party") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("party")}>Party / Narration {sortKey === "party" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("dr") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("dr")}>Debit {sortKey === "dr" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("cr") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("cr")}>Credit {sortKey === "cr" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                : !entries.length
+                : !sortedData.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No entries for {formatDate(date)}</TableCell></TableRow>
                   : entries.map((e: any, i: number) => (
                       <TableRow

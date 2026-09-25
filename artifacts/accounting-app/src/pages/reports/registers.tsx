@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
 
@@ -56,6 +56,7 @@ function SaleRegister() {
   const invoices: any[] = (data as any)?.invoices || [];
   const totals = (data as any)?.totals || {};
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("sale-register", SALE_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(invoices, "date", "desc");
   const vis = visibleKeys;
 
   const labelCols = visibleColumns.filter(c => !AMOUNT_KEYS.has(c.key));
@@ -65,30 +66,44 @@ function SaleRegister() {
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         
         <div className="flex items-center gap-2">
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={invoices} columns={visibleColumns} filename={`sale-register-${from}-${to}`} title="Sale Register" />
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`sale-register-${from}-${to}`}
+            title="Sale Register"
+            shareSummary={`Sale Register: Total ${formatCurrency(totals.grandTotal)}`}
+          />
         </div>
       </div>
       <Table>
         <TableHeader>
           <TableRow>
-            {vis.has("date") && <TableHead>Date</TableHead>}
-            {vis.has("invoiceNumber") && <TableHead>Invoice#</TableHead>}
-            {vis.has("partyName") && <TableHead>Party</TableHead>}
+            {vis.has("date") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("date")}>Date {sortKey === "date" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+            {vis.has("invoiceNumber") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("invoiceNumber")}>Invoice# {sortKey === "invoiceNumber" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+            {vis.has("partyName") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("partyName")}>Party {sortKey === "partyName" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
             {vis.has("partyGstin") && <TableHead>GSTIN</TableHead>}
             {vis.has("totalTaxable") && <TableHead className="text-right">Taxable</TableHead>}
             {vis.has("totalCgst") && <TableHead className="text-right">CGST</TableHead>}
             {vis.has("totalSgst") && <TableHead className="text-right">SGST</TableHead>}
             {vis.has("totalIgst") && <TableHead className="text-right">IGST</TableHead>}
-            {vis.has("grandTotal") && <TableHead className="text-right">Total</TableHead>}
+            {vis.has("grandTotal") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("grandTotal")}>Total {sortKey === "grandTotal" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading
             ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-            : !invoices.length
+            : !sortedData.length
               ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No data for selected period</TableCell></TableRow>
-              : invoices.map((inv: any) => (
+              : sortedData.map((inv: any) => (
                 <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/sales/invoices/${inv.id}`)}>
                   {vis.has("date") && <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>}
                   {vis.has("invoiceNumber") && <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>}

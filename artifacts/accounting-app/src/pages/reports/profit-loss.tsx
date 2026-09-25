@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/format";
 import { Printer } from "lucide-react";
+import { ShareButton } from "@/components/share-button";
+import { ExportButtons } from "@/components/export-buttons";
 import { useFY } from "@/lib/financial-year";
 
 export default function ProfitLoss() {
@@ -31,9 +33,24 @@ export default function ProfitLoss() {
         <div className="flex flex-wrap items-center gap-3">
           
           
-          <Button type="button" variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5 print:hidden">
-            <Printer className="h-3.5 w-3.5" />Print PDF
-          </Button>
+          <div className="flex items-center gap-2 print:hidden">
+            <ExportButtons
+              data={[
+                { item: "Net Sales", amount: d?.income?.netSales ?? 0 },
+                { item: "Cost of Goods Sold", amount: d?.cogs?.cogs ?? 0 },
+                { item: "Gross Profit", amount: d?.grossProfit ?? 0 },
+                { item: "Total Expenses", amount: d?.expenses?.total ?? 0 },
+                { item: "Net Profit", amount: d?.netProfit ?? 0 },
+              ]}
+              columns={[{ key: "item", header: "Particulars" }, { key: "amount", header: "Amount", format: (v: any) => formatCurrency(v) }]}
+              filename={`profit-loss-${from}-${to}`}
+              title="Profit & Loss Statement"
+            />
+            <ShareButton
+              title="Profit & Loss Statement"
+              summaryText={d ? `Net Profit: ${formatCurrency(d.netProfit || 0)}, Gross Profit: ${formatCurrency(d.grossProfit || 0)}` : undefined}
+            />
+          </div>
         </div>
       </div>
 

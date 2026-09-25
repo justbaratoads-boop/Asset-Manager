@@ -13,9 +13,9 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
 
@@ -57,6 +57,7 @@ export default function PartyStatement() {
   const { data: rawLedgers = [] } = useListLedgers({});
   const { data, isLoading } = useGetPartyStatement({ partyId: partyId ? partyId as any : undefined, from, to });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("party-statement", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(transactions, "date", "desc");
   const vis = visibleKeys;
 
   const transactions: any[] = (data as any)?.transactions || [];
@@ -79,10 +80,22 @@ export default function PartyStatement() {
               Interest Calculation
             </Button>
           )}
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          {transactions.length > 0 && (
-            <ExportButtons data={transactions} columns={visibleColumns} filename={`ledger-statement-${selectedAccount?.name || ""}`} title={`Ledger Statement — ${selectedAccount?.name || ""}`} />
-          )}
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`ledger-statement-${selectedAccount?.name || ""}`}
+            title={`Ledger Statement — ${selectedAccount?.name || ""}`}
+            shareSummary={selectedAccount ? `Account: ${selectedAccount.name}, Closing Balance: ${formatCurrency(Math.abs(closingBalance))} ${closingBalance >= 0 ? "Dr" : "Cr"}` : undefined}
+          />
         </div>
       </div>
 
@@ -161,15 +174,15 @@ export default function PartyStatement() {
                   {vis.has("type") && <TableHead>Type</TableHead>}
                   {vis.has("number") && <TableHead>Reference#</TableHead>}
                   {vis.has("narration") && <TableHead>Narration</TableHead>}
-                  {vis.has("debit") && <TableHead className="text-right">Debit</TableHead>}
-                  {vis.has("credit") && <TableHead className="text-right">Credit</TableHead>}
-                  {vis.has("balance") && <TableHead className="text-right">Balance</TableHead>}
+                  {vis.has("debit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("debit")}>Debit {sortKey === "debit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("credit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("credit")}>Credit {sortKey === "credit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
-                  : !transactions.length
+                  : !sortedData.length
                     ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions found in selected period</TableCell></TableRow>
                     : transactions.map((t: any, i: number) => {
                       const path = t.id ? navPath(t.type, t.id) : null;

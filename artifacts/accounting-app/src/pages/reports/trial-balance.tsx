@@ -4,9 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
+import { ReportActions } from "@/components/report-actions";
 import { ColumnSelector } from "@/components/column-selector";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 
 const groupColors: Record<string, string> = {
   assets: "bg-blue-100 text-blue-700",
@@ -30,37 +31,51 @@ export default function TrialBalance() {
   const { data, isLoading } = useGetTrialBalance({});
   const rows: any[] = (data as any)?.rows || [];
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("trial-balance", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(rows, "name", "asc");
   const vis = visibleKeys;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Trial Balance</h1>
-        <div className="flex items-center gap-2">
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={rows} columns={visibleColumns} filename="trial-balance" title="Trial Balance" />
-        </div>
+        <ReportActions
+          allColumns={allColumns}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+          onResetSort={() => { setSortKey(""); setSortDir(null); }}
+          visibleKeys={vis}
+          onToggleColumn={toggle}
+          onSelectAllColumns={() => setAll(true)}
+          onClearAllColumns={() => setAll(false)}
+          data={sortedData}
+          visibleColumns={visibleColumns}
+          filename="trial-balance"
+          title="Trial Balance"
+          shareSummary={`Total Debit: ${formatCurrency((data as any)?.totalDebit || 0)}, Total Credit: ${formatCurrency((data as any)?.totalCredit || 0)}`}
+        />
       </div>
       <Card>
         <CardContent className="p-4">
           <Table>
             <TableHeader>
               <TableRow>
-                {vis.has("name") && <TableHead>Ledger</TableHead>}
-                {vis.has("group") && <TableHead>Group</TableHead>}
-                {vis.has("nature") && <TableHead>Nature</TableHead>}
-                {vis.has("openingBalance") && <TableHead className="text-right">Opening</TableHead>}
-                {vis.has("debit") && <TableHead className="text-right">Debit</TableHead>}
-                {vis.has("credit") && <TableHead className="text-right">Credit</TableHead>}
-                {vis.has("closing") && <TableHead className="text-right">Balance</TableHead>}
+                {vis.has("name") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>Ledger {sortKey === "name" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("group") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("group")}>Group {sortKey === "group" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("nature") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("nature")}>Nature {sortKey === "nature" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("openingBalance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("openingBalance")}>Opening {sortKey === "openingBalance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("debit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("debit")}>Debit {sortKey === "debit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("credit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("credit")}>Credit {sortKey === "credit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("closing") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("closing")}>Balance {sortKey === "closing" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                : !rows.length
+                : !sortedData.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No ledger data</TableCell></TableRow>
-                  : rows.map((r: any) => (
+                  : sortedData.map((r: any) => (
+
                     <TableRow key={r.id}>
                       {vis.has("name") && <TableCell className="font-medium">{r.name}</TableCell>}
                       {vis.has("group") && <TableCell><Badge variant="outline" className={`text-xs capitalize ${groupColors[r.group] || ""}`}>{r.group}</Badge></TableCell>}

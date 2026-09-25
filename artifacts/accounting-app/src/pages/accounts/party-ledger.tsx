@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ArrowLeft, Pencil, Phone, Mail, MapPin, Building2, ShieldCheck, ShieldOff, Info } from "lucide-react";
+import { ReportActions } from "@/components/report-actions";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 
 const gstBadge: Record<string, { label: string; cls: string }> = {
   registered:   { label: "Registered",   cls: "bg-green-100 text-green-800 border-green-300" },
@@ -38,6 +41,20 @@ export default function PartyView() {
   const p = party as any;
   const l = ledger as any;
   const gst = gstBadge[p?.gstType] ?? gstBadge.unregistered;
+
+  const ALL_COLUMNS = [
+    { header: "Date", key: "date", format: formatDate },
+    { header: "Type", key: "type" },
+    { header: "Description", key: "description" },
+    { header: "Ref #", key: "ref" },
+    { header: "Debit", key: "dr", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
+    { header: "Credit", key: "cr", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
+    { header: "Balance", key: "balance", format: (v: any) => String(Number(v).toFixed(2)) },
+  ];
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("party-ledger", ALL_COLUMNS);
+  const rawTxs = l?.transactions || [];
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(rawTxs, "date", "desc");
+  const vis = visibleKeys;
 
   return (
     <div className="space-y-4">
@@ -167,7 +184,25 @@ export default function PartyView() {
 
       {/* Transactions */}
       <div>
-        <h2 className="text-base font-semibold mb-2">All Transactions</h2>
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <h2 className="text-base font-semibold">All Transactions</h2>
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`party-ledger-${p?.name || "party"}`}
+            title={`${p?.name || "Party"} Statement`}
+            shareSummary={l ? `Party: ${p?.name}, Closing Balance: ${formatCurrency(Math.abs(l.closingBalance))} ${l.closingBalance >= 0 ? "Dr" : "Cr"}` : undefined}
+          />
+        </div>
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
@@ -188,7 +223,7 @@ export default function PartyView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {l.transactions.map((t: any, i: number) => (
+                  {sortedData.map((t: any, i: number) => (
                     <TableRow key={i}>
                       <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
                       <TableCell>

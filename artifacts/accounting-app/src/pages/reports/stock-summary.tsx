@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatQty } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { StockLedgerDialog } from "@/components/stock-ledger-dialog";
 
@@ -39,6 +39,7 @@ export default function StockSummary() {
   const [ledgerItem, setLedgerItem] = useState<{ id: number; name: string } | null>(null);
   const { data, isLoading } = useGetStockSummary({ from, to });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-summary", ALL_COLUMNS, DEFAULT_VISIBLE);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(summary, "name", "asc");
   const vis = visibleKeys;
 
   const summary: any[] = (data as any)?.summary || [];
@@ -51,8 +52,22 @@ export default function StockSummary() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Stock Summary</h1>
         <div className="flex items-center gap-2">
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={summary} columns={visibleColumns} filename={`stock-summary-${from}-${to}`} title="Stock Summary" />
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`stock-summary-${from}-${to}`}
+            title="Stock Summary"
+            shareSummary={`Closing Stock Value: ${formatCurrency(totalClosingValue)}`}
+          />
         </div>
       </div>
 
@@ -92,9 +107,9 @@ export default function StockSummary() {
             <TableBody>
               {isLoading
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
-                : !summary.length
+                : !sortedData.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No stock items found</TableCell></TableRow>
-                  : summary.map((item: any) => (
+                  : sortedData.map((item: any) => (
                     <TableRow
                       key={item.id}
                       className="cursor-pointer hover:bg-muted/50"

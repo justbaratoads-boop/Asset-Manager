@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ArrowLeft, Calculator, FileWarning } from "lucide-react";
+import { ReportActions } from "@/components/report-actions";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 
 export default function InterestCalculationReport() {
@@ -23,6 +26,19 @@ export default function InterestCalculationReport() {
   
   const [fromDate, setFromDate] = useState(globalFrom);
   const [toDate, setToDate] = useState(globalTo);
+  const ALL_COLUMNS = [
+    { header: "Date", key: "date", format: formatDate },
+    { header: "Invoice#", key: "invoiceNumber" },
+    { header: "Due Date", key: "dueDate", format: formatDate },
+    { header: "Balance Due", key: "balanceDue", format: (v: any) => String(Number(v).toFixed(2)) },
+    { header: "Overdue Days", key: "daysOverdue" },
+    { header: "Interest Rate", key: "rate" },
+    { header: "Interest", key: "interest", format: (v: any) => String(Number(v).toFixed(2)) },
+  ];
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("interest-calculation", ALL_COLUMNS);
+  const invoices = data?.invoices || [];
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(invoices, "date", "desc");
+  const vis = visibleKeys;
 
   const fetchInterest = async () => {
     if (!partyId) return;

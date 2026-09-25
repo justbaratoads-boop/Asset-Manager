@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
 import { Printer } from "lucide-react";
+import { ShareButton } from "@/components/share-button";
+import { ExportButtons } from "@/components/export-buttons";
 
 const GROUP_LABELS: Record<string, string> = {
   assets: "Fixed & Current Assets",
@@ -41,9 +43,21 @@ export default function BalanceSheet() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Balance Sheet</h1>
-        <Button type="button" variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5 print:hidden">
-          <Printer className="h-3.5 w-3.5" />Print PDF
-        </Button>
+        <div className="flex items-center gap-2 print:hidden">
+          <ExportButtons
+            data={[
+              { section: "Total Assets", amount: d?.assets?.total ?? 0 },
+              { section: "Total Liabilities & Capital", amount: d?.totalLiabilitiesAndCapital ?? 0 },
+            ]}
+            columns={[{ key: "section", header: "Section" }, { key: "amount", header: "Amount", format: (v: any) => formatCurrency(v) }]}
+            filename="balance-sheet"
+            title="Balance Sheet"
+          />
+          <ShareButton
+            title="Balance Sheet"
+            summaryText={d ? `Total Assets: ${formatCurrency(d.assets?.total || 0)}, Total Liabilities: ${formatCurrency(d.totalLiabilitiesAndCapital || 0)}` : undefined}
+          />
+        </div>
       </div>
 
       {isLoading && <p className="text-muted-foreground">Loading...</p>}

@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
 
@@ -43,6 +43,7 @@ export default function AllTransactions() {
 
   const { data, isLoading } = useGetAllTransactions({ from: from || undefined, to: to || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("all-transactions", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(transactions, "date", "desc");
   const vis = visibleKeys;
 
   let transactions: any[] = (data as any)?.transactions || [];
@@ -63,8 +64,22 @@ export default function AllTransactions() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">All Transactions</h1>
         <div className="flex items-center gap-2">
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={transactions} columns={visibleColumns} filename={`all-transactions-${from}-${to}`} title="All Transactions" />
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`all-transactions-${from}-${to}`}
+            title="All Transactions"
+            shareSummary={`Total Debit: ${formatCurrency(totalDebit)}, Total Credit: ${formatCurrency(totalCredit)}`}
+          />
         </div>
       </div>
 
@@ -92,19 +107,19 @@ export default function AllTransactions() {
           <Table>
             <TableHeader>
               <TableRow>
-                {vis.has("date") && <TableHead>Date</TableHead>}
-                {vis.has("type") && <TableHead>Type</TableHead>}
-                {vis.has("number") && <TableHead>Reference#</TableHead>}
-                {vis.has("party") && <TableHead>Party / Narration</TableHead>}
-                {vis.has("amount") && <TableHead className="text-right">Amount</TableHead>}
-                {vis.has("debit") && <TableHead className="text-right">Debit</TableHead>}
-                {vis.has("credit") && <TableHead className="text-right">Credit</TableHead>}
+                {vis.has("date") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("date")}>Date {sortKey === "date" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("type") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")}>Type {sortKey === "type" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("number") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("number")}>Reference# {sortKey === "number" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("party") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("party")}>Party / Narration {sortKey === "party" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("amount") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("amount")}>Amount {sortKey === "amount" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("debit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("debit")}>Debit {sortKey === "debit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                {vis.has("credit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("credit")}>Credit {sortKey === "credit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
-                : !transactions.length
+                : !sortedData.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
                   : transactions.map((t: any, i: number) => (
                       <TableRow

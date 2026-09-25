@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate, today } from "@/lib/format";
 import { ArrowLeft } from "lucide-react";
+import { ReportActions } from "@/components/report-actions";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 
 const txTypeLabel: Record<string, string> = {
@@ -50,6 +53,20 @@ export default function LedgerStatement() {
 
   const s = statement as any;
   const l = ledger as any;
+
+  const ALL_COLUMNS = [
+    { header: "Date", key: "date", format: formatDate },
+    { header: "Type", key: "type" },
+    { header: "Description", key: "description" },
+    { header: "Ref #", key: "ref" },
+    { header: "Debit", key: "dr", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
+    { header: "Credit", key: "cr", format: (v: any) => v > 0 ? String(Number(v).toFixed(2)) : "" },
+    { header: "Balance", key: "balance", format: (v: any) => String(Number(v).toFixed(2)) },
+  ];
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("ledger-statement", ALL_COLUMNS);
+  const rawTxs = s?.transactions || [];
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(rawTxs, "date", "desc");
+  const vis = visibleKeys;
 
   return (
     <div className="space-y-4">
@@ -114,6 +131,24 @@ export default function LedgerStatement() {
                 className="h-8 w-36 text-sm"
               />
             </div>
+            <div className="ml-auto">
+              <ReportActions
+                allColumns={allColumns}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+                onResetSort={() => { setSortKey(""); setSortDir(null); }}
+                visibleKeys={vis}
+                onToggleColumn={toggle}
+                onSelectAllColumns={() => setAll(true)}
+                onClearAllColumns={() => setAll(false)}
+                data={sortedData}
+                visibleColumns={visibleColumns}
+                filename={`ledger-statement-${l?.name || "account"}`}
+                title={`${l?.name || "Ledger"} Statement`}
+                shareSummary={s ? `Closing Balance: ${formatCurrency(Math.abs(s.closingBalance))} ${s.closingBalance >= 0 ? "Dr" : "Cr"}` : undefined}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -139,7 +174,7 @@ export default function LedgerStatement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {s.transactions.map((t: any, i: number) => (
+                {sortedData.map((t: any, i: number) => (
                   <TableRow key={i}>
                     <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
                     <TableCell>

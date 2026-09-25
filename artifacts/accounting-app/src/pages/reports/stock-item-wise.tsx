@@ -6,9 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ export default function StockReportItemWise() {
   const { data: itemData, isLoading } = useGetStockItem(Number(itemId), { query: { enabled: !!itemId } });
 
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-item-wise", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(transactions, "date", "desc");
   const vis = visibleKeys;
 
   // Filter transactions by date range on the client side since the API returns all for this item
@@ -63,8 +64,22 @@ export default function StockReportItemWise() {
           </div>
           
           
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={transactions} columns={visibleColumns} filename={`stock-item-${itemId}-${from}-${to}`} title="Stock Report Item Wise" />
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`stock-item-${itemId}-${from}-${to}`}
+            title="Stock Report Item Wise"
+            shareSummary={itemData ? `Item: ${itemData.name}, Current Stock: ${itemData.currentStock} ${itemData.unit}` : undefined}
+          />
         </div>
       </div>
       
@@ -93,13 +108,13 @@ export default function StockReportItemWise() {
                   {vis.has("batchId") && <TableHead>Batch ID</TableHead>}
                   {vis.has("inQty") && <TableHead className="text-right">In</TableHead>}
                   {vis.has("outQty") && <TableHead className="text-right">Out</TableHead>}
-                  {vis.has("balance") && <TableHead className="text-right">Balance</TableHead>}
+                  {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                  : !transactions.length
+                  : !sortedData.length
                     ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No transactions found</TableCell></TableRow>
                     : transactions.map((t: any, i: number) => {
                       const qty = Number(t.quantity);

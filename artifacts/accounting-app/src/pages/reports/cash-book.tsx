@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
 import { X, Wallet } from "lucide-react";
@@ -28,6 +28,7 @@ export default function CashBook() {
   const { data, isLoading } = useGetCashBook({ from: globalFrom, to: globalTo });
   const entries: any[] = (data as any)?.entries || [];
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("cash-book", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(entries, "date", "desc");
   const vis = visibleKeys;
 
   return (
@@ -71,8 +72,22 @@ export default function CashBook() {
             )}
           </div>
 
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={entries} columns={visibleColumns} filename={`cash-book-${globalFrom || "all"}-${globalTo || "all"}`} title="Cash Book" />
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename={`cash-book-${globalFrom || "all"}-${globalTo || "all"}`}
+            title="Cash Book"
+            shareSummary={`Cash In: ${formatCurrency((data as any)?.totalIn || 0)}, Cash Out: ${formatCurrency((data as any)?.totalOut || 0)}`}
+          />
         </div>
       </div>
 
@@ -92,13 +107,13 @@ export default function CashBook() {
                 {vis.has("party") && <TableHead>Party</TableHead>}
                 {vis.has("cashIn") && <TableHead className="text-right">Cash In</TableHead>}
                 {vis.has("cashOut") && <TableHead className="text-right">Cash Out</TableHead>}
-                {vis.has("balance") && <TableHead className="text-right">Balance</TableHead>}
+                {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-              ) : !entries.length ? (
+              ) : !sortedData.length ? (
                 <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No cash entries for selected period</TableCell></TableRow>
               ) : (
                 entries.map((e: any, i: number) => {

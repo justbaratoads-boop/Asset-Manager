@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
 import { Building2, CreditCard, ArrowDownRight, ArrowUpRight, Search, X, ExternalLink, RefreshCw } from "lucide-react";
@@ -77,6 +77,7 @@ export default function BankBook() {
   });
 
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("bank-book-modal", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(selectedBank?.entries || [], "date", "desc");
   const vis = visibleKeys;
 
   const handleBankClick = (bank: BankAccount) => {
@@ -380,18 +381,21 @@ export default function BankBook() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <ColumnSelector
+                  <ReportActions
                     allColumns={allColumns}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+                    onResetSort={() => { setSortKey(""); setSortDir(null); }}
                     visibleKeys={vis}
-                    onToggle={toggle}
-                    onSelectAll={() => setAll(true)}
-                    onClearAll={() => setAll(false)}
-                  />
-                  <ExportButtons
-                    data={selectedBank.entries || []}
-                    columns={visibleColumns}
+                    onToggleColumn={toggle}
+                    onSelectAllColumns={() => setAll(true)}
+                    onClearAllColumns={() => setAll(false)}
+                    data={sortedData}
+                    visibleColumns={visibleColumns}
                     filename={`bank-statement-${selectedBank.name.toLowerCase().replace(/\s+/g, "-")}`}
                     title={`${selectedBank.name} Statement`}
+                    shareSummary={`${selectedBank.name} Balance: ${formatCurrency(Math.abs(selectedBank.closingBalance))} ${selectedBank.closingBalance >= 0 ? "Dr" : "Cr"}`}
                   />
                 </div>
               </div>

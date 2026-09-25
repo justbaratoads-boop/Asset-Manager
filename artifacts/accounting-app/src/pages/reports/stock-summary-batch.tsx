@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency, formatQty } from "@/lib/format";
 import { ExportButtons } from "@/components/export-buttons";
+import { ShareButton } from "@/components/share-button";
 import { useFY } from "@/lib/financial-year";
 import { useFetch } from "@/hooks/use-fetch";
 import { Layers, Package, ArrowDownCircle, ArrowUpCircle, TrendingUp, ChevronRight } from "lucide-react";
@@ -328,12 +329,18 @@ export default function StockSummaryBatch() {
             Average cost valuation · {items.length} items · click any row to see full transaction detail
           </p>
         </div>
-        <ExportButtons
-          data={exportRows}
-          columns={Object.keys(exportRows[0] || {}).map(k => ({ key: k, header: k }))}
-          filename={`batch-stock-summary-${from}-${to}`}
-          title="Batch-wise Stock Summary"
-        />
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            data={exportRows}
+            columns={Object.keys(exportRows[0] || {}).map(k => ({ key: k, header: k }))}
+            filename={`batch-stock-summary-${from}-${to}`}
+            title="Batch-wise Stock Summary"
+          />
+          <ShareButton
+            title="Batch-wise Stock Summary"
+            summaryText={`Batch-wise Stock Summary: ${items.length} items`}
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

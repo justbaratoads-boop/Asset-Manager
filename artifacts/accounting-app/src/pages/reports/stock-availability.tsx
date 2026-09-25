@@ -6,9 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/pagination";
-import { ExportButtons } from "@/components/export-buttons";
-import { ColumnSelector } from "@/components/column-selector";
+import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useReportSort } from "@/hooks/use-report-sort";
 import { cn } from "@/lib/utils";
 import { formatQty } from "@/lib/format";
 import { StockLedgerDialog } from "@/components/stock-ledger-dialog";
@@ -45,6 +45,7 @@ export default function StockAvailabilityReport() {
   const [page, setPage] = useState(1);
   const [ledgerItem, setLedgerItem] = useState<{ id: number; name: string } | null>(null);
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-availability", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(exportData, "itemName", "asc");
   const vis = visibleKeys;
 
   const { data: items = [], isLoading } = useQuery({
@@ -78,8 +79,22 @@ export default function StockAvailabilityReport() {
         <h1 className="text-xl font-bold">Stock Availability Report</h1>
         <div className="flex items-center gap-2">
           <p className="text-xs text-muted-foreground">{list.length} items</p>
-          <ColumnSelector allColumns={allColumns} visibleKeys={vis} onToggle={toggle} onSelectAll={() => setAll(true)} onClearAll={() => setAll(false)} />
-          <ExportButtons data={exportData} columns={visibleColumns} filename="stock-availability" title="Stock Availability Report" />
+          <ReportActions
+            allColumns={allColumns}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+            onResetSort={() => { setSortKey(""); setSortDir(null); }}
+            visibleKeys={vis}
+            onToggleColumn={toggle}
+            onSelectAllColumns={() => setAll(true)}
+            onClearAllColumns={() => setAll(false)}
+            data={sortedData}
+            visibleColumns={visibleColumns}
+            filename="stock-availability"
+            title="Stock Availability Report"
+            shareSummary={`Total Physical: ${totalPhysical.toLocaleString()}, Available: ${totalAvailable.toLocaleString()}`}
+          />
         </div>
       </div>
 
@@ -99,7 +114,7 @@ export default function StockAvailabilityReport() {
                 {vis.has("unit") && <TableHead>Unit</TableHead>}
                 {vis.has("physicalStock") && <TableHead className="text-right">Physical Stock</TableHead>}
                 {vis.has("reservedQty") && <TableHead className="text-right">Reserved (Orders)</TableHead>}
-                {vis.has("availableStock") && <TableHead className="text-right">Available Stock</TableHead>}
+                {vis.has("availableStock") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("availableStock")}>Available Stock {sortKey === "availableStock" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
                 {vis.has("batchName") && <TableHead>Batch</TableHead>}
                 {vis.has("batchAvail") && <TableHead className="text-right">Batch Avail</TableHead>}
                 {vis.has("status") && <TableHead>Status</TableHead>}
