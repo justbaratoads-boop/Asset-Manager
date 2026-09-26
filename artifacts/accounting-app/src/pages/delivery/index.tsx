@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, today } from "@/lib/format";
-import { Plus, Trash2, Eye, CheckCircle2, Truck, UserRound, FileText, Search, Calendar, Phone, MapPin, Printer, ExternalLink, RotateCcw, ArrowRight, SkipForward, AlertTriangle, Check, DollarSign } from "lucide-react";
+import { Plus, Trash2, Eye, CheckCircle2, Truck, UserRound, FileText, Search, Calendar, Phone, MapPin, Printer, ExternalLink, RotateCcw, ArrowRight, SkipForward, AlertTriangle, Check, DollarSign, X, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useLocation } from "wouter";
@@ -1111,61 +1111,270 @@ function DeliveriesTab() {
   const [completeDeliveryId, setCompleteDeliveryId] = useState<number | null>(null);
   const [undeliverId, setUndeliverId] = useState<number | null>(null);
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "delivered" | "undelivered">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const { data: deliveries = [], isLoading } = useListDeliveries({});
+  const updateMutation = useUpdateDelivery();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const list = (deliveries as any[]).filter(d => d.status !== "cancelled");
+
+  // Stage counts
+  const pendingCount = list.filter(d => d.status === "pending").length;
+  const inTransitCount = list.filter(d => d.status === "in_transit").length;
+  const completedCount = list.filter(d => d.status === "delivered").length;
+  const undeliveredCount = list.filter(d => d.status === "undelivered").length;
+  const allCount = list.length;
+
+  const hasActiveFilters = statusFilter !== "all" || search.trim() !== "" || dateFrom !== "" || dateTo !== "";
+
+  const resetFilters = () => {
+    setStatusFilter("all");
+    setSearch("");
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const handleMarkInTransit = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await updateMutation.mutateAsync({ id, data: { status: "in_transit" } as any });
+      queryClient.invalidateQueries({ queryKey: getListDeliveriesQueryKey() });
+      toast({ title: "Delivery marked as In Transit (Out for Delivery)" });
+    } catch (err: any) {
+      toast({ title: "Failed to update status", variant: "destructive" });
+    }
+  };
+
   const filteredList = list.filter((d: any) => {
-    if (statusFilter === "all") return true;
-    if (statusFilter === "active") return d.status === "pending" || d.status === "in_transit";
-    if (statusFilter === "delivered") return d.status === "delivered";
-    if (statusFilter === "undelivered") return d.status === "undelivered";
+    // Stage / status filter
+    if (statusFilter !== "all") {
+      if (statusFilter === "completed" || statusFilter === "delivered") {
+        if (d.status !== "delivered") return false;
+      } else if (statusFilter === "pending") {
+        if (d.status !== "pending") return false;
+      } else if (statusFilter === "in_transit") {
+        if (d.status !== "in_transit") return false;
+      } else if (statusFilter === "undelivered") {
+        if (d.status !== "undelivered") return false;
+      } else if (d.status !== statusFilter) {
+        return false;
+      }
+    }
+
+    // Date range filter
+    if (dateFrom && d.date && d.date < dateFrom) return false;
+    if (dateTo && d.date && d.date > dateTo) return false;
+
+    // Search query
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      const invoiceNums = Array.isArray(d.invoices) ? d.invoices.map((i: any) => i.invoiceNumber).join(" ").toLowerCase() : "";
+      const partyNames = Array.isArray(d.invoices) ? d.invoices.map((i: any) => i.partyName).join(" ").toLowerCase() : "";
+      const matches =
+        (d.challanNumber && d.challanNumber.toLowerCase().includes(q)) ||
+        (d.tripNumber && d.tripNumber.toLowerCase().includes(q)) ||
+        (d.invoiceNumber && d.invoiceNumber.toLowerCase().includes(q)) ||
+        (d.partyName && d.partyName.toLowerCase().includes(q)) ||
+        (d.destination && d.destination.toLowerCase().includes(q)) ||
+        (d.driverName && d.driverName.toLowerCase().includes(q)) ||
+        (d.vehicleNumber && d.vehicleNumber.toLowerCase().includes(q)) ||
+        invoiceNums.includes(q) ||
+        partyNames.includes(q);
+
+      if (!matches) return false;
+    }
+
     return true;
   });
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <h2 className="font-semibold text-base">Delivery Challans</h2>
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${statusFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-            >
-              All ({list.length})
-            </button>
-            <button
-              onClick={() => setStatusFilter("active")}
-              className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${statusFilter === "active" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-            >
-              Active ({list.filter(d => d.status === "pending" || d.status === "in_transit").length})
-            </button>
-            <button
-              onClick={() => setStatusFilter("delivered")}
-              className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${statusFilter === "delivered" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-            >
-              Delivered ({list.filter(d => d.status === "delivered").length})
-            </button>
-            <button
-              onClick={() => setStatusFilter("undelivered")}
-              className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${statusFilter === "undelivered" ? "bg-rose-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-            >
-              Undelivered ({list.filter(d => d.status === "undelivered").length})
-            </button>
-          </div>
+      {/* Header with Title & Action */}
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <h2 className="font-bold text-lg tracking-tight">Delivery Challans</h2>
+          <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-medium">
+            {filteredList.length} of {list.length} challans
+          </span>
         </div>
         <AssignBillDialog deliveries={list} />
+      </div>
+
+      {/* Stage Filter Pills */}
+      <div className="space-y-3 mb-4 bg-muted/20 border rounded-xl p-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-muted-foreground mr-1 flex items-center gap-1">
+              <Filter className="h-3.5 w-3.5" /> Stage:
+            </span>
+
+            {/* All */}
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all shadow-sm ${
+                statusFilter === "all"
+                  ? "bg-slate-900 text-white ring-2 ring-slate-400/40"
+                  : "bg-background text-muted-foreground hover:bg-muted border"
+              }`}
+            >
+              All ({allCount})
+            </button>
+
+            {/* Pending Stage */}
+            <button
+              type="button"
+              onClick={() => setStatusFilter("pending")}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 ${
+                statusFilter === "pending"
+                  ? "bg-amber-500 text-white ring-2 ring-amber-400/50"
+                  : "bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+              Pending ({pendingCount})
+            </button>
+
+            {/* In Transit Stage */}
+            <button
+              type="button"
+              onClick={() => setStatusFilter("in_transit")}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 ${
+                statusFilter === "in_transit"
+                  ? "bg-blue-600 text-white ring-2 ring-blue-400/50"
+                  : "bg-blue-50 text-blue-800 border border-blue-200/80 hover:bg-blue-100"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-blue-400" />
+              In Transit ({inTransitCount})
+            </button>
+
+            {/* Completed / Delivered Stage */}
+            <button
+              type="button"
+              onClick={() => setStatusFilter("delivered")}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 ${
+                statusFilter === "delivered" || statusFilter === "completed"
+                  ? "bg-green-600 text-white ring-2 ring-green-400/50"
+                  : "bg-green-50 text-green-800 border border-green-200/80 hover:bg-green-100"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-green-400" />
+              Completed ({completedCount})
+            </button>
+
+            {/* Undelivered / Returned Stage */}
+            <button
+              type="button"
+              onClick={() => setStatusFilter("undelivered")}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 ${
+                statusFilter === "undelivered"
+                  ? "bg-rose-600 text-white ring-2 ring-rose-400/50"
+                  : "bg-rose-50 text-rose-800 border border-rose-200/80 hover:bg-rose-100"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-rose-400" />
+              Undelivered ({undeliveredCount})
+            </button>
+          </div>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2"
+            >
+              <X className="h-3.5 w-3.5" /> Clear Filters
+            </Button>
+          )}
+        </div>
+
+        {/* Filter Controls Row: Search + Stage Select + Date Range */}
+        <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-muted/40">
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search challan#, bill#, party, driver, destination..."
+              className="h-8 pl-8 text-xs bg-background"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Stage Dropdown */}
+          <div className="w-44">
+            <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
+              <SelectTrigger className="h-8 text-xs bg-background">
+                <SelectValue placeholder="All Stages" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages ({allCount})</SelectItem>
+                <SelectItem value="pending">Pending Stage ({pendingCount})</SelectItem>
+                <SelectItem value="in_transit">In Transit Stage ({inTransitCount})</SelectItem>
+                <SelectItem value="delivered">Completed Stage ({completedCount})</SelectItem>
+                <SelectItem value="undelivered">Undelivered Stage ({undeliveredCount})</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Date range from/to */}
+          <div className="flex items-center gap-1 bg-background border rounded-md px-2 py-0.5 h-8">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-[11px] text-muted-foreground">From</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="text-xs bg-transparent outline-none w-28 cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 bg-background border rounded-md px-2 py-0.5 h-8">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-[11px] text-muted-foreground">To</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="text-xs bg-transparent outline-none w-28 cursor-pointer"
+            />
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
         <p className="text-center py-8 text-muted-foreground text-sm">Loading...</p>
       ) : filteredList.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Truck className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No deliveries yet. Assign bills to get started.</p>
+        <div className="text-center py-12 text-muted-foreground border rounded-xl bg-card space-y-3">
+          <Truck className="h-10 w-10 mx-auto opacity-30" />
+          {list.length === 0 ? (
+            <p className="text-sm">No deliveries yet. Assign bills to get started.</p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">No deliveries found matching the selected filters.</p>
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={resetFilters} className="text-xs">
+                  <X className="h-3.5 w-3.5 mr-1" /> Reset all filters
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -1260,6 +1469,17 @@ function DeliveriesTab() {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
+                        {d.status === "pending" && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title="Dispatch / Mark In Transit"
+                            onClick={(e) => handleMarkInTransit(d.id, e)}
+                          >
+                            <Truck className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {d.status !== "delivered" && d.status !== "undelivered" && (
                           <>
                             <Button
@@ -1275,7 +1495,7 @@ function DeliveriesTab() {
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                              title="Mark Delivered"
+                              title="Complete Delivery"
                               onClick={(e) => { e.stopPropagation(); setCompleteDeliveryId(d.id); }}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
