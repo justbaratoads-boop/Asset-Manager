@@ -3,6 +3,7 @@ import { useGetStockSummary } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatQty } from "@/lib/format";
@@ -11,6 +12,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { StockLedgerDialog } from "@/components/stock-ledger-dialog";
+import { X } from "lucide-react";
 
 const ALL_COLUMNS = [
   { header: "Item", key: "name" },
@@ -33,16 +35,16 @@ const ALL_COLUMNS = [
 const DEFAULT_VISIBLE = ["name","unit","hsnCode","openingQty","openingValue","purchasedQty","purchasedValue","soldQty","soldValue","closingQty","closingValue"];
 
 export default function StockSummary() {
-  const { fy, globalFrom: from, globalTo: to } = useFY();
-  
+  const { fy, globalFrom: from, globalTo: to, setGlobalFrom, setGlobalTo, clearGlobalDates } = useFY();
   
   const [ledgerItem, setLedgerItem] = useState<{ id: number; name: string } | null>(null);
   const { data, isLoading } = useGetStockSummary({ from, to });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-summary", ALL_COLUMNS, DEFAULT_VISIBLE);
+
+  const summary: any[] = (data as any)?.summary || [];
   const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(summary, "name", "asc");
   const vis = visibleKeys;
 
-  const summary: any[] = (data as any)?.summary || [];
   const totalClosingValue = summary.reduce((s: number, i: any) => s + (i.closingValue || 0), 0);
   const totalPurchasedValue = summary.reduce((s: number, i: any) => s + (i.purchasedValue || 0), 0);
   const totalSoldValue = summary.reduce((s: number, i: any) => s + (i.soldValue || 0), 0);
@@ -72,8 +74,35 @@ export default function StockSummary() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        
-        
+        <div className="flex items-center gap-1.5 bg-card border rounded-lg p-1.5 shadow-sm">
+          <Label className="text-xs text-muted-foreground ml-1">From</Label>
+          <Input
+            type="date"
+            value={from || ""}
+            onChange={(e) => setGlobalFrom(e.target.value)}
+            className="h-8 w-34 text-xs"
+            title="From Date"
+          />
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input
+            type="date"
+            value={to || ""}
+            onChange={(e) => setGlobalTo(e.target.value)}
+            className="h-8 w-34 text-xs"
+            title="To Date"
+          />
+          {(from || to) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearGlobalDates}
+              className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+              title="Clear date filter"
+            >
+              <X className="h-3.5 w-3.5 mr-1" /> Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

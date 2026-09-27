@@ -4,11 +4,12 @@ import { useListStockItems, useDeleteStockItem, getListStockItemsQueryKey, useGe
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/format";
-import { Plus, Search, Eye, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { Plus, Search, Eye, Pencil, Trash2, AlertTriangle, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -18,16 +19,22 @@ const PAGE_SIZE = 20;
 
 export default function StockItemList() {
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const { data: items = [], isLoading } = useListStockItems({ search: search || undefined });
+  const { data: items = [], isLoading } = useListStockItems({
+    search: search || undefined,
+    from: dateFrom || undefined,
+    to: dateTo || undefined,
+  });
   const deleteMutation = useDeleteStockItem();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: companySettings } = useGetCompanySettings();
   const enableDualLedger = (companySettings as any)?.enableDualLedger ?? false;
 
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -59,9 +66,40 @@ export default function StockItemList() {
         <Link href="/inventory/items/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Item</Button></Link>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Search items..." value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Search items..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-1.5 bg-card border rounded-lg p-1.5 shadow-sm shrink-0">
+          <Label className="text-xs text-muted-foreground ml-1">From</Label>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-8 w-34 text-xs"
+            title="From Date"
+          />
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-8 w-34 text-xs"
+            title="To Date"
+          />
+          {(dateFrom || dateTo) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setDateFrom(""); setDateTo(""); }}
+              className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+              title="Clear date filter"
+            >
+              <X className="h-3.5 w-3.5 mr-1" /> Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Mobile card list */}
@@ -86,6 +124,9 @@ export default function StockItemList() {
                         <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", item.isTaxLiability ? "border-green-300 text-green-700 bg-green-50" : "border-red-300 text-red-700 bg-red-50")}>
                           {item.isTaxLiability ? "Pakka" : "Kaccha"}
                         </Badge>
+                      )}
+                      {item.createdAt && (
+                        <span className="text-xs text-muted-foreground">{formatDate(item.createdAt)}</span>
                       )}
                       {item.hsnCode && <span className="text-xs font-mono text-muted-foreground">HSN: {item.hsnCode}</span>}
                       <span className="text-xs text-muted-foreground">{item.unit}</span>
@@ -132,6 +173,7 @@ export default function StockItemList() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>HSN</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead className="text-right">Purchase Rate</TableHead>
@@ -142,9 +184,9 @@ export default function StockItemList() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
               ) : list.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No items found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No items found</TableCell></TableRow>
               ) : paginated.map((item: any) => {
                 const isLow = item.physicalStock <= item.minStockLevel;
                 return (
@@ -159,6 +201,9 @@ export default function StockItemList() {
                           </Badge>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {item.createdAt ? formatDate(item.createdAt) : "-"}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-mono">{item.hsnCode || "-"}</TableCell>
                     <TableCell className="text-sm">{item.unit}</TableCell>

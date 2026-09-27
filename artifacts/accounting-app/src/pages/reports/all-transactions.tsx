@@ -3,6 +3,8 @@ import { useGetAllTransactions } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -11,6 +13,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
+import { Search, X } from "lucide-react";
 
 const TYPE_COLORS: Record<string, string> = {
   "Sale Invoice": "bg-green-100 text-green-700",
@@ -36,21 +39,32 @@ const ALL_COLUMNS = [
 const ALL_TYPES = ["Sale Invoice", "Purchase Invoice", "Payment", "Receipt", "Journal", "Order", "Credit Note", "Debit Note"];
 
 export default function AllTransactions() {
-  const { globalFrom: from, globalTo: to } = useFY();
+  const { globalFrom, globalTo, setGlobalFrom, setGlobalTo, clearGlobalDates } = useFY();
   const [typeFilter, setTypeFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [selectedTx, setSelectedTx] = useState<TransactionTarget | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const { data, isLoading } = useGetAllTransactions({ from: from || undefined, to: to || undefined });
+  const { data, isLoading } = useGetAllTransactions({ from: globalFrom || undefined, to: globalTo || undefined });
   const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("all-transactions", ALL_COLUMNS);
-  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(transactions, "date", "desc");
+
+  let rawTransactions: any[] = (data as any)?.transactions || [];
+  if (typeFilter !== "all") rawTransactions = rawTransactions.filter((t: any) => t.type === typeFilter);
+  if (search.trim()) {
+    const q = search.toLowerCase();
+    rawTransactions = rawTransactions.filter((t: any) =>
+      (t.number && String(t.number).toLowerCase().includes(q)) ||
+      (t.party && String(t.party).toLowerCase().includes(q)) ||
+      (t.narration && String(t.narration).toLowerCase().includes(q)) ||
+      (t.type && String(t.type).toLowerCase().includes(q))
+    );
+  }
+
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(rawTransactions, "date", "desc");
   const vis = visibleKeys;
 
-  let transactions: any[] = (data as any)?.transactions || [];
-  if (typeFilter !== "all") transactions = transactions.filter((t: any) => t.type === typeFilter);
-
-  const totalDebit = transactions.reduce((s: number, t: any) => s + (t.debit || 0), 0);
-  const totalCredit = transactions.reduce((s: number, t: any) => s + (t.credit || 0), 0);
+  const totalDebit = rawTransactions.reduce((s: number, t: any) => s + (t.debit || 0), 0);
+  const totalCredit = rawTransactions.reduce((s: number, t: any) => s + (t.credit || 0), 0);
 
   const handleRowClick = (t: any) => {
     if (t.id) {
@@ -76,7 +90,7 @@ export default function AllTransactions() {
             onClearAllColumns={() => setAll(false)}
             data={sortedData}
             visibleColumns={visibleColumns}
-            filename={`all-transactions-${from}-${to}`}
+            filename={`all-transactions-${globalFrom || "all"}-${globalTo || "all"}`}
             title="All Transactions"
             shareSummary={`Total Debit: ${formatCurrency(totalDebit)}, Total Credit: ${formatCurrency(totalCredit)}`}
           />
@@ -84,20 +98,60 @@ export default function AllTransactions() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1.5 bg-card border rounded-lg p-1.5 shadow-sm">
+          <Label className="text-xs text-muted-foreground ml-1">From</Label>
+          <Input
+            type="date"
+            value={globalFrom || ""}
+            onChange={(e) => setGlobalFrom(e.target.value)}
+            className="h-8 w-34 text-xs"
+            title="From Date"
+          />
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input
+            type="date"
+            value={globalTo || ""}
+            onChange={(e) => setGlobalTo(e.target.value)}
+            className="h-8 w-34 text-xs"
+            title="To Date"
+          />
+          {(globalFrom || globalTo) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearGlobalDates}
+              className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+              title="Clear date filter"
+            >
+              <X className="h-3.5 w-3.5 mr-1" /> Clear
+            </Button>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
-          <Label>Type</Label>
+          <Label className="text-xs text-muted-foreground">Type</Label>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
               {ALL_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
+
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            className="pl-8 h-8 text-xs"
+            placeholder="Search party, ref#, narration..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Transactions</p><p className="text-xl font-bold">{transactions.length}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Transactions</p><p className="text-xl font-bold">{sortedData.length}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Debit</p><p className="text-xl font-bold">{formatCurrency(totalDebit)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Credit</p><p className="text-xl font-bold">{formatCurrency(totalCredit)}</p></CardContent></Card>
       </div>
@@ -121,7 +175,7 @@ export default function AllTransactions() {
                 ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                 : !sortedData.length
                   ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
-                  : transactions.map((t: any, i: number) => (
+                  : sortedData.map((t: any, i: number) => (
                       <TableRow
                         key={i}
                         className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}

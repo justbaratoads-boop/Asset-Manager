@@ -249,10 +249,41 @@ router.delete("/stock-categories/:id", authMiddleware, async (req, res) => {
 
 // ---- ITEMS ----
 router.get("/stock-items", async (req, res) => {
-  const { search, categoryId, lowStock } = req.query;
+  const { search, categoryId, lowStock, from, to } = req.query as {
+    search?: string;
+    categoryId?: string;
+    lowStock?: string;
+    from?: string;
+    to?: string;
+  };
   const conditions: any[] = [eq(stockItemsTable.isDeleted, "false")];
   if (categoryId) conditions.push(eq(stockItemsTable.categoryId, Number(categoryId)));
   if (search) conditions.push(ilike(stockItemsTable.name, `%${search}%`));
+  if (from && to) {
+    conditions.push(sql`(
+      (${stockItemsTable.createdAt}::date >= ${from}::date AND ${stockItemsTable.createdAt}::date <= ${to}::date)
+      OR ${stockItemsTable.id} IN (
+        SELECT ${stockTransactionsTable.itemId} FROM ${stockTransactionsTable}
+        WHERE ${stockTransactionsTable.createdAt}::date >= ${from}::date AND ${stockTransactionsTable.createdAt}::date <= ${to}::date
+      )
+    )`);
+  } else if (from) {
+    conditions.push(sql`(
+      ${stockItemsTable.createdAt}::date >= ${from}::date
+      OR ${stockItemsTable.id} IN (
+        SELECT ${stockTransactionsTable.itemId} FROM ${stockTransactionsTable}
+        WHERE ${stockTransactionsTable.createdAt}::date >= ${from}::date
+      )
+    )`);
+  } else if (to) {
+    conditions.push(sql`(
+      ${stockItemsTable.createdAt}::date <= ${to}::date
+      OR ${stockItemsTable.id} IN (
+        SELECT ${stockTransactionsTable.itemId} FROM ${stockTransactionsTable}
+        WHERE ${stockTransactionsTable.createdAt}::date <= ${to}::date
+      )
+    )`);
+  }
 
   const items = await db.select({
     item: stockItemsTable,

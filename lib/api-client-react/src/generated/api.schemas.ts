@@ -1286,6 +1286,8 @@ export type ListStockItemsParams = {
   search?: string;
   categoryId?: number;
   lowStock?: boolean;
+  from?: string;
+  to?: string;
 };
 
 export type ListSaleInvoicesParams = {
