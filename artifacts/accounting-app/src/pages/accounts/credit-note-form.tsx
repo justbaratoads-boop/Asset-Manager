@@ -211,7 +211,8 @@ export default function CreditNoteForm() {
     setIsSaving(true);
     const payload = {
       date, partyId, partyName: selectedParty?.name || "",
-      reason, amount: grandTotal, items,
+      reason, amount: grandTotal,
+      items: computedItems,
       totalTaxable: totals.taxable, totalCgst: totals.cgst,
       totalSgst: totals.sgst, totalIgst: totals.igst, isInterstate,
       otherCharges: charges.length > 0 ? JSON.stringify(charges) : null,

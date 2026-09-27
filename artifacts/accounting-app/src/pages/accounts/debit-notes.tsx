@@ -43,9 +43,26 @@ function DebitNoteViewSheet({ id, onClose }: { id: number | null; onClose: () =>
   })();
 
   const taxable = items.reduce((s, i) => s + Number(i.taxableAmount || 0), 0);
-  const cgst = items.reduce((s, i) => s + Number(i.cgst || 0), 0);
-  const sgst = items.reduce((s, i) => s + Number(i.sgst || 0), 0);
-  const igst = items.reduce((s, i) => s + Number(i.igst || 0), 0);
+  let cgst = items.reduce((s, i) => s + Number(i.cgst || 0), 0);
+  let sgst = items.reduce((s, i) => s + Number(i.sgst || 0), 0);
+  let igst = items.reduce((s, i) => s + Number(i.igst || 0), 0);
+
+  const isInterstate = data?.isInterstate === true || data?.isInterstate === "true" || items.some((i: any) => Number(i.igst) > 0);
+  for (const c of otherChargesList) {
+    if (c.gstCalculationMethod === 'flat_rate' && Number(c.gstRate) > 0) {
+      const amt = c.type === 'deduct' ? -Number(c.amount) : Number(c.amount);
+      const tax = (amt * Number(c.gstRate)) / 100;
+      if (isInterstate) {
+        igst += tax;
+      } else {
+        cgst += tax / 2;
+        sgst += tax / 2;
+      }
+    }
+  }
+  cgst = Number(cgst.toFixed(2));
+  sgst = Number(sgst.toFixed(2));
+  igst = Number(igst.toFixed(2));
 
   return (
     <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
