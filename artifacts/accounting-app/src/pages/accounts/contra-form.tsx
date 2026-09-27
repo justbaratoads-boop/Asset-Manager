@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, today } from "@/lib/format";
 import { ArrowLeft, ArrowRight, Search, ArrowLeftRight } from "lucide-react";
+import { VoucherActionButtons } from "@/components/voucher-actions";
 import { useToast } from "@/hooks/use-toast";
 
 type Ledger = { id: number; name: string; group: string };
@@ -180,14 +181,19 @@ export default function ContraForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/accounts/contra">
-          <Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold">{isEdit ? "Edit Contra Voucher" : "New Contra Voucher"}</h1>
-          <p className="text-xs text-muted-foreground">Transfer funds between Cash and Bank accounts</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Link href="/accounts/contra">
+            <Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold">{isEdit ? "Edit Contra Voucher" : "New Contra Voucher"}</h1>
+            <p className="text-xs text-muted-foreground">Transfer funds between Cash and Bank accounts</p>
+          </div>
         </div>
+        {isEdit && existing && (
+          <VoucherActionButtons type="contra" voucher={existing} size="sm" />
+        )}
       </div>
 
       <Card>

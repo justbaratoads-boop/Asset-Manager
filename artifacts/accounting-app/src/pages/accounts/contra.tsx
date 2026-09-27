@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Pencil, Trash2, Eye, ArrowRight, ArrowLeftRight } from "lucide-react";
+import { VoucherActionButtons, VoucherPrintButton, VoucherShareButton } from "@/components/voucher-actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -80,10 +81,12 @@ export default function ContraList() {
                 </div>
                 <p className="font-bold text-base text-primary shrink-0">{formatCurrency(j.totalDebit)}</p>
               </div>
-              <div className="flex gap-2 border-t pt-3">
+              <div className="flex gap-2 border-t pt-3 flex-wrap">
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewId(j.id)}>
                   <Eye className="h-3.5 w-3.5 mr-1" />View
                 </Button>
+                <VoucherPrintButton type="contra" voucher={j} size="sm" variant="outline" className="flex-1" />
+                <VoucherShareButton type="contra" voucher={j} size="sm" variant="outline" className="flex-1" />
                 <Link href={`/accounts/contra/${j.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
@@ -139,6 +142,8 @@ export default function ContraList() {
                       <TableCell className="text-right font-semibold text-primary">{formatCurrency(j.totalDebit)}</TableCell>
                       <TableCell onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1 justify-end">
+                          <VoucherPrintButton type="contra" voucher={j} size="icon" variant="ghost" className="h-7 w-7" />
+                          <VoucherShareButton type="contra" voucher={j} size="icon" variant="ghost" className="h-7 w-7" />
                           <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewId(j.id)}>
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
@@ -185,10 +190,15 @@ function ContraViewSheet({ id, onClose }: { id: number | null; onClose: () => vo
     <Sheet open={!!id} onOpenChange={open => !open && onClose()}>
       <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <ArrowLeftRight className="h-5 w-5 text-primary" />
-            Contra Voucher
-          </SheetTitle>
+          <div className="flex items-center justify-between pr-6">
+            <SheetTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-primary" />
+              Contra Voucher
+            </SheetTitle>
+            {entry && (
+              <VoucherActionButtons type="contra" voucher={entry} size="sm" />
+            )}
+          </div>
         </SheetHeader>
 
         {isLoading ? (
@@ -248,13 +258,19 @@ function ContraViewSheet({ id, onClose }: { id: number | null; onClose: () => vo
               </p>
             )}
 
-            <div className="flex gap-2 pt-2 border-t">
-              <Button variant="outline" className="flex-1" onClick={onClose}>Close</Button>
-              {id && (
-                <Link href={`/accounts/contra/${id}/edit`} className="flex-1">
-                  <Button className="w-full gap-2"><Pencil className="h-4 w-4" />Edit</Button>
-                </Link>
-              )}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t flex-wrap">
+              <div className="flex gap-2">
+                <VoucherPrintButton type="contra" voucher={entry} size="sm" />
+                <VoucherShareButton type="contra" voucher={entry} size="sm" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+                {id && (
+                  <Link href={`/accounts/contra/${id}/edit`}>
+                    <Button size="sm" className="gap-1.5"><Pencil className="h-3.5 w-3.5" />Edit</Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         )}

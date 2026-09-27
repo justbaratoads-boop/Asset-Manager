@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Pencil, Trash2, Eye, CheckCircle2, AlertCircle, BookOpen } from "lucide-react";
+import { VoucherActionButtons, VoucherPrintButton, VoucherShareButton } from "@/components/voucher-actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
@@ -82,10 +83,12 @@ export default function JournalList() {
                   <p className="font-semibold text-rose-700">{formatCurrency(j.totalCredit)}</p>
                 </div>
               </div>
-              <div className="flex gap-2 border-t pt-3">
+              <div className="flex gap-2 border-t pt-3 flex-wrap">
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewId(j.id)}>
                   <Eye className="h-3.5 w-3.5 mr-1" />View
                 </Button>
+                <VoucherPrintButton type="journal" voucher={j} size="sm" variant="outline" className="flex-1" />
+                <VoucherShareButton type="journal" voucher={j} size="sm" variant="outline" className="flex-1" />
                 <Link href={`/accounts/journal/${j.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
@@ -132,6 +135,8 @@ export default function JournalList() {
                   <TableCell className="text-right font-medium text-rose-700">{formatCurrency(j.totalCredit)}</TableCell>
                   <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">
+                      <VoucherPrintButton type="journal" voucher={j} size="icon" variant="ghost" className="h-7 w-7" />
+                      <VoucherShareButton type="journal" voucher={j} size="icon" variant="ghost" className="h-7 w-7" />
                       <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewId(j.id)}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
@@ -180,10 +185,15 @@ function JournalViewSheet({ id, onClose, onEdit }: { id: number | null; onClose:
     <Sheet open={!!id} onOpenChange={open => !open && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            Journal Entry
-          </SheetTitle>
+          <div className="flex items-center justify-between pr-6">
+            <SheetTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Journal Entry
+            </SheetTitle>
+            {entry && (
+              <VoucherActionButtons type="journal" voucher={entry} size="sm" />
+            )}
+          </div>
         </SheetHeader>
 
         {isLoading ? (
@@ -272,13 +282,19 @@ function JournalViewSheet({ id, onClose, onEdit }: { id: number | null; onClose:
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 pt-2 border-t">
-              <Button variant="outline" className="flex-1" onClick={onClose}>Close</Button>
-              {id && (
-                <Link href={`/accounts/journal/${id}/edit`} className="flex-1">
-                  <Button className="w-full gap-2"><Pencil className="h-4 w-4" />Edit Entry</Button>
-                </Link>
-              )}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t flex-wrap">
+              <div className="flex gap-2">
+                <VoucherPrintButton type="journal" voucher={entry} size="sm" />
+                <VoucherShareButton type="journal" voucher={entry} size="sm" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+                {id && (
+                  <Link href={`/accounts/journal/${id}/edit`}>
+                    <Button size="sm" className="gap-1.5"><Pencil className="h-3.5 w-3.5" />Edit Entry</Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         )}

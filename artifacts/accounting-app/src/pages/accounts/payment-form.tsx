@@ -207,9 +207,14 @@ export default function PaymentForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
-      <div className="flex items-center gap-3">
-        <Button type="button" variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
-        <h1 className="text-xl font-bold">{isEdit ? "Edit Payment Voucher" : "New Payment Voucher"}</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Button type="button" variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
+          <h1 className="text-xl font-bold">{isEdit ? "Edit Payment Voucher" : "New Payment Voucher"}</h1>
+        </div>
+        {isEdit && existing && (
+          <VoucherActionButtons type="payment" voucher={existing} ledgers={allLedgers} size="sm" />
+        )}
       </div>
       <Card>
         <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">

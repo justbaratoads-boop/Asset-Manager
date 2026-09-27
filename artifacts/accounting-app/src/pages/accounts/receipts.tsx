@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus, Pencil, Trash2, Eye } from "lucide-react";
+import { VoucherActionButtons, VoucherPrintButton, VoucherShareButton } from "@/components/voucher-actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { Badge } from "@/components/ui/badge";
@@ -99,10 +100,12 @@ export default function ReceiptList() {
                 </div>
                 <p className="font-bold text-base text-green-600">{formatCurrency(r.amount)}</p>
               </div>
-              <div className="flex gap-2 border-t pt-3" onClick={e => e.stopPropagation()}>
+              <div className="flex gap-2 border-t pt-3 flex-wrap" onClick={e => e.stopPropagation()}>
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewItem(r)}>
                   <Eye className="h-3.5 w-3.5 mr-1" />View
                 </Button>
+                <VoucherPrintButton type="receipt" voucher={r} ledgers={ledgers} size="sm" variant="outline" className="flex-1" />
+                <VoucherShareButton type="receipt" voucher={r} ledgers={ledgers} size="sm" variant="outline" className="flex-1" />
                 <Link href={`/accounts/receipts/${r.id}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full"><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
                 </Link>
@@ -148,7 +151,9 @@ export default function ReceiptList() {
                   <TableCell className="text-sm">{formatLedgersSummary(r)}</TableCell>
                   <TableCell className="text-right font-medium text-green-600">{formatCurrency(r.amount)}</TableCell>
                   <TableCell onClick={e => e.stopPropagation()}>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 justify-end">
+                      <VoucherPrintButton type="receipt" voucher={r} ledgers={ledgers} size="icon" variant="ghost" className="h-7 w-7" />
+                      <VoucherShareButton type="receipt" voucher={r} ledgers={ledgers} size="icon" variant="ghost" className="h-7 w-7" />
                       <Button size="icon" variant="ghost" className="h-7 w-7" title="View" onClick={() => setViewItem(r)}><Eye className="h-3.5 w-3.5" /></Button>
                       <Link href={`/accounts/receipts/${r.id}/edit`}><Button size="icon" variant="ghost" className="h-7 w-7" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button></Link>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -166,7 +171,12 @@ export default function ReceiptList() {
       <Dialog open={!!viewItem} onOpenChange={o => !o && setViewItem(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Receipt Voucher — {viewItem?.voucherNumber}</DialogTitle>
+            <div className="flex items-center justify-between pr-6">
+              <DialogTitle>Receipt Voucher — {viewItem?.voucherNumber}</DialogTitle>
+              {viewItem && (
+                <VoucherActionButtons type="receipt" voucher={viewItem} ledgers={ledgers} size="sm" />
+              )}
+            </div>
           </DialogHeader>
           {viewItem && (() => {
             const allocs = getLedgerAllocations(viewItem);
@@ -214,15 +224,21 @@ export default function ReceiptList() {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 pt-2 border-t">
-                  <Link href={`/accounts/receipts/${viewItem.id}/edit`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => setViewItem(null)}>
-                      <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+                <div className="flex items-center justify-between gap-2 pt-2 border-t flex-wrap">
+                  <div className="flex gap-2">
+                    <VoucherPrintButton type="receipt" voucher={viewItem} ledgers={ledgers} size="sm" />
+                    <VoucherShareButton type="receipt" voucher={viewItem} ledgers={ledgers} size="sm" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/accounts/receipts/${viewItem.id}/edit`}>
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setViewItem(null)}>
+                        <Pencil className="h-3.5 w-3.5" />Edit
+                      </Button>
+                    </Link>
+                    <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={() => { setDeleteId(viewItem.id); setViewItem(null); }}>
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
-                  </Link>
-                  <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={() => { setDeleteId(viewItem.id); setViewItem(null); }}>
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
-                  </Button>
+                  </div>
                 </div>
               </div>
             );

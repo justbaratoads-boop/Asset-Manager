@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, today } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Search } from "lucide-react";
+import { VoucherActionButtons } from "@/components/voucher-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
 
@@ -255,11 +256,16 @@ export default function JournalForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
-      <div className="flex items-center gap-3">
-        <Link href="/accounts/journal">
-          <Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
-        </Link>
-        <h1 className="text-xl font-bold">{isEdit ? "Edit Journal Entry" : "New Journal Entry"}</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Link href="/accounts/journal">
+            <Button type="button" variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
+          </Link>
+          <h1 className="text-xl font-bold">{isEdit ? "Edit Journal Entry" : "New Journal Entry"}</h1>
+        </div>
+        {isEdit && existing && (
+          <VoucherActionButtons type="journal" voucher={existing} size="sm" />
+        )}
       </div>
 
       <Card>
