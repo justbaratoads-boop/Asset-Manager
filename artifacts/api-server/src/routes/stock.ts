@@ -345,6 +345,139 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
   res.status(201).json({ ...item, physicalStock: Number(item.physicalStock) });
 });
 
+router.post("/stock-items/bulk-import", authMiddleware, async (req, res) => {
+  const { items, onDuplicate = "skip" } = req.body as {
+    items: any[];
+    onDuplicate?: "skip" | "update";
+  };
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "No items provided for import" });
+  }
+
+  // Pre-load all categories to map category name -> id
+  const existingCategories = await db.select().from(stockCategoriesTable);
+  const categoryMap = new Map<string, number>();
+  for (const c of existingCategories) {
+    categoryMap.set(c.name.trim().toLowerCase(), c.id);
+  }
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const raw = items[i];
+    const name = (raw.name || "").trim();
+    if (!name) {
+      errors.push(`Row ${i + 1}: Item name is required`);
+      skipped++;
+      continue;
+    }
+
+    try {
+      // Resolve category
+      let categoryId: number | null = null;
+      const catName = (raw.category || raw.categoryName || "").trim();
+      if (catName) {
+        const catKey = catName.toLowerCase();
+        if (categoryMap.has(catKey)) {
+          categoryId = categoryMap.get(catKey)!;
+        } else {
+          const [newCat] = await db.insert(stockCategoriesTable).values({
+            name: catName,
+          }).returning();
+          categoryId = newCat.id;
+          categoryMap.set(catKey, newCat.id);
+        }
+      } else if (raw.categoryId) {
+        categoryId = Number(raw.categoryId);
+      }
+
+      // Check existing item
+      const [existing] = await db.select()
+        .from(stockItemsTable)
+        .where(and(ilike(stockItemsTable.name, name), eq(stockItemsTable.isDeleted, "false")))
+        .limit(1);
+
+      const purchaseRate = String(Number(raw.purchaseRate) || 0);
+      const saleRate = String(Number(raw.saleRate) || 0);
+      const minStockLevel = String(Number(raw.minStockLevel) || 0);
+      const physicalStock = Number(raw.physicalStock ?? raw.openingStock ?? 0);
+      const gstApplicable = raw.gstApplicable === true || raw.gstApplicable === "true" || raw.gstApplicable === "yes" || raw.gstApplicable === "Yes" ? "true" : "false";
+      const gstRate = String(Number(raw.gstRate) || 0);
+      const isTaxLiability = raw.isTaxLiability === false || raw.isTaxLiability === "false" || String(raw.taxType || "").toLowerCase() === "kaccha" ? false : true;
+      const unit = (raw.unit || "pcs").trim();
+      const hsnCode = raw.hsnCode ? String(raw.hsnCode).trim() : null;
+      const barcode = raw.barcode ? String(raw.barcode).trim() : null;
+      const brand = raw.brand ? String(raw.brand).trim() : null;
+
+      if (existing) {
+        if (onDuplicate === "update") {
+          await db.update(stockItemsTable).set({
+            categoryId: categoryId ?? existing.categoryId,
+            hsnCode: hsnCode ?? existing.hsnCode,
+            unit: unit || existing.unit,
+            purchaseRate,
+            saleRate,
+            minStockLevel,
+            barcode: barcode ?? existing.barcode,
+            brand: brand ?? existing.brand,
+            physicalStock: String(physicalStock),
+            gstApplicable,
+            gstRate,
+            isTaxLiability,
+          }).where(eq(stockItemsTable.id, existing.id));
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
+        const [inserted] = await db.insert(stockItemsTable).values({
+          name,
+          categoryId,
+          hsnCode,
+          unit,
+          purchaseRate,
+          saleRate,
+          minStockLevel,
+          barcode,
+          brand,
+          physicalStock: String(physicalStock),
+          gstApplicable,
+          gstRate,
+          isTaxLiability,
+        }).returning();
+
+        if (physicalStock > 0) {
+          await db.insert(stockTransactionsTable).values({
+            itemId: inserted.id,
+            type: "opening",
+            quantity: String(physicalStock),
+            balanceAfter: String(physicalStock),
+            reference: "Opening Stock (Bulk Import)",
+          });
+        }
+        created++;
+      }
+    } catch (err: any) {
+      console.error(`Error importing item row ${i + 1} (${name}):`, err);
+      errors.push(`Row ${i + 1} (${name}): ${err.message || "Failed to save"}`);
+      skipped++;
+    }
+  }
+
+  res.json({
+    success: true,
+    total: items.length,
+    created,
+    updated,
+    skipped,
+    errors,
+  });
+});
+
 router.get("/stock-items/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   const [item] = await db.select().from(stockItemsTable).where(eq(stockItemsTable.id, id)).limit(1);

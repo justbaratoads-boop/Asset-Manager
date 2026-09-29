@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatCurrency, INDIAN_STATES } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye, Lock, Info } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, BookOpen, Users, Eye, Lock, Info, Upload } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
@@ -127,6 +128,7 @@ export default function LedgerAccounts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"ledger" | "party">("ledger");
   const [editItem, setEditItem] = useState<any>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   // Ledger form state
   const [ledgerForm, setLedgerForm] = useState(BLANK_LEDGER);
@@ -344,7 +346,12 @@ export default function LedgerAccounts() {
             {" "}and Ledger — {filtered.length} total
           </p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />New Account</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5">
+            <Upload className="h-4 w-4" /> Import Ledgers
+          </Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />New Account</Button>
+        </div>
       </div>
 
       <Card>
@@ -954,6 +961,8 @@ export default function LedgerAccounts() {
         onConfirm={handleDelete}
         loading={deleteMutation.isPending}
       />
+
+      <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} type="ledgers" />
     </div>
   );
 }

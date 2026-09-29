@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   ledgersTable, journalEntriesTable, journalLinesTable, paymentsTable, receiptsTable,
   saleInvoicesTable, purchaseInvoicesTable, saleInvoicePaymentsTable, purchaseInvoicePaymentsTable,
-  partiesTable, creditNotesTable, debitNotesTable,
+  partiesTable, creditNotesTable, debitNotesTable, companySettingsTable,
 } from "@workspace/db/schema";
 import { eq, and, ilike, gte, lte, isNotNull, ne } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
@@ -103,6 +103,182 @@ router.post("/ledgers", authMiddleware, async (req, res) => {
     hsnSac: data.hsnSac || null,
   }).returning();
   res.status(201).json({ ...ledger, openingBalance: Number(ledger.openingBalance) });
+});
+
+router.post("/ledgers/bulk-import", authMiddleware, async (req, res) => {
+  const { ledgers, onDuplicate = "skip" } = req.body as {
+    ledgers: any[];
+    onDuplicate?: "skip" | "update";
+  };
+
+  if (!Array.isArray(ledgers) || ledgers.length === 0) {
+    return res.status(400).json({ error: "No ledgers provided for import" });
+  }
+
+  // Fetch company state for isOutOfState calculation
+  const [co] = await db.select({ state: companySettingsTable.state }).from(companySettingsTable).limit(1);
+  const companyState = (co?.state || "").trim().toLowerCase();
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < ledgers.length; i++) {
+    const raw = ledgers[i];
+    const name = (raw.name || raw.ledgerName || "").trim();
+    if (!name) {
+      errors.push(`Row ${i + 1}: Ledger name is required`);
+      skipped++;
+      continue;
+    }
+
+    const group = (raw.group || raw.accountGroup || "Sundry Debtors").trim();
+    const lowerGroup = group.toLowerCase();
+    const isParty = lowerGroup.includes("debtor") || lowerGroup.includes("creditor") || lowerGroup.includes("customer") || lowerGroup.includes("supplier");
+
+    const openingBalance = String(Number(raw.openingBalance) || 0);
+    const rawBalType = (raw.balanceType || raw.nature || "").trim().toLowerCase();
+    const balanceType = rawBalType === "cr" ? "cr" : (lowerGroup.includes("creditor") || lowerGroup.includes("supplier") ? "cr" : "dr");
+
+    try {
+      if (isParty) {
+        // Party ledger (Customer/Supplier)
+        const type = lowerGroup.includes("creditor") || lowerGroup.includes("supplier") ? "supplier" : "customer";
+        const partyState = (raw.state || "").trim();
+        const isOutOfState = companyState && partyState && companyState !== partyState.toLowerCase() ? "true" : "false";
+
+        const [existingParty] = await db.select({ id: partiesTable.id })
+          .from(partiesTable)
+          .where(and(ilike(partiesTable.name, name), eq(partiesTable.isDeleted, "false")))
+          .limit(1);
+
+        const gstin = raw.gstin ? String(raw.gstin).trim().toUpperCase() : null;
+        let gstType = (raw.gstType || "").trim().toLowerCase();
+        if (!gstType) {
+          gstType = gstin ? "registered" : "unregistered";
+        }
+        const pan = raw.pan ? String(raw.pan).trim().toUpperCase() : (gstin && gstin.length >= 12 ? gstin.slice(2, 12) : null);
+
+        if (existingParty) {
+          if (onDuplicate === "update") {
+            await db.update(partiesTable).set({
+              type,
+              accountGroup: group,
+              gstType,
+              gstin,
+              pan,
+              isOutOfState,
+              phone: raw.phone ? String(raw.phone).trim() : undefined,
+              email: raw.email ? String(raw.email).trim() : undefined,
+              address: raw.address ? String(raw.address).trim() : undefined,
+              city: raw.city ? String(raw.city).trim() : undefined,
+              state: partyState || undefined,
+              pincode: raw.pincode ? String(raw.pincode).trim() : undefined,
+              openingBalance,
+              balanceType,
+            }).where(eq(partiesTable.id, existingParty.id));
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          await db.insert(partiesTable).values({
+            name,
+            type,
+            accountGroup: group,
+            gstType,
+            gstHistory: "[]",
+            isOutOfState,
+            address: raw.address ? String(raw.address).trim() : null,
+            city: raw.city ? String(raw.city).trim() : null,
+            state: partyState || null,
+            pincode: raw.pincode ? String(raw.pincode).trim() : null,
+            gstin,
+            pan,
+            phone: raw.phone ? String(raw.phone).trim() : null,
+            email: raw.email ? String(raw.email).trim() : null,
+            openingBalance,
+            balanceType,
+            creditLimitEnabled: "false",
+          });
+          created++;
+        }
+      } else {
+        // General ledger
+        const [existingLedger] = await db.select({ id: ledgersTable.id, isSystem: ledgersTable.isSystem })
+          .from(ledgersTable)
+          .where(and(ilike(ledgersTable.name, name), eq(ledgersTable.isDeleted, "false")))
+          .limit(1);
+
+        const bankName = raw.bankName ? String(raw.bankName).trim() : null;
+        const bankBranch = raw.bankBranch ? String(raw.bankBranch).trim() : null;
+        const accountNumber = raw.accountNumber ? String(raw.accountNumber).trim() : null;
+        const ifscCode = raw.ifscCode ? String(raw.ifscCode).trim() : null;
+        const upiId = raw.upiId ? String(raw.upiId).trim() : null;
+        const isGstApplicable = raw.isGstApplicable === true || raw.isGstApplicable === "true" || raw.isGstApplicable === "yes";
+        const gstRate = raw.gstRate ? String(Number(raw.gstRate) || 0) : null;
+        const hsnSac = raw.hsnSac ? String(raw.hsnSac).trim() : null;
+
+        if (existingLedger) {
+          if (onDuplicate === "update") {
+            if (existingLedger.isSystem === "true") {
+              await db.update(ledgersTable).set({
+                openingBalance,
+                nature: balanceType,
+              }).where(eq(ledgersTable.id, existingLedger.id));
+            } else {
+              await db.update(ledgersTable).set({
+                group,
+                nature: balanceType,
+                openingBalance,
+                bankName,
+                bankBranch,
+                accountNumber,
+                ifscCode,
+                upiId,
+                isGstApplicable,
+                gstRate,
+                hsnSac,
+              }).where(eq(ledgersTable.id, existingLedger.id));
+            }
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          await db.insert(ledgersTable).values({
+            name,
+            group,
+            nature: balanceType,
+            openingBalance,
+            bankName,
+            bankBranch,
+            accountNumber,
+            ifscCode,
+            upiId,
+            isGstApplicable,
+            gstRate,
+            hsnSac,
+          });
+          created++;
+        }
+      }
+    } catch (err: any) {
+      console.error(`Error importing ledger row ${i + 1} (${name}):`, err);
+      errors.push(`Row ${i + 1} (${name}): ${err.message || "Failed to save"}`);
+      skipped++;
+    }
+  }
+
+  res.json({
+    success: true,
+    total: ledgers.length,
+    created,
+    updated,
+    skipped,
+    errors,
+  });
 });
 
 router.get("/ledgers/:id", authMiddleware, async (req, res) => {

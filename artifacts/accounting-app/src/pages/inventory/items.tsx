@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Search, Eye, Pencil, Trash2, AlertTriangle, X } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, AlertTriangle, X, Upload } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export default function StockItemList() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [page, setPage] = useState(1);
   const { data: items = [], isLoading } = useListStockItems({
     search: search || undefined,
@@ -63,7 +65,12 @@ export default function StockItemList() {
           <h1 className="text-xl font-bold">Stock Items</h1>
           <p className="text-sm text-muted-foreground">{list.length} items</p>
         </div>
-        <Link href="/inventory/items/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Item</Button></Link>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5">
+            <Upload className="h-4 w-4" /> Import Items
+          </Button>
+          <Link href="/inventory/items/new"><Button size="sm"><Plus className="h-4 w-4 mr-1" />New Item</Button></Link>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
@@ -228,6 +235,7 @@ export default function StockItemList() {
         </CardContent>
       </Card>
       <ConfirmDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)} onConfirm={handleDelete} loading={deleteMutation.isPending} />
+      <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} type="items" />
     </div>
   );
 }

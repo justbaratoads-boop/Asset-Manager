@@ -5,10 +5,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Upload, Database, FileSpreadsheet, HardDriveDownload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
+import { downloadStockItemTemplate, downloadLedgerTemplate } from "@/lib/excel-import";
 
 export default function Utilities() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const [importItemOpen, setImportItemOpen] = useState(false);
+  const [importLedgerOpen, setImportLedgerOpen] = useState(false);
   
   // Parse path to determine active tab
   const activeTab = location.includes("import") ? "import" 
@@ -144,40 +148,48 @@ export default function Utilities() {
                   <Upload className="h-5 w-5 text-primary" />
                   Bulk Import Items
                 </CardTitle>
-                <CardDescription>Upload an Excel or CSV file to create multiple stock items at once.</CardDescription>
+                <CardDescription>Upload an Excel (.xlsx / .xls) or CSV file to create or update multiple stock items at once.</CardDescription>
               </CardHeader>
-              <form onSubmit={(e) => handleImport(e, "Items")}>
-                <CardContent>
-                  <input type="file" accept=".csv, .xlsx, .xls" required className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="link" className="p-0 h-auto text-xs" type="button">Download Template</Button>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" className="w-full">Upload & Process</Button>
-                </CardFooter>
-              </form>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Use our sample template pre-configured with required columns (Name, Unit, Rates, Opening Stock, GST, etc.) for seamless import.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={downloadStockItemTemplate} className="text-xs gap-1.5">
+                    <Download className="h-3.5 w-3.5 text-primary" /> Download Sample Template (.xlsx)
+                  </Button>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button onClick={() => setImportItemOpen(true)} className="w-full gap-2">
+                  <Upload className="h-4 w-4" /> Open Item Import Wizard
+                </Button>
+              </CardFooter>
             </Card>
             
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Upload className="h-5 w-5 text-primary" />
-                  Bulk Import Parties
+                  Bulk Import Ledgers & Parties
                 </CardTitle>
-                <CardDescription>Upload an Excel or CSV file to create multiple customer/supplier ledgers.</CardDescription>
+                <CardDescription>Upload an Excel (.xlsx / .xls) or CSV file to create or update multiple customer, supplier, bank, and expense ledgers.</CardDescription>
               </CardHeader>
-              <form onSubmit={(e) => handleImport(e, "Parties")}>
-                <CardContent>
-                  <input type="file" accept=".csv, .xlsx, .xls" required className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="link" className="p-0 h-auto text-xs" type="button">Download Template</Button>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" className="w-full">Upload & Process</Button>
-                </CardFooter>
-              </form>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Use our sample template pre-configured with Debtors, Creditors, Bank, and Expense ledger formats with GSTIN and address fields.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={downloadLedgerTemplate} className="text-xs gap-1.5">
+                    <Download className="h-3.5 w-3.5 text-primary" /> Download Sample Template (.xlsx)
+                  </Button>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button onClick={() => setImportLedgerOpen(true)} className="w-full gap-2">
+                  <Upload className="h-4 w-4" /> Open Ledger Import Wizard
+                </Button>
+              </CardFooter>
             </Card>
           </div>
         </TabsContent>
@@ -214,6 +226,9 @@ export default function Utilities() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <BulkImportDialog open={importItemOpen} onOpenChange={setImportItemOpen} type="items" />
+      <BulkImportDialog open={importLedgerOpen} onOpenChange={setImportLedgerOpen} type="ledgers" />
     </div>
   );
 }
