@@ -38,11 +38,12 @@ export function ItemSearchCombobox({
 }: ItemSearchComboboxProps) {
   const [query, setQuery] = useState(() => (stockItemId ? "" : itemName));
   const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [dropdownStyle, setDropdownStyle] = useState<{ top?: number; bottom?: number; left: number; width: number }>({ left: 0, width: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Sync local query with itemName prop when no item is locked
-  // (handles external resets like clearItem, and loading existing invoices)
   useEffect(() => {
     if (!stockItemId) {
       setQuery(itemName);
@@ -77,6 +78,7 @@ export function ItemSearchCombobox({
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
         setQuery("");
+        setHighlightedIndex(-1);
         // Discard free-form text — only inventory items are valid
         if (!stockItemId) onNameChange("");
       }
@@ -99,6 +101,61 @@ export function ItemSearchCombobox({
   const filtered = (stockItems || [])
     .filter(s => s.name?.toLowerCase().includes((query || "").toLowerCase()))
     .slice(0, 30);
+
+  // Reset highlight to first item on query change or open
+  useEffect(() => {
+    if (open && filtered.length > 0) {
+      setHighlightedIndex(0);
+    } else {
+      setHighlightedIndex(-1);
+    }
+  }, [query, open, filtered.length]);
+
+  // Scroll highlighted item into view automatically
+  useEffect(() => {
+    if (open && highlightedIndex >= 0 && listRef.current) {
+      const itemEl = listRef.current.children[highlightedIndex] as HTMLElement;
+      if (itemEl && typeof itemEl.scrollIntoView === "function") {
+        itemEl.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedIndex, open]);
+
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setOpen(true);
+        updateDropdownPosition();
+        setHighlightedIndex(0);
+        return;
+      }
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (filtered.length === 0) return;
+      setHighlightedIndex(prev => (prev < filtered.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (filtered.length === 0) return;
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : filtered.length - 1));
+    } else if (e.key === "Enter") {
+      if (open && highlightedIndex >= 0 && highlightedIndex < filtered.length) {
+        e.preventDefault();
+        const selected = filtered[highlightedIndex];
+        onItemSelect(selected);
+        setQuery("");
+        setOpen(false);
+        setHighlightedIndex(-1);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setHighlightedIndex(-1);
+    }
+  };
 
   if (stockItemId) {
     return (
@@ -127,6 +184,7 @@ export function ItemSearchCombobox({
             setOpen(true);
           }}
           onFocus={() => { setOpen(true); updateDropdownPosition(); }}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={cn("pl-7 text-sm", inputClassName)}
           autoComplete="off"
@@ -135,7 +193,7 @@ export function ItemSearchCombobox({
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            onClick={() => { setQuery(""); onNameChange(""); setOpen(false); }}
+            onClick={() => { setQuery(""); onNameChange(""); setOpen(false); setHighlightedIndex(-1); }}
           >
             <X className="h-3 w-3" />
           </button>
@@ -150,6 +208,7 @@ export function ItemSearchCombobox({
 
       {open && createPortal(
         <div
+          ref={listRef}
           className="fixed z-[9999] bg-background border rounded-md shadow-lg max-h-52 overflow-y-auto"
           style={{
             top: dropdownStyle.top !== undefined ? `${dropdownStyle.top}px` : "auto",
@@ -163,16 +222,21 @@ export function ItemSearchCombobox({
               {query ? `No items matching "${query}"` : "No items found"}
             </div>
           ) : (
-            filtered.map(item => (
+            filtered.map((item, idx) => (
               <button
                 key={item.id}
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                className={cn(
+                  "w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer",
+                  idx === highlightedIndex ? "bg-accent text-accent-foreground font-medium" : "hover:bg-muted"
+                )}
+                onMouseEnter={() => setHighlightedIndex(idx)}
                 onMouseDown={e => {
                   e.preventDefault();
                   onItemSelect(item);
                   setQuery("");
                   setOpen(false);
+                  setHighlightedIndex(-1);
                 }}
               >
                 {item.name}
@@ -202,13 +266,16 @@ export function ItemMultiSearch({
 }: ItemMultiSearchProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
         setQuery("");
+        setHighlightedIndex(-1);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -221,6 +288,56 @@ export function ItemMultiSearch({
 
   const selectedItems = (stockItems || []).filter(s => selectedIds.includes(s.id));
 
+  useEffect(() => {
+    if (open && unselected.length > 0) {
+      setHighlightedIndex(0);
+    } else {
+      setHighlightedIndex(-1);
+    }
+  }, [query, open, unselected.length]);
+
+  useEffect(() => {
+    if (open && highlightedIndex >= 0 && listRef.current) {
+      const itemEl = listRef.current.children[highlightedIndex] as HTMLElement;
+      if (itemEl && typeof itemEl.scrollIntoView === "function") {
+        itemEl.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedIndex, open]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setOpen(true);
+        setHighlightedIndex(0);
+        return;
+      }
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (unselected.length === 0) return;
+      setHighlightedIndex(prev => (prev < unselected.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (unselected.length === 0) return;
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : unselected.length - 1));
+    } else if (e.key === "Enter") {
+      if (open && highlightedIndex >= 0 && highlightedIndex < unselected.length) {
+        e.preventDefault();
+        onToggle(unselected[highlightedIndex].id);
+        setQuery("");
+        setOpen(false);
+        setHighlightedIndex(-1);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setHighlightedIndex(-1);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <div ref={wrapRef} className="relative">
@@ -229,27 +346,33 @@ export function ItemMultiSearch({
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className="pl-8 text-sm"
           autoComplete="off"
         />
         {open && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+          <div ref={listRef} className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
             {unselected.length === 0 ? (
               <div className="px-3 py-2 text-sm text-muted-foreground">
                 {query ? `No results for "${query}"` : selectedIds.length === stockItems.length ? "All items selected" : "No items"}
               </div>
             ) : (
-              unselected.map(item => (
+              unselected.map((item, idx) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer",
+                    idx === highlightedIndex ? "bg-accent text-accent-foreground font-medium" : "hover:bg-muted"
+                  )}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
                   onMouseDown={e => {
                     e.preventDefault();
                     onToggle(item.id);
                     setQuery("");
                     setOpen(false);
+                    setHighlightedIndex(-1);
                   }}
                 >
                   {item.name}

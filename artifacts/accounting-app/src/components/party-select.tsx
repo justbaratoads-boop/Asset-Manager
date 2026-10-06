@@ -18,8 +18,12 @@ interface Props {
 export function PartySelect({ value, onChange, parties, placeholder = "Select party", hasError }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [dropdownStyle, setDropdownStyle] = useState<{ top?: number; bottom?: number; left: number; width: number }>({ left: 0, width: 0 });
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const updatePosition = useCallback(() => {
     if (ref.current) {
@@ -50,6 +54,7 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
         const portal = document.getElementById("party-select-portal");
         if (portal && portal.contains(e.target as Node)) return;
         setOpen(false);
+        setHighlightedIndex(-1);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -75,11 +80,70 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
     !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Initialize or reset highlight on search change or open
+  useEffect(() => {
+    if (open && filtered.length > 0) {
+      const selIdx = filtered.findIndex(p => p.id === value);
+      setHighlightedIndex(selIdx >= 0 ? selIdx : 0);
+    } else {
+      setHighlightedIndex(-1);
+    }
+  }, [search, open, filtered.length, value]);
+
+  // Scroll highlighted item into view automatically
+  useEffect(() => {
+    if (open && highlightedIndex >= 0 && listRef.current) {
+      const itemEl = listRef.current.children[highlightedIndex] as HTMLElement;
+      if (itemEl && typeof itemEl.scrollIntoView === "function") {
+        itemEl.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedIndex, open]);
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setOpen(true);
+      setSearch("");
+      updatePosition();
+    }
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (filtered.length === 0) return;
+      setHighlightedIndex(prev => (prev < filtered.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (filtered.length === 0) return;
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : filtered.length - 1));
+    } else if (e.key === "Enter") {
+      if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
+        e.preventDefault();
+        const p = filtered[highlightedIndex];
+        onChange(p.id);
+        setOpen(false);
+        setSearch("");
+        setHighlightedIndex(-1);
+        triggerRef.current?.focus();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setSearch("");
+      setHighlightedIndex(-1);
+      triggerRef.current?.focus();
+    }
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => { setOpen(o => !o); setSearch(""); updatePosition(); }}
+        onKeyDown={handleTriggerKeyDown}
         className={cn(
           "w-full h-9 flex items-center justify-between rounded-md border bg-background px-3 text-sm text-left focus:outline-none focus:ring-1 focus:ring-ring",
           hasError ? "border-destructive" : "border-input hover:border-primary/50"
@@ -113,25 +177,34 @@ export function PartySelect({ value, onChange, parties, placeholder = "Select pa
         >
           <div className="p-1.5 border-b">
             <input
+              ref={inputRef}
               autoFocus
               className="w-full h-7 px-2 text-xs rounded border border-input bg-background outline-none"
-              placeholder="Search..."
+              placeholder="Search party (use ↑ ↓ arrows to navigate, Enter to select)..."
               value={search}
               onChange={e => setSearch(e.target.value)}
+              onKeyDown={handleInputKeyDown}
             />
           </div>
-          <div className="max-h-52 overflow-y-auto py-1">
+          <div ref={listRef} className="max-h-52 overflow-y-auto py-1">
             {filtered.length === 0 ? (
               <div className="text-center py-3 text-xs text-muted-foreground">No parties found</div>
-            ) : filtered.map(p => (
+            ) : filtered.map((p, idx) => (
               <button
                 key={p.id}
                 type="button"
                 className={cn(
-                  "w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground",
-                  value === p.id && "bg-accent font-medium"
+                  "w-full text-left px-3 py-1.5 text-sm transition-colors cursor-pointer",
+                  idx === highlightedIndex ? "bg-accent text-accent-foreground font-medium" : value === p.id ? "bg-muted font-medium" : "hover:bg-accent/50"
                 )}
-                onClick={() => { onChange(p.id); setOpen(false); setSearch(""); }}
+                onMouseEnter={() => setHighlightedIndex(idx)}
+                onClick={() => {
+                  onChange(p.id);
+                  setOpen(false);
+                  setSearch("");
+                  setHighlightedIndex(-1);
+                  triggerRef.current?.focus();
+                }}
               >
                 <div className="flex justify-between items-center">
                   <span>{p.name}</span>
