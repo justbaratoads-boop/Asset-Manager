@@ -12,21 +12,39 @@ import {
 import { useGetCompanySettings } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
+import { cn } from "@/lib/utils";
+
 interface ShareButtonProps {
   title?: string;
   summaryText?: string;
   url?: string;
+  customText?: string;
+  className?: string;
+  size?: "default" | "sm" | "lg" | "icon";
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  showText?: boolean;
+  label?: string;
 }
 
-export function ShareButton({ title = "Report", summaryText, url }: ShareButtonProps) {
+export function ShareButton({
+  title = "Report",
+  summaryText,
+  url,
+  customText,
+  className = "",
+  size = "sm",
+  variant = "outline",
+  showText = true,
+  label = "Share",
+}: ShareButtonProps) {
   const { data: companySettings } = useGetCompanySettings();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  const businessName = (companySettings as any)?.companyName || "Business";
+  const businessName = (companySettings as any)?.companyName || (companySettings as any)?.name || "Business";
   const shareUrl = url || (typeof window !== "undefined" ? window.location.href : "");
 
-  const fullText = `*${title}*\n${businessName}${summaryText ? `\n${summaryText}` : ""}\n\nLink: ${shareUrl}`;
+  const fullText = customText || `*${title}*\n${businessName}${summaryText ? `\n${summaryText}` : ""}\n\nLink: ${shareUrl}`;
 
   const handleWhatsApp = () => {
     const encoded = encodeURIComponent(fullText);
@@ -41,12 +59,12 @@ export function ShareButton({ title = "Report", summaryText, url }: ShareButtonP
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(customText || shareUrl);
       setCopied(true);
-      toast({ title: "Link copied to clipboard!" });
+      toast({ title: customText ? "Details copied to clipboard!" : "Link copied to clipboard!" });
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast({ title: "Failed to copy link", variant: "destructive" });
+      toast({ title: "Failed to copy", variant: "destructive" });
     }
   };
 
@@ -55,7 +73,7 @@ export function ShareButton({ title = "Report", summaryText, url }: ShareButtonP
       try {
         await navigator.share({
           title: `${title} - ${businessName}`,
-          text: summaryText || title,
+          text: customText || summaryText || title,
           url: shareUrl,
         });
       } catch (err: any) {
@@ -71,14 +89,14 @@ export function ShareButton({ title = "Report", summaryText, url }: ShareButtonP
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5 h-8">
+        <Button variant={variant} size={size} className={cn("gap-1.5", className)}>
           <Share2 className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Share</span>
+          {showText && <span>{label}</span>}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="text-xs uppercase text-muted-foreground font-semibold">
-          Share Report
+          {title?.toLowerCase().includes("invoice") ? "Share Invoice" : "Share"}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleWhatsApp} className="gap-2 cursor-pointer text-xs">

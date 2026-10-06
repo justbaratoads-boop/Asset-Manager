@@ -14,6 +14,8 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Printer, ArrowLeft, Copy, IndianRupee, Edit, FileCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react";
+import { ShareButton } from "@/components/share-button";
+import { formatSaleInvoiceShareText } from "@/lib/invoice-share";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
 function itemBaseRate(item: any): number {
@@ -1024,6 +1026,11 @@ export default function SaleInvoiceView() {
               <Edit className="h-4 w-4" /><span className="hidden sm:inline">Edit</span>
             </Button>
           </Link>
+          <ShareButton
+            title={`Sale Invoice #${inv.invoiceNumber}`}
+            customText={formatSaleInvoiceShareText(inv, company)}
+            url={typeof window !== "undefined" ? window.location.href : undefined}
+          />
           <Button variant="outline" size="sm" onClick={() => { setCopies("2"); setPrintDialogOpen(true); }}>
             <Copy className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Print 2nd Copy</span>
           </Button>

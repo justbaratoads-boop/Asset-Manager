@@ -18,6 +18,8 @@ import { Plus, Search, Pencil, Trash2, Calendar, X, IndianRupee, Eye, FileText, 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+import { ShareButton } from "@/components/share-button";
+import { formatPurchaseInvoiceShareText } from "@/lib/invoice-share";
 
 /** Always returns the pre-GST base rate per unit, regardless of inclusive/exclusive. */
 function itemBaseRate(item: any): number {
@@ -62,6 +64,7 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [lastId, setLastId] = useState<number | null>(null);
+  const { data: company } = useGetCompanySettings();
 
   useEffect(() => {
     if (!id) { setData(null); setLastId(null); return; }
@@ -99,11 +102,18 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
   return (
     <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
+        <SheetHeader className="flex flex-row items-center justify-between space-y-0 pr-6">
           <SheetTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
             Purchase Invoice
           </SheetTitle>
+          {data && (
+            <ShareButton
+              title={`Purchase Invoice #${data.invoiceNumber}`}
+              customText={formatPurchaseInvoiceShareText(data, company)}
+              url={typeof window !== "undefined" ? `${window.location.origin}/purchase/invoices/${data.id}` : undefined}
+            />
+          )}
         </SheetHeader>
 
         {loading ? (
@@ -268,6 +278,13 @@ function PurchaseInvoiceViewSheet({ id, onClose, onPayClick }: {
             {/* Actions */}
             <div className="flex gap-2 border-t pt-4">
               <Button variant="outline" className="flex-1" onClick={onClose}>Close</Button>
+              <ShareButton
+                title={`Purchase Invoice #${data.invoiceNumber}`}
+                customText={formatPurchaseInvoiceShareText(data, company)}
+                url={typeof window !== "undefined" ? `${window.location.origin}/purchase/invoices/${data.id}` : undefined}
+                className="flex-1"
+                showText={true}
+              />
               {Number(data.balanceDue) > 0 && (
                 <Button
                   variant="outline"

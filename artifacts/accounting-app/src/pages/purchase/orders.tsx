@@ -15,6 +15,8 @@ import { Plus, Search, Pencil, Trash2, Calendar, X, Eye, PackageCheck, CheckChec
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
+import { ShareButton } from "@/components/share-button";
+import { formatOrderShareText } from "@/lib/invoice-share";
 
 const PAGE_SIZE = 20;
 
@@ -44,6 +46,7 @@ function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: (
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { data: batches = [] } = useFetch<any[]>("/api/stock-batches");
+  const { data: company } = useGetCompanySettings();
 
   useEffect(() => {
     if (!id) { setData(null); return; }
@@ -68,11 +71,18 @@ function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: (
   return (
     <Sheet open={!!id} onOpenChange={v => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
+        <SheetHeader className="flex flex-row items-center justify-between space-y-0 pr-6">
           <SheetTitle className="flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-primary" />
             Purchase Order
           </SheetTitle>
+          {data && (
+            <ShareButton
+              title={`Purchase Order #${data.orderNumber || data.id}`}
+              customText={formatOrderShareText(data, "purchase", company)}
+              url={typeof window !== "undefined" ? `${window.location.origin}/purchase/orders` : undefined}
+            />
+          )}
         </SheetHeader>
 
         {loading ? (
@@ -151,6 +161,13 @@ function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: (
 
             <div className="flex gap-2 border-t pt-4">
               <Button variant="outline" className="flex-1" onClick={onClose}>Close</Button>
+              <ShareButton
+                title={`Purchase Order #${data.orderNumber || data.id}`}
+                customText={formatOrderShareText(data, "purchase", company)}
+                url={typeof window !== "undefined" ? `${window.location.origin}/purchase/orders` : undefined}
+                className="flex-1"
+                showText={true}
+              />
               {data.status === "open" && id && (
                 <Link href={`/purchase/orders/${id}/edit`} className="flex-1">
                   <Button className="w-full gap-2"><Pencil className="h-4 w-4" />Edit Order</Button>
