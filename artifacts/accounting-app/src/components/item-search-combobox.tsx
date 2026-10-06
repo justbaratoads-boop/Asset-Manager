@@ -17,6 +17,7 @@ interface ItemSearchComboboxProps {
   stockItems: StockItemOption[];
   itemName: string;
   stockItemId?: number;
+  stockAvail?: Record<number, { physicalStock?: number; availableStock?: number; [key: string]: any }>;
   onNameChange: (name: string) => void;
   onItemSelect: (item: StockItemOption) => void;
   onClear: () => void;
@@ -29,6 +30,7 @@ export function ItemSearchCombobox({
   stockItems,
   itemName,
   stockItemId,
+  stockAvail,
   onNameChange,
   onItemSelect,
   onClear,
@@ -61,13 +63,13 @@ export function ItemSearchCombobox({
         setDropdownStyle({
           bottom: window.innerHeight - rect.top + 4,
           left: rect.left,
-          width: Math.max(rect.width, 220),
+          width: Math.max(rect.width, 300),
         });
       } else {
         setDropdownStyle({
           top: rect.bottom + 4,
           left: rect.left,
-          width: Math.max(rect.width, 220),
+          width: Math.max(rect.width, 300),
         });
       }
     }
@@ -222,26 +224,42 @@ export function ItemSearchCombobox({
               {query ? `No items matching "${query}"` : "No items found"}
             </div>
           ) : (
-            filtered.map((item, idx) => (
-              <button
-                key={item.id}
-                type="button"
-                className={cn(
-                  "w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer",
-                  idx === highlightedIndex ? "bg-accent text-accent-foreground font-medium" : "hover:bg-muted"
-                )}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                onMouseDown={e => {
-                  e.preventDefault();
-                  onItemSelect(item);
-                  setQuery("");
-                  setOpen(false);
-                  setHighlightedIndex(-1);
-                }}
-              >
-                {item.name}
-              </button>
-            ))
+            filtered.map((item, idx) => {
+              const physStock = stockAvail?.[item.id]?.physicalStock ?? item.physicalStock ?? 0;
+              const unit = item.unit || "";
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer flex items-center justify-between gap-3",
+                    idx === highlightedIndex ? "bg-accent text-accent-foreground font-medium" : "hover:bg-muted"
+                  )}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    onItemSelect(item);
+                    setQuery("");
+                    setOpen(false);
+                    setHighlightedIndex(-1);
+                  }}
+                >
+                  <span className="truncate flex-1 font-medium">{item.name}</span>
+                  <span
+                    className={cn(
+                      "text-xs shrink-0 px-2 py-0.5 rounded-full font-medium whitespace-nowrap",
+                      Number(physStock) < 0
+                        ? "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-950/40"
+                        : Number(physStock) === 0
+                        ? "text-amber-700 bg-amber-100 dark:text-amber-400 dark:bg-amber-950/40"
+                        : "text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/40"
+                    )}
+                  >
+                    Stock: {physStock}{unit ? ` ${unit}` : ""}
+                  </span>
+                </button>
+              );
+            })
           )}
         </div>,
         document.body
@@ -358,26 +376,42 @@ export function ItemMultiSearch({
                 {query ? `No results for "${query}"` : selectedIds.length === stockItems.length ? "All items selected" : "No items"}
               </div>
             ) : (
-              unselected.map((item, idx) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={cn(
-                    "w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer",
-                    idx === highlightedIndex ? "bg-accent text-accent-foreground font-medium" : "hover:bg-muted"
-                  )}
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  onMouseDown={e => {
-                    e.preventDefault();
-                    onToggle(item.id);
-                    setQuery("");
-                    setOpen(false);
-                    setHighlightedIndex(-1);
-                  }}
-                >
-                  {item.name}
-                </button>
-              ))
+              unselected.map((item, idx) => {
+                const physStock = item.physicalStock ?? 0;
+                const unit = item.unit || "";
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={cn(
+                      "w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer flex items-center justify-between gap-3",
+                      idx === highlightedIndex ? "bg-accent text-accent-foreground font-medium" : "hover:bg-muted"
+                    )}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      onToggle(item.id);
+                      setQuery("");
+                      setOpen(false);
+                      setHighlightedIndex(-1);
+                    }}
+                  >
+                    <span className="truncate flex-1 font-medium">{item.name}</span>
+                    <span
+                      className={cn(
+                        "text-xs shrink-0 px-2 py-0.5 rounded-full font-medium whitespace-nowrap",
+                        Number(physStock) < 0
+                          ? "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-950/40"
+                          : Number(physStock) === 0
+                          ? "text-amber-700 bg-amber-100 dark:text-amber-400 dark:bg-amber-950/40"
+                          : "text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/40"
+                      )}
+                    >
+                      Stock: {physStock}{unit ? ` ${unit}` : ""}
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
         )}

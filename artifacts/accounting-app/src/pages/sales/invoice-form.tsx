@@ -542,6 +542,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                     stockItems={filteredStockItems}
                     itemName={item.itemName}
                     stockItemId={item.stockItemId}
+                    stockAvail={stockAvail}
                     onNameChange={v => updateItem(index, "itemName", v)}
                     onItemSelect={si => selectStockItem(index, String(si.id))}
                     onClear={() => clearItem(index)}
@@ -718,6 +719,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                           stockItems={filteredStockItems}
                           itemName={item.itemName}
                           stockItemId={item.stockItemId}
+                          stockAvail={stockAvail}
                           onNameChange={v => updateItem(index, "itemName", v)}
                           onItemSelect={si => selectStockItem(index, String(si.id))}
                           onClear={() => clearItem(index)}

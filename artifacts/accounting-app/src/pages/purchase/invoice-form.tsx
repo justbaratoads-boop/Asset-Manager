@@ -415,6 +415,7 @@ export default function PurchaseInvoiceForm() {
                       stockItems={filteredStockItems}
                       itemName={item.itemName}
                       stockItemId={item.stockItemId}
+                      stockAvail={stockAvail}
                       onNameChange={v => updateItem(i, "itemName", v)}
                       onItemSelect={si => selectStock(i, String(si.id))}
                       onClear={() => clearItem(i)}
@@ -522,6 +523,7 @@ export default function PurchaseInvoiceForm() {
                             stockItems={filteredStockItems}
                             itemName={item.itemName}
                             stockItemId={item.stockItemId}
+                            stockAvail={stockAvail}
                             onNameChange={v => updateItem(i, "itemName", v)}
                             onItemSelect={si => selectStock(i, String(si.id))}
                             onClear={() => clearItem(i)}

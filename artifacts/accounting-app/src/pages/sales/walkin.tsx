@@ -99,7 +99,27 @@ export default function WalkinSale() {
                   <TableCell>
                     <Select onValueChange={v => selectStock(i, v)}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select item" /></SelectTrigger>
-                      <SelectContent>{(stockItems as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        {(stockItems as any[]).map((s: any) => {
+                          const phys = s.physicalStock ?? 0;
+                          return (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              <div className="flex items-center justify-between gap-3 w-full">
+                                <span className="font-medium">{s.name}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                                  Number(phys) < 0
+                                    ? "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-950/40"
+                                    : Number(phys) === 0
+                                    ? "text-amber-700 bg-amber-100 dark:text-amber-400 dark:bg-amber-950/40"
+                                    : "text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/40"
+                                }`}>
+                                  Stock: {phys} {s.unit || ""}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
                     </Select>
                     <Input className="h-7 mt-1 text-xs" placeholder="Name" value={item.itemName} onChange={e => updateItem(i, "itemName", e.target.value)} />
                   </TableCell>
