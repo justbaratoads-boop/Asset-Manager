@@ -50,6 +50,7 @@ import { downloadStockItemTemplate, downloadLedgerTemplate } from "@/lib/excel-i
 import { useFY } from "@/lib/financial-year";
 import { customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import * as XLSX from "xlsx";
 
 export default function Utilities() {
   const [location, setLocation] = useLocation();
@@ -60,6 +61,9 @@ export default function Utilities() {
   // Dialogs
   const [importItemOpen, setImportItemOpen] = useState(false);
   const [importLedgerOpen, setImportLedgerOpen] = useState(false);
+
+  // Excel Export State
+  const [exportingType, setExportingType] = useState<string | null>(null);
 
   // Backup Export State
   const [exportDateMode, setExportDateMode] = useState<"all" | "range">("all");
@@ -87,18 +91,134 @@ export default function Utilities() {
     setLocation(`/utility/${val}`);
   };
 
-  const handleExport = (type: string) => {
-    toast({
-      title: "Export Started",
-      description: `Your ${type} data is being exported to Excel.`,
-    });
-    setTimeout(() => {
+  // ==========================================
+  // REAL EXCEL EXPORT (Items, Parties, Sales)
+  // ==========================================
+  const handleExport = async (type: string) => {
+    try {
+      setExportingType(type);
+      toast({
+        title: "Exporting Data",
+        description: `Preparing ${type} export for download...`,
+      });
+
+      if (type === "Items") {
+        const items = await customFetch<any[]>("/api/stock-items");
+        if (!items || items.length === 0) {
+          toast({ title: "No Items Found", description: "There are no stock items to export." });
+          return;
+        }
+        const rows = items.map((it: any) => ({
+          "Item Name": it.name || "",
+          "Category": it.categoryName || "",
+          "HSN Code": it.hsnCode || "",
+          "Unit": it.unit || "pcs",
+          "Purchase Rate": Number(it.purchaseRate || 0),
+          "Sale Rate": Number(it.saleRate || 0),
+          "Current Physical Stock": Number(it.physicalStock || 0),
+          "Min Stock Level": Number(it.minStockLevel || 0),
+          "Barcode": it.barcode || "",
+          "Brand": it.brand || "",
+          "GST Applicable": it.gstApplicable === "true" ? "Yes" : "No",
+          "GST Rate (%)": Number(it.gstRate || 0),
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Stock Items");
+        XLSX.writeFile(wb, `Stock_Items_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      } else if (type === "Parties") {
+        const [parties, ledgers] = await Promise.all([
+          customFetch<any[]>("/api/parties").catch(() => []),
+          customFetch<any[]>("/api/ledgers").catch(() => []),
+        ]);
+
+        const rows: any[] = [];
+        (parties || []).forEach((p: any) => {
+          rows.push({
+            "Name": p.name || "",
+            "Category": "Party",
+            "Account Group": p.accountGroup || "Sundry Debtors",
+            "Type": p.type || "customer",
+            "GSTIN": p.gstin || "",
+            "GST Type": p.gstType || "unregistered",
+            "Phone": p.phone || "",
+            "Email": p.email || "",
+            "Address": p.address || "",
+            "City": p.city || "",
+            "State": p.state || "",
+            "Pincode": p.pincode || "",
+            "Opening Balance": Number(p.openingBalance || 0),
+            "Balance Type": (p.balanceType || "dr").toUpperCase(),
+          });
+        });
+
+        (ledgers || []).forEach((l: any) => {
+          rows.push({
+            "Name": l.name || "",
+            "Category": "General Ledger",
+            "Account Group": l.group || "",
+            "Type": "ledger",
+            "GSTIN": "",
+            "GST Type": l.isGstApplicable ? "gst" : "none",
+            "Phone": "",
+            "Email": "",
+            "Address": "",
+            "City": "",
+            "State": "",
+            "Pincode": "",
+            "Opening Balance": Number(l.openingBalance || 0),
+            "Balance Type": (l.nature || "dr").toUpperCase(),
+          });
+        });
+
+        if (rows.length === 0) {
+          toast({ title: "No Parties Found", description: "There are no parties or ledgers to export." });
+          return;
+        }
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Parties & Ledgers");
+        XLSX.writeFile(wb, `Parties_and_Ledgers_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      } else if (type === "Sales Invoices") {
+        const invoices = await customFetch<any[]>("/api/sale-invoices");
+        if (!invoices || invoices.length === 0) {
+          toast({ title: "No Sales Found", description: "There are no sales invoices to export." });
+          return;
+        }
+        const rows = invoices.map((inv: any) => ({
+          "Invoice Number": inv.invoiceNumber || "",
+          "Date": inv.date || "",
+          "Customer Name": inv.partyName || "",
+          "Customer GSTIN": inv.partyGstin || "",
+          "Subtotal": Number(inv.subtotal || 0),
+          "Taxable Amount": Number(inv.totalTaxable || 0),
+          "CGST": Number(inv.totalCgst || 0),
+          "SGST": Number(inv.totalSgst || 0),
+          "IGST": Number(inv.totalIgst || 0),
+          "Grand Total": Number(inv.grandTotal || 0),
+          "Amount Paid": Number(inv.amountPaid || 0),
+          "Balance Due": Number(inv.balanceDue || 0),
+          "Status": inv.status || "confirmed",
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Sales Invoices");
+        XLSX.writeFile(wb, `Sales_Invoices_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      }
+
       toast({
         title: "Export Complete",
-        description: `${type} data exported successfully.`,
-        variant: "default",
+        description: `${type} data exported and downloaded successfully.`,
       });
-    }, 1500);
+    } catch (err: any) {
+      toast({
+        title: "Export Failed",
+        description: err.message || `Failed to export ${type}.`,
+        variant: "destructive",
+      });
+    } finally {
+      setExportingType(null);
+    }
   };
 
   // ==========================================
@@ -115,7 +235,17 @@ export default function Utilities() {
         url += `?${params.toString()}`;
       }
 
-      const blob = await customFetch<Blob>(url, { responseType: "blob" });
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server returned error ${res.status}`);
+      }
+
+      const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
@@ -312,11 +442,23 @@ export default function Utilities() {
                   <FileSpreadsheet className="h-5 w-5 text-primary" />
                   Export Items
                 </CardTitle>
-                <CardDescription>Download all your stock items and current inventory levels to an Excel file.</CardDescription>
+                <CardDescription>Download all your stock items and current inventory levels to an Excel (.xlsx) file.</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button onClick={() => handleExport("Items")} className="w-full">
-                  Export Items to Excel
+                <Button 
+                  onClick={() => handleExport("Items")} 
+                  disabled={exportingType === "Items"} 
+                  className="w-full gap-2"
+                >
+                  {exportingType === "Items" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Exporting Items...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" /> Export Items to Excel
+                    </>
+                  )}
                 </Button>
               </CardFooter>
             </Card>
@@ -327,11 +469,23 @@ export default function Utilities() {
                   <FileSpreadsheet className="h-5 w-5 text-primary" />
                   Export Parties
                 </CardTitle>
-                <CardDescription>Download all your customer and supplier ledger details to an Excel file.</CardDescription>
+                <CardDescription>Download all your customer, supplier, and ledger details to an Excel (.xlsx) file.</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button onClick={() => handleExport("Parties")} className="w-full">
-                  Export Parties to Excel
+                <Button 
+                  onClick={() => handleExport("Parties")} 
+                  disabled={exportingType === "Parties"} 
+                  className="w-full gap-2"
+                >
+                  {exportingType === "Parties" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Exporting Parties...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" /> Export Parties to Excel
+                    </>
+                  )}
                 </Button>
               </CardFooter>
             </Card>
@@ -342,11 +496,23 @@ export default function Utilities() {
                   <FileSpreadsheet className="h-5 w-5 text-primary" />
                   Export Sales
                 </CardTitle>
-                <CardDescription>Download all sales invoices for the current financial year to an Excel file.</CardDescription>
+                <CardDescription>Download all sales invoices and tax breakdown to an Excel (.xlsx) file.</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button onClick={() => handleExport("Sales Invoices")} className="w-full">
-                  Export Sales to Excel
+                <Button 
+                  onClick={() => handleExport("Sales Invoices")} 
+                  disabled={exportingType === "Sales Invoices"} 
+                  className="w-full gap-2"
+                >
+                  {exportingType === "Sales Invoices" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Exporting Sales...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" /> Export Sales to Excel
+                    </>
+                  )}
                 </Button>
               </CardFooter>
             </Card>

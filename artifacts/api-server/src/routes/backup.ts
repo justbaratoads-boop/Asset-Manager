@@ -9,7 +9,6 @@ import {
   stockItemsTable,
   stockBatchesTable,
   stockTransactionsTable,
-  stockItemGstHistoryTable,
   saleInvoicesTable,
   saleInvoiceItemsTable,
   saleInvoicePaymentsTable,
@@ -48,40 +47,25 @@ router.get("/backup/export", authMiddleware, async (req, res) => {
     const { from, to } = req.query as { from?: string; to?: string };
     const isFiltered = !!(from || to);
 
-    // 1. Query Masters (always included)
-    const [
-      companySettings,
-      accountGroups,
-      ledgers,
-      parties,
-      stockCategories,
-      stockItems,
-      stockBatches,
-      drivers,
-      vehicles,
-      users,
-      counters,
-    ] = await Promise.all([
-      db.select().from(companySettingsTable),
-      db.select().from(accountGroupsTable).where(eq(accountGroupsTable.isDeleted, "false")),
-      db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false")),
-      db.select().from(partiesTable).where(eq(partiesTable.isDeleted, "false")),
-      db.select().from(stockCategoriesTable).where(eq(stockCategoriesTable.isDeleted, "false")),
-      db.select().from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false")),
-      db.select().from(stockBatchesTable),
-      db.select().from(driversTable),
-      db.select().from(vehiclesTable),
-      db.select({
-        id: usersTable.id,
-        name: usersTable.name,
-        email: usersTable.email,
-        role: usersTable.role,
-        permissions: usersTable.permissions,
-        passwordHash: usersTable.passwordHash,
-        isDeleted: usersTable.isDeleted,
-      }).from(usersTable).where(eq(usersTable.isDeleted, "false")),
-      db.select().from(countersTable),
-    ]);
+    // 1. Query Masters sequentially to avoid node-postgres client contention
+    const companySettings = await db.select().from(companySettingsTable);
+    const accountGroups = await db.select().from(accountGroupsTable).where(eq(accountGroupsTable.isDeleted, "false"));
+    const ledgers = await db.select().from(ledgersTable).where(eq(ledgersTable.isDeleted, "false"));
+    const parties = await db.select().from(partiesTable).where(eq(partiesTable.isDeleted, "false"));
+    const stockCategories = await db.select().from(stockCategoriesTable);
+    const stockItems = await db.select().from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false"));
+    const stockBatches = await db.select().from(stockBatchesTable);
+    const drivers = await db.select().from(driversTable);
+    const vehicles = await db.select().from(vehiclesTable);
+    const users = await db.select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      role: usersTable.role,
+      permissions: usersTable.permissions,
+      isActive: usersTable.isActive,
+    }).from(usersTable);
+    const counters = await db.select().from(countersTable);
 
     // Helper for date filtering
     const buildDateCond = (dateCol: any) => {
@@ -94,81 +78,67 @@ router.get("/backup/export", authMiddleware, async (req, res) => {
     // 2. Query Vouchers
     const saleCond = buildDateCond(saleInvoicesTable.date);
     const saleInvoices = await db.select().from(saleInvoicesTable).where(saleCond);
-    const saleInvoiceIds = saleInvoices.map(s => s.id);
+    const saleInvoiceIds = saleInvoices.map((s: any) => s.id);
 
     let saleInvoiceItems: any[] = [];
     let saleInvoicePayments: any[] = [];
     if (saleInvoiceIds.length > 0) {
-      [saleInvoiceItems, saleInvoicePayments] = await Promise.all([
-        db.select().from(saleInvoiceItemsTable).where(inArray(saleInvoiceItemsTable.invoiceId, saleInvoiceIds)),
-        db.select().from(saleInvoicePaymentsTable).where(inArray(saleInvoicePaymentsTable.invoiceId, saleInvoiceIds)),
-      ]);
+      saleInvoiceItems = await db.select().from(saleInvoiceItemsTable).where(inArray(saleInvoiceItemsTable.invoiceId, saleInvoiceIds));
+      saleInvoicePayments = await db.select().from(saleInvoicePaymentsTable).where(inArray(saleInvoicePaymentsTable.invoiceId, saleInvoiceIds));
     }
 
     const purchCond = buildDateCond(purchaseInvoicesTable.date);
     const purchaseInvoices = await db.select().from(purchaseInvoicesTable).where(purchCond);
-    const purchaseInvoiceIds = purchaseInvoices.map(p => p.id);
+    const purchaseInvoiceIds = purchaseInvoices.map((p: any) => p.id);
 
     let purchaseInvoiceItems: any[] = [];
     let purchaseInvoicePayments: any[] = [];
     if (purchaseInvoiceIds.length > 0) {
-      [purchaseInvoiceItems, purchaseInvoicePayments] = await Promise.all([
-        db.select().from(purchaseInvoiceItemsTable).where(inArray(purchaseInvoiceItemsTable.invoiceId, purchaseInvoiceIds)),
-        db.select().from(purchaseInvoicePaymentsTable).where(inArray(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoiceIds)),
-      ]);
+      purchaseInvoiceItems = await db.select().from(purchaseInvoiceItemsTable).where(inArray(purchaseInvoiceItemsTable.invoiceId, purchaseInvoiceIds));
+      purchaseInvoicePayments = await db.select().from(purchaseInvoicePaymentsTable).where(inArray(purchaseInvoicePaymentsTable.invoiceId, purchaseInvoiceIds));
     }
 
-    const [
-      receipts,
-      payments,
-      journalEntries,
-      creditNotes,
-      debitNotes,
-      orders,
-      purchaseOrders,
-      deliveries,
-    ] = await Promise.all([
-      db.select().from(receiptsTable).where(buildDateCond(receiptsTable.date)),
-      db.select().from(paymentsTable).where(buildDateCond(paymentsTable.date)),
-      db.select().from(journalEntriesTable).where(buildDateCond(journalEntriesTable.date)),
-      db.select().from(creditNotesTable).where(buildDateCond(creditNotesTable.date)),
-      db.select().from(debitNotesTable).where(buildDateCond(debitNotesTable.date)),
-      db.select().from(ordersTable).where(buildDateCond(ordersTable.date)),
-      db.select().from(purchaseOrdersTable).where(buildDateCond(purchaseOrdersTable.date)),
-      db.select().from(deliveriesTable).where(
-        from && to ? sql`${deliveriesTable.date} >= ${from}::date AND ${deliveriesTable.date} <= ${to}::date` :
-        from ? sql`${deliveriesTable.date} >= ${from}::date` :
-        to ? sql`${deliveriesTable.date} <= ${to}::date` : undefined
-      ),
-    ]);
+    const receipts = await db.select().from(receiptsTable).where(buildDateCond(receiptsTable.date));
+    const payments = await db.select().from(paymentsTable).where(buildDateCond(paymentsTable.date));
+    const journalEntries = await db.select().from(journalEntriesTable).where(buildDateCond(journalEntriesTable.date));
+    const creditNotes = await db.select().from(creditNotesTable).where(buildDateCond(creditNotesTable.date));
+    const debitNotes = await db.select().from(debitNotesTable).where(buildDateCond(debitNotesTable.date));
+    const orders = await db.select().from(ordersTable).where(buildDateCond(ordersTable.date));
+    const purchaseOrders = await db.select().from(purchaseOrdersTable).where(buildDateCond(purchaseOrdersTable.date));
+    
+    const deliveries = await db.select().from(deliveriesTable).where(
+      from && to ? sql`${deliveriesTable.date} >= ${from}::date AND ${deliveriesTable.date} <= ${to}::date` :
+      from ? sql`${deliveriesTable.date} >= ${from}::date` :
+      to ? sql`${deliveriesTable.date} <= ${to}::date` : undefined
+    );
 
     // Query voucher children
-    const journalIds = journalEntries.map(j => j.id);
+    const journalIds = journalEntries.map((j: any) => j.id);
     const journalLines = journalIds.length > 0
-      ? await db.select().from(journalLinesTable).where(inArray(journalLinesTable.journalEntryId, journalIds))
+      ? await db.select().from(journalLinesTable).where(inArray(journalLinesTable.entryId, journalIds))
       : [];
 
-    const creditNoteIds = creditNotes.map(c => c.id);
+    const creditNoteIds = creditNotes.map((c: any) => c.id);
     const creditNoteItems = creditNoteIds.length > 0
-      ? await db.select().from(creditNoteItemsTable).where(inArray(creditNoteItemsTable.creditNoteId, creditNoteIds))
+      ? await db.select().from(creditNoteItemsTable).where(inArray(creditNoteItemsTable.noteId, creditNoteIds))
       : [];
 
-    const debitNoteIds = debitNotes.map(d => d.id);
+    const debitNoteIds = debitNotes.map((d: any) => d.id);
     const debitNoteItems = debitNoteIds.length > 0
-      ? await db.select().from(debitNoteItemsTable).where(inArray(debitNoteItemsTable.debitNoteId, debitNoteIds))
+      ? await db.select().from(debitNoteItemsTable).where(inArray(debitNoteItemsTable.noteId, debitNoteIds))
       : [];
 
-    const orderIds = orders.map(o => o.id);
+    const orderIds = orders.map((o: any) => o.id);
     const orderItems = orderIds.length > 0
       ? await db.select().from(orderItemsTable).where(inArray(orderItemsTable.orderId, orderIds))
       : [];
 
-    const purchaseOrderIds = purchaseOrders.map(p => p.id);
+    const purchaseOrderIds = purchaseOrders.map((p: any) => p.id);
     const purchaseOrderItems = purchaseOrderIds.length > 0
-      ? await db.select().from(purchaseOrderItemsTable).where(inArray(purchaseOrderItemsTable.purchaseOrderId, purchaseOrderIds))
+      ? await db.select().from(purchaseOrderItemsTable).where(inArray(purchaseOrderItemsTable.orderId, purchaseOrderIds))
       : [];
 
-    const deliveryIds = deliveries.map(d => d.id);
+    const deliveryIds = deliveries.map((d: any) => d.id);
     const deliveryInvoices = deliveryIds.length > 0
       ? await db.select().from(deliveryInvoicesTable).where(inArray(deliveryInvoicesTable.deliveryId, deliveryIds))
       : [];
@@ -184,7 +154,7 @@ router.get("/backup/export", authMiddleware, async (req, res) => {
 
     const stockTransactions = await db.select().from(stockTransactionsTable).where(stockTxCond);
 
-    const company = companySettings[0] || {};
+    const company: any = companySettings[0] || {};
     const companyName = company.companyName || "Company";
     const companySlug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
@@ -325,6 +295,14 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
     const batchIdMap = new Map<number, number>();
     const driverIdMap = new Map<number, number>();
     const vehicleIdMap = new Map<number, number>();
+    const saleInvoiceIdMap = new Map<number, number>();
+    const purchaseInvoiceIdMap = new Map<number, number>();
+    const journalIdMap = new Map<number, number>();
+    const creditNoteIdMap = new Map<number, number>();
+    const debitNoteIdMap = new Map<number, number>();
+    const orderIdMap = new Map<number, number>();
+    const purchaseOrderIdMap = new Map<number, number>();
+    const deliveryIdMap = new Map<number, number>();
 
     const restoredCounts: Record<string, number> = {
       parties: 0,
@@ -370,7 +348,7 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
       await db.delete(stockTransactionsTable);
     }
 
-    // 1. Restore Company Settings if available and replace mode
+    // 1. Restore Company Settings if replace mode
     if (mode === "replace" && Array.isArray(d.companySettings) && d.companySettings[0]) {
       const cs = d.companySettings[0];
       const [existingCs] = await db.select({ id: companySettingsTable.id }).from(companySettingsTable).limit(1);
@@ -421,6 +399,7 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
             group: l.group,
             nature: l.nature || "dr",
             openingBalance: String(l.openingBalance || 0),
+            isSystem: l.isSystem || "false",
             bankName: l.bankName || null,
             bankBranch: l.bankBranch || null,
             accountNumber: l.accountNumber || null,
@@ -428,9 +407,8 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
             upiId: l.upiId || null,
             isGstApplicable: l.isGstApplicable || false,
             gstCalculationMethod: l.gstCalculationMethod || "none",
-            gstRate: l.gstRate || null,
+            gstRate: l.gstRate ? String(l.gstRate) : null,
             hsnSac: l.hsnSac || null,
-            isSystem: l.isSystem || "false",
           }).returning();
           ledgerIdMap.set(l.id, inserted.id);
           restoredCounts.ledgers++;
@@ -454,7 +432,7 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
             type: p.type || "customer",
             accountGroup: p.accountGroup || "Sundry Debtors",
             gstType: p.gstType || "unregistered",
-            gstHistory: p.gstHistory || "[]",
+            gstHistory: typeof p.gstHistory === "string" ? p.gstHistory : JSON.stringify(p.gstHistory || []),
             isOutOfState: p.isOutOfState || "false",
             address: p.address || null,
             city: p.city || null,
@@ -469,6 +447,10 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
             paymentTerms: p.paymentTerms || null,
             openingBalance: String(p.openingBalance || 0),
             balanceType: p.balanceType || "dr",
+            interestEnabled: p.interestEnabled || "false",
+            interestGracePeriod: String(p.interestGracePeriod || 0),
+            interestRate: p.interestRate ? String(p.interestRate) : null,
+            interestByTransaction: p.interestByTransaction || "false",
           }).returning();
           partyIdMap.set(p.id, inserted.id);
           restoredCounts.parties++;
@@ -481,7 +463,7 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
       for (const c of d.stockCategories) {
         const [existing] = await db.select({ id: stockCategoriesTable.id })
           .from(stockCategoriesTable)
-          .where(and(eq(stockCategoriesTable.name, c.name), eq(stockCategoriesTable.isDeleted, "false")))
+          .where(eq(stockCategoriesTable.name, c.name))
           .limit(1);
 
         if (existing) {
@@ -598,7 +580,6 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
     }
 
     // 9. Restore Sale Invoices & Child items
-    const saleInvoiceIdMap = new Map<number, number>();
     if (Array.isArray(d.saleInvoices)) {
       for (const inv of d.saleInvoices) {
         const [existing] = await db.select({ id: saleInvoicesTable.id })
@@ -613,22 +594,26 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
           const [inserted] = await db.insert(saleInvoicesTable).values({
             invoiceNumber: inv.invoiceNumber,
             date: inv.date,
-            dueDate: inv.dueDate || null,
             partyId: mappedPartyId,
             partyName: inv.partyName,
             partyGstin: inv.partyGstin || null,
-            partyState: inv.partyState || null,
-            isOutOfState: inv.isOutOfState || "false",
+            billingAddress: inv.billingAddress || null,
+            isGst: inv.isGst !== undefined ? inv.isGst : true,
+            isInterstate: inv.isInterstate || false,
             subtotal: String(inv.subtotal || 0),
-            taxAmount: String(inv.taxAmount || 0),
-            discountAmount: String(inv.discountAmount || 0),
-            roundOff: String(inv.roundOff || 0),
-            totalAmount: String(inv.totalAmount || 0),
-            status: inv.status || "unpaid",
+            totalDiscount: String(inv.totalDiscount || 0),
+            totalTaxable: String(inv.totalTaxable || 0),
+            totalCgst: String(inv.totalCgst || 0),
+            totalSgst: String(inv.totalSgst || 0),
+            totalIgst: String(inv.totalIgst || 0),
+            totalGst: String(inv.totalGst || 0),
+            grandTotal: String(inv.grandTotal || 0),
+            amountPaid: String(inv.amountPaid || 0),
+            balanceDue: String(inv.balanceDue || 0),
             notes: inv.notes || null,
-            terms: inv.terms || null,
+            otherCharges: inv.otherCharges || null,
+            status: inv.status || "confirmed",
             isKaccha: inv.isKaccha || false,
-            otherExpenses: inv.otherExpenses ? JSON.stringify(inv.otherExpenses) : null,
           }).returning();
           saleInvoiceIdMap.set(inv.id, inserted.id);
           restoredCounts.saleInvoices++;
@@ -646,23 +631,21 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
           await db.insert(saleInvoiceItemsTable).values({
             invoiceId: newInvId,
             stockItemId: newStockItemId,
-            batchId: newBatchId,
             itemName: item.itemName,
             hsnCode: item.hsnCode || null,
             quantity: String(item.quantity || 1),
             unit: item.unit || "pcs",
             rate: String(item.rate || 0),
-            discountPercent: String(item.discountPercent || 0),
-            discountAmount: String(item.discountAmount || 0),
-            taxRate: String(item.taxRate || 0),
-            taxAmount: String(item.taxAmount || 0),
-            cgstRate: String(item.cgstRate || 0),
-            cgstAmount: String(item.cgstAmount || 0),
-            sgstRate: String(item.sgstRate || 0),
-            sgstAmount: String(item.sgstAmount || 0),
-            igstRate: String(item.igstRate || 0),
-            igstAmount: String(item.igstAmount || 0),
-            totalAmount: String(item.totalAmount || 0),
+            discountPct: String(item.discountPct || 0),
+            gstPct: String(item.gstPct || 0),
+            gstInclusive: item.gstInclusive || false,
+            taxableAmount: String(item.taxableAmount || 0),
+            cgst: String(item.cgst || 0),
+            sgst: String(item.sgst || 0),
+            igst: String(item.igst || 0),
+            total: String(item.total || 0),
+            batchId: newBatchId,
+            description: item.description || null,
           });
         }
       }
@@ -675,10 +658,9 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
           const newLedgerId = p.ledgerId ? ledgerIdMap.get(p.ledgerId) || null : null;
           await db.insert(saleInvoicePaymentsTable).values({
             invoiceId: newInvId,
-            paymentDate: p.paymentDate,
+            mode: p.mode || "Cash",
             amount: String(p.amount || 0),
-            paymentMode: p.paymentMode || "Cash",
-            referenceNumber: p.referenceNumber || null,
+            reference: p.reference || null,
             notes: p.notes || null,
             ledgerId: newLedgerId,
           });
@@ -687,7 +669,6 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
     }
 
     // 10. Restore Purchase Invoices & Child items
-    const purchaseInvoiceIdMap = new Map<number, number>();
     if (Array.isArray(d.purchaseInvoices)) {
       for (const inv of d.purchaseInvoices) {
         const [existing] = await db.select({ id: purchaseInvoicesTable.id })
@@ -703,20 +684,23 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
             invoiceNumber: inv.invoiceNumber,
             supplierInvoiceNumber: inv.supplierInvoiceNumber || null,
             date: inv.date,
-            dueDate: inv.dueDate || null,
             partyId: mappedPartyId,
             partyName: inv.partyName,
-            partyGstin: inv.partyGstin || null,
-            partyState: inv.partyState || null,
-            isOutOfState: inv.isOutOfState || "false",
+            isGst: inv.isGst !== undefined ? inv.isGst : true,
+            isInterstate: inv.isInterstate || false,
+            isReverseCharge: inv.isReverseCharge || false,
             subtotal: String(inv.subtotal || 0),
-            taxAmount: String(inv.taxAmount || 0),
-            discountAmount: String(inv.discountAmount || 0),
-            roundOff: String(inv.roundOff || 0),
-            totalAmount: String(inv.totalAmount || 0),
-            status: inv.status || "unpaid",
+            totalTaxable: String(inv.totalTaxable || 0),
+            totalCgst: String(inv.totalCgst || 0),
+            totalSgst: String(inv.totalSgst || 0),
+            totalIgst: String(inv.totalIgst || 0),
+            grandTotal: String(inv.grandTotal || 0),
+            amountPaid: String(inv.amountPaid || 0),
+            balanceDue: String(inv.balanceDue || 0),
+            status: inv.status || "confirmed",
             notes: inv.notes || null,
-            otherExpenses: inv.otherExpenses ? JSON.stringify(inv.otherExpenses) : null,
+            otherCharges: inv.otherCharges || null,
+            isKaccha: inv.isKaccha || false,
           }).returning();
           purchaseInvoiceIdMap.set(inv.id, inserted.id);
           restoredCounts.purchaseInvoices++;
@@ -739,17 +723,14 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
             quantity: String(item.quantity || 1),
             unit: item.unit || "pcs",
             rate: String(item.rate || 0),
-            discountPercent: String(item.discountPercent || 0),
-            discountAmount: String(item.discountAmount || 0),
-            taxRate: String(item.taxRate || 0),
-            taxAmount: String(item.taxAmount || 0),
-            cgstRate: String(item.cgstRate || 0),
-            cgstAmount: String(item.cgstAmount || 0),
-            sgstRate: String(item.sgstRate || 0),
-            sgstAmount: String(item.sgstAmount || 0),
-            igstRate: String(item.igstRate || 0),
-            igstAmount: String(item.igstAmount || 0),
-            totalAmount: String(item.totalAmount || 0),
+            discountPct: String(item.discountPct || 0),
+            gstPct: String(item.gstPct || 0),
+            gstInclusive: item.gstInclusive || false,
+            taxableAmount: String(item.taxableAmount || 0),
+            cgst: String(item.cgst || 0),
+            sgst: String(item.sgst || 0),
+            igst: String(item.igst || 0),
+            total: String(item.total || 0),
           });
         }
       }
@@ -758,15 +739,11 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
         for (const p of d.purchaseInvoicePayments) {
           const newInvId = purchaseInvoiceIdMap.get(p.invoiceId);
           if (!newInvId) continue;
-          const newLedgerId = p.ledgerId ? ledgerIdMap.get(p.ledgerId) || null : null;
           await db.insert(purchaseInvoicePaymentsTable).values({
             invoiceId: newInvId,
-            paymentDate: p.paymentDate,
+            mode: p.mode || "Bank",
             amount: String(p.amount || 0),
-            paymentMode: p.paymentMode || "Bank",
-            referenceNumber: p.referenceNumber || null,
-            notes: p.notes || null,
-            ledgerId: newLedgerId,
+            reference: p.reference || null,
           });
         }
       }
@@ -777,12 +754,12 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
       for (const r of d.receipts) {
         const [existing] = await db.select({ id: receiptsTable.id })
           .from(receiptsTable)
-          .where(and(eq(receiptsTable.receiptNumber, r.receiptNumber), eq(receiptsTable.isDeleted, "false")))
+          .where(and(eq(receiptsTable.voucherNumber, r.voucherNumber), eq(receiptsTable.isDeleted, "false")))
           .limit(1);
 
         if (!existing) {
           const mappedPartyId = r.partyId ? partyIdMap.get(r.partyId) || null : null;
-          const mappedLedgerId = r.ledgerId ? ledgerIdMap.get(r.ledgerId) || null : null;
+          const mappedLedgerId = r.ledgerId ? ledgerIdMap.get(r.ledgerId) || r.ledgerId : r.ledgerId;
 
           // Remap allocations if present
           let allocs = r.ledgerAllocations;
@@ -797,16 +774,17 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
           }
 
           await db.insert(receiptsTable).values({
-            receiptNumber: r.receiptNumber,
+            voucherNumber: r.voucherNumber,
             date: r.date,
             partyId: mappedPartyId,
             partyName: r.partyName,
-            amount: String(r.amount || 0),
-            paymentMode: r.paymentMode || "Cash",
-            referenceNumber: r.referenceNumber || null,
-            notes: r.notes || null,
             ledgerId: mappedLedgerId,
+            paymentMode: r.paymentMode || "cash",
+            amount: String(r.amount || 0),
+            narration: r.narration || null,
+            reference: r.reference || null,
             ledgerAllocations: allocs ? JSON.stringify(allocs) : null,
+            isKaccha: r.isKaccha || false,
           });
           restoredCounts.receipts++;
         }
@@ -817,12 +795,12 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
       for (const p of d.payments) {
         const [existing] = await db.select({ id: paymentsTable.id })
           .from(paymentsTable)
-          .where(and(eq(paymentsTable.paymentNumber, p.paymentNumber), eq(paymentsTable.isDeleted, "false")))
+          .where(and(eq(paymentsTable.voucherNumber, p.voucherNumber), eq(paymentsTable.isDeleted, "false")))
           .limit(1);
 
         if (!existing) {
           const mappedPartyId = p.partyId ? partyIdMap.get(p.partyId) || null : null;
-          const mappedLedgerId = p.ledgerId ? ledgerIdMap.get(p.ledgerId) || null : null;
+          const mappedLedgerId = p.ledgerId ? ledgerIdMap.get(p.ledgerId) || p.ledgerId : p.ledgerId;
 
           let allocs = p.ledgerAllocations;
           if (typeof allocs === "string") {
@@ -836,16 +814,17 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
           }
 
           await db.insert(paymentsTable).values({
-            paymentNumber: p.paymentNumber,
+            voucherNumber: p.voucherNumber,
             date: p.date,
             partyId: mappedPartyId,
             partyName: p.partyName,
-            amount: String(p.amount || 0),
-            paymentMode: p.paymentMode || "Cash",
-            referenceNumber: p.referenceNumber || null,
-            notes: p.notes || null,
             ledgerId: mappedLedgerId,
+            paymentMode: p.paymentMode || "cash",
+            amount: String(p.amount || 0),
+            narration: p.narration || null,
+            reference: p.reference || null,
             ledgerAllocations: allocs ? JSON.stringify(allocs) : null,
+            isKaccha: p.isKaccha || false,
           });
           restoredCounts.payments++;
         }
@@ -853,24 +832,24 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
     }
 
     // 12. Journal Entries & Lines
-    const journalIdMap = new Map<number, number>();
     if (Array.isArray(d.journalEntries)) {
       for (const j of d.journalEntries) {
         const [existing] = await db.select({ id: journalEntriesTable.id })
           .from(journalEntriesTable)
-          .where(and(eq(journalEntriesTable.entryNumber, j.entryNumber), eq(journalEntriesTable.isDeleted, "false")))
+          .where(and(eq(journalEntriesTable.voucherNumber, j.voucherNumber), eq(journalEntriesTable.isDeleted, "false")))
           .limit(1);
 
         if (existing) {
           journalIdMap.set(j.id, existing.id);
         } else {
           const [inserted] = await db.insert(journalEntriesTable).values({
-            entryNumber: j.entryNumber,
+            voucherNumber: j.voucherNumber,
+            voucherType: j.voucherType || "journal",
             date: j.date,
-            narration: j.narration || null,
+            narration: j.narration || "",
             totalDebit: String(j.totalDebit || 0),
             totalCredit: String(j.totalCredit || 0),
-            isSystem: j.isSystem || "false",
+            isKaccha: j.isKaccha || false,
           }).returning();
           journalIdMap.set(j.id, inserted.id);
           restoredCounts.journalEntries++;
@@ -879,24 +858,23 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
 
       if (Array.isArray(d.journalLines)) {
         for (const line of d.journalLines) {
-          const newJId = journalIdMap.get(line.journalEntryId);
+          const newJId = journalIdMap.get(line.entryId);
           if (!newJId) continue;
-          const newLedgerId = line.ledgerId ? ledgerIdMap.get(line.ledgerId) || line.ledgerId : null;
+          const newLedgerId = line.ledgerId ? ledgerIdMap.get(line.ledgerId) || line.ledgerId : line.ledgerId;
+          const mappedPartyId = line.partyId ? partyIdMap.get(line.partyId) || null : null;
 
           await db.insert(journalLinesTable).values({
-            journalEntryId: newJId,
+            entryId: newJId,
             ledgerId: newLedgerId,
-            ledgerName: line.ledgerName,
+            partyId: mappedPartyId,
             type: line.type,
             amount: String(line.amount || 0),
-            narration: line.narration || null,
           });
         }
       }
     }
 
     // 13. Credit Notes & Items
-    const creditNoteIdMap = new Map<number, number>();
     if (Array.isArray(d.creditNotes)) {
       for (const cn of d.creditNotes) {
         const [existing] = await db.select({ id: creditNotesTable.id })
@@ -908,27 +886,17 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
           creditNoteIdMap.set(cn.id, existing.id);
         } else {
           const mappedPartyId = cn.partyId ? partyIdMap.get(cn.partyId) || null : null;
-          const mappedOrigInvId = cn.originalInvoiceId ? saleInvoiceIdMap.get(cn.originalInvoiceId) || null : null;
+          const mappedOrigInvId = cn.saleInvoiceId ? saleInvoiceIdMap.get(cn.saleInvoiceId) || null : null;
 
           const [inserted] = await db.insert(creditNotesTable).values({
             noteNumber: cn.noteNumber,
-            originalInvoiceId: mappedOrigInvId,
-            originalInvoiceNumber: cn.originalInvoiceNumber || null,
             date: cn.date,
+            saleInvoiceId: mappedOrigInvId,
             partyId: mappedPartyId,
             partyName: cn.partyName,
-            partyGstin: cn.partyGstin || null,
-            partyState: cn.partyState || null,
-            isOutOfState: cn.isOutOfState || "false",
-            subtotal: String(cn.subtotal || 0),
-            taxAmount: String(cn.taxAmount || 0),
-            totalAmount: String(cn.totalAmount || 0),
-            reason: cn.reason || null,
-            notes: cn.notes || null,
-            otherExpenses: cn.otherExpenses ? JSON.stringify(cn.otherExpenses) : null,
-            otherExpensesGstRate: cn.otherExpensesGstRate ? String(cn.otherExpensesGstRate) : null,
-            otherExpensesTaxAmount: cn.otherExpensesTaxAmount ? String(cn.otherExpensesTaxAmount) : null,
-            isKaccha: cn.isKaccha || false,
+            reason: cn.reason || "Sales Return",
+            amount: String(cn.amount || 0),
+            otherCharges: cn.otherCharges || null,
           }).returning();
           creditNoteIdMap.set(cn.id, inserted.id);
           restoredCounts.creditNotes++;
@@ -937,36 +905,34 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
 
       if (Array.isArray(d.creditNoteItems)) {
         for (const item of d.creditNoteItems) {
-          const newCnId = creditNoteIdMap.get(item.creditNoteId);
+          const newCnId = creditNoteIdMap.get(item.noteId);
           if (!newCnId) continue;
           const newStockItemId = item.stockItemId ? itemIdMap.get(item.stockItemId) || null : null;
+          const newBatchId = item.batchId ? batchIdMap.get(item.batchId) || null : null;
 
           await db.insert(creditNoteItemsTable).values({
-            creditNoteId: newCnId,
+            noteId: newCnId,
             stockItemId: newStockItemId,
+            batchId: newBatchId,
             itemName: item.itemName,
             hsnCode: item.hsnCode || null,
             quantity: String(item.quantity || 1),
             unit: item.unit || "pcs",
             rate: String(item.rate || 0),
-            discountPercent: String(item.discountPercent || 0),
-            discountAmount: String(item.discountAmount || 0),
-            taxRate: String(item.taxRate || 0),
-            taxAmount: String(item.taxAmount || 0),
-            cgstRate: String(item.cgstRate || 0),
-            cgstAmount: String(item.cgstAmount || 0),
-            sgstRate: String(item.sgstRate || 0),
-            sgstAmount: String(item.sgstAmount || 0),
-            igstRate: String(item.igstRate || 0),
-            igstAmount: String(item.igstAmount || 0),
-            totalAmount: String(item.totalAmount || 0),
+            discountPct: String(item.discountPct || 0),
+            gstPct: String(item.gstPct || 0),
+            gstInclusive: item.gstInclusive || false,
+            taxableAmount: String(item.taxableAmount || 0),
+            cgst: String(item.cgst || 0),
+            sgst: String(item.sgst || 0),
+            igst: String(item.igst || 0),
+            total: String(item.total || 0),
           });
         }
       }
     }
 
     // 14. Debit Notes & Items
-    const debitNoteIdMap = new Map<number, number>();
     if (Array.isArray(d.debitNotes)) {
       for (const dn of d.debitNotes) {
         const [existing] = await db.select({ id: debitNotesTable.id })
@@ -978,26 +944,17 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
           debitNoteIdMap.set(dn.id, existing.id);
         } else {
           const mappedPartyId = dn.partyId ? partyIdMap.get(dn.partyId) || null : null;
-          const mappedOrigInvId = dn.originalInvoiceId ? purchaseInvoiceIdMap.get(dn.originalInvoiceId) || null : null;
+          const mappedOrigInvId = dn.purchaseInvoiceId ? purchaseInvoiceIdMap.get(dn.purchaseInvoiceId) || null : null;
 
           const [inserted] = await db.insert(debitNotesTable).values({
             noteNumber: dn.noteNumber,
-            originalInvoiceId: mappedOrigInvId,
-            originalInvoiceNumber: dn.originalInvoiceNumber || null,
             date: dn.date,
+            purchaseInvoiceId: mappedOrigOrigId || mappedOrigInvId,
             partyId: mappedPartyId,
             partyName: dn.partyName,
-            partyGstin: dn.partyGstin || null,
-            partyState: dn.partyState || null,
-            isOutOfState: dn.isOutOfState || "false",
-            subtotal: String(dn.subtotal || 0),
-            taxAmount: String(dn.taxAmount || 0),
-            totalAmount: String(dn.totalAmount || 0),
-            reason: dn.reason || null,
-            notes: dn.notes || null,
-            otherExpenses: dn.otherExpenses ? JSON.stringify(dn.otherExpenses) : null,
-            otherExpensesGstRate: dn.otherExpensesGstRate ? String(dn.otherExpensesGstRate) : null,
-            otherExpensesTaxAmount: dn.otherExpensesTaxAmount ? String(dn.otherExpensesTaxAmount) : null,
+            reason: dn.reason || "Purchase Return",
+            amount: String(dn.amount || 0),
+            otherCharges: dn.otherCharges || null,
           }).returning();
           debitNoteIdMap.set(dn.id, inserted.id);
           restoredCounts.debitNotes++;
@@ -1006,35 +963,203 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
 
       if (Array.isArray(d.debitNoteItems)) {
         for (const item of d.debitNoteItems) {
-          const newDnId = debitNoteIdMap.get(item.debitNoteId);
+          const newDnId = debitNoteIdMap.get(item.noteId);
           if (!newDnId) continue;
           const newStockItemId = item.stockItemId ? itemIdMap.get(item.stockItemId) || null : null;
+          const newBatchId = item.batchId ? batchIdMap.get(item.batchId) || null : null;
 
           await db.insert(debitNoteItemsTable).values({
-            debitNoteId: newDnId,
+            noteId: newDnId,
+            stockItemId: newStockItemId,
+            batchId: newBatchId,
+            itemName: item.itemName,
+            hsnCode: item.hsnCode || null,
+            quantity: String(item.quantity || 1),
+            unit: item.unit || "pcs",
+            rate: String(item.rate || 0),
+            discountPct: String(item.discountPct || 0),
+            gstPct: String(item.gstPct || 0),
+            gstInclusive: item.gstInclusive || false,
+            taxableAmount: String(item.taxableAmount || 0),
+            cgst: String(item.cgst || 0),
+            sgst: String(item.sgst || 0),
+            igst: String(item.igst || 0),
+            total: String(item.total || 0),
+          });
+        }
+      }
+    }
+
+    // 15. Orders & Purchase Orders
+    if (Array.isArray(d.orders)) {
+      for (const ord of d.orders) {
+        const [existing] = await db.select({ id: ordersTable.id })
+          .from(ordersTable)
+          .where(and(eq(ordersTable.orderNumber, ord.orderNumber), eq(ordersTable.isDeleted, "false")))
+          .limit(1);
+
+        if (existing) {
+          orderIdMap.set(ord.id, existing.id);
+        } else {
+          const mappedPartyId = ord.partyId ? partyIdMap.get(ord.partyId) || null : null;
+          const [inserted] = await db.insert(ordersTable).values({
+            orderNumber: ord.orderNumber,
+            date: ord.date,
+            partyId: mappedPartyId,
+            partyName: ord.partyName,
+            partyPhone: ord.partyPhone || null,
+            deliveryAddress: ord.deliveryAddress || null,
+            notes: ord.notes || null,
+            status: ord.status || "pending",
+            grandTotal: String(ord.grandTotal || 0),
+            driverName: ord.driverName || null,
+            vehicleName: ord.vehicleName || null,
+            vehicleNo: ord.vehicleNo || null,
+            dispatchNotes: ord.dispatchNotes || null,
+            deliveryDate: ord.deliveryDate || null,
+            isKaccha: ord.isKaccha || false,
+          }).returning();
+          orderIdMap.set(ord.id, inserted.id);
+          restoredCounts.orders++;
+        }
+      }
+
+      if (Array.isArray(d.orderItems)) {
+        for (const item of d.orderItems) {
+          const newOrderId = orderIdMap.get(item.orderId);
+          if (!newOrderId) continue;
+          const newStockItemId = item.stockItemId ? itemIdMap.get(item.stockItemId) || null : null;
+          const newBatchId = item.batchId ? batchIdMap.get(item.batchId) || null : null;
+
+          await db.insert(orderItemsTable).values({
+            orderId: newOrderId,
             stockItemId: newStockItemId,
             itemName: item.itemName,
             hsnCode: item.hsnCode || null,
             quantity: String(item.quantity || 1),
             unit: item.unit || "pcs",
             rate: String(item.rate || 0),
-            discountPercent: String(item.discountPercent || 0),
-            discountAmount: String(item.discountAmount || 0),
-            taxRate: String(item.taxRate || 0),
-            taxAmount: String(item.taxAmount || 0),
-            cgstRate: String(item.cgstRate || 0),
-            cgstAmount: String(item.cgstAmount || 0),
-            sgstRate: String(item.sgstRate || 0),
-            sgstAmount: String(item.sgstAmount || 0),
-            igstRate: String(item.igstRate || 0),
-            igstAmount: String(item.igstAmount || 0),
-            totalAmount: String(item.totalAmount || 0),
+            discountPct: String(item.discountPct || 0),
+            gstPct: String(item.gstPct || 0),
+            gstInclusive: item.gstInclusive || false,
+            taxableAmount: String(item.taxableAmount || 0),
+            cgst: String(item.cgst || 0),
+            sgst: String(item.sgst || 0),
+            igst: String(item.igst || 0),
+            total: String(item.total || 0),
+            batchId: newBatchId,
+            description: item.description || null,
           });
         }
       }
     }
 
-    // 15. Stock Transactions
+    if (Array.isArray(d.purchaseOrders)) {
+      for (const po of d.purchaseOrders) {
+        const [existing] = await db.select({ id: purchaseOrdersTable.id })
+          .from(purchaseOrdersTable)
+          .where(and(eq(purchaseOrdersTable.poNumber, po.poNumber), eq(purchaseOrdersTable.isDeleted, "false")))
+          .limit(1);
+
+        if (existing) {
+          purchaseOrderIdMap.set(po.id, existing.id);
+        } else {
+          const mappedPartyId = po.partyId ? partyIdMap.get(po.partyId) || null : null;
+          const [inserted] = await db.insert(purchaseOrdersTable).values({
+            poNumber: po.poNumber,
+            date: po.date,
+            partyId: mappedPartyId,
+            partyName: po.partyName,
+            status: po.status || "open",
+            grandTotal: String(po.grandTotal || 0),
+            notes: po.notes || null,
+            deliveryDate: po.deliveryDate || null,
+            isKaccha: po.isKaccha || false,
+          }).returning();
+          purchaseOrderIdMap.set(po.id, inserted.id);
+          restoredCounts.purchaseOrders++;
+        }
+      }
+
+      if (Array.isArray(d.purchaseOrderItems)) {
+        for (const item of d.purchaseOrderItems) {
+          const newPoId = purchaseOrderIdMap.get(item.orderId);
+          if (!newPoId) continue;
+          const newStockItemId = item.stockItemId ? itemIdMap.get(item.stockItemId) || null : null;
+          const newBatchId = item.batchId ? batchIdMap.get(item.batchId) || null : null;
+
+          await db.insert(purchaseOrderItemsTable).values({
+            orderId: newPoId,
+            stockItemId: newStockItemId,
+            itemName: item.itemName,
+            hsnCode: item.hsnCode || null,
+            quantity: String(item.quantity || 1),
+            unit: item.unit || "pcs",
+            rate: String(item.rate || 0),
+            discountPct: String(item.discountPct || 0),
+            gstPct: String(item.gstPct || 0),
+            gstInclusive: item.gstInclusive || false,
+            taxableAmount: String(item.taxableAmount || 0),
+            cgst: String(item.cgst || 0),
+            sgst: String(item.sgst || 0),
+            igst: String(item.igst || 0),
+            batchId: newBatchId,
+            total: String(item.total || 0),
+            receivedQty: String(item.receivedQty || 0),
+          });
+        }
+      }
+    }
+
+    // 16. Deliveries & Invoices
+    if (Array.isArray(d.deliveries)) {
+      for (const del of d.deliveries) {
+        const [existing] = await db.select({ id: deliveriesTable.id })
+          .from(deliveriesTable)
+          .where(eq(deliveriesTable.tripNumber, del.tripNumber))
+          .limit(1);
+
+        if (existing) {
+          deliveryIdMap.set(del.id, existing.id);
+        } else {
+          const mappedSaleInvId = del.saleInvoiceId ? saleInvoiceIdMap.get(del.saleInvoiceId) || null : null;
+          const mappedDriverId = del.driverId ? driverIdMap.get(del.driverId) || null : null;
+          const mappedVehicleId = del.vehicleId ? vehicleIdMap.get(del.vehicleId) || null : null;
+
+          const [inserted] = await db.insert(deliveriesTable).values({
+            challanNumber: del.challanNumber || null,
+            tripNumber: del.tripNumber,
+            date: del.date || null,
+            saleInvoiceId: mappedSaleInvId,
+            driverId: mappedDriverId,
+            vehicleId: mappedVehicleId,
+            invoiceNumber: del.invoiceNumber || null,
+            partyName: del.partyName || null,
+            destination: del.destination || null,
+            status: del.status || "pending",
+            totalAmount: String(del.totalAmount || 0),
+            notes: del.notes || null,
+          }).returning();
+          deliveryIdMap.set(del.id, inserted.id);
+          restoredCounts.deliveries++;
+        }
+      }
+
+      if (Array.isArray(d.deliveryInvoices)) {
+        for (const di of d.deliveryInvoices) {
+          const newDelId = deliveryIdMap.get(di.deliveryId);
+          if (!newDelId) continue;
+          const mappedInvId = saleInvoiceIdMap.get(di.invoiceId) || di.invoiceId;
+
+          await db.insert(deliveryInvoicesTable).values({
+            deliveryId: newDelId,
+            invoiceId: mappedInvId,
+          });
+        }
+      }
+    }
+
+    // 17. Stock Transactions
     if (Array.isArray(d.stockTransactions)) {
       for (const tx of d.stockTransactions) {
         const newItemId = tx.itemId ? itemIdMap.get(tx.itemId) || null : null;
@@ -1054,7 +1179,7 @@ router.post("/backup/restore", authMiddleware, async (req, res) => {
       }
     }
 
-    // 16. Sync sequence Counters
+    // 18. Sync sequence Counters
     if (Array.isArray(d.counters)) {
       for (const c of d.counters) {
         const [existing] = await db.select().from(countersTable).where(eq(countersTable.name, c.name)).limit(1);
