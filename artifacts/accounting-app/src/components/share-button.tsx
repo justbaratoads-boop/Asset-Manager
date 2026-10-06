@@ -89,9 +89,9 @@ export function ShareButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} className={cn("gap-1.5", className)}>
+        <Button variant={variant} size={size} className={cn("h-8 px-2 sm:px-3 text-xs gap-1 sm:gap-1.5", className)}>
           <Share2 className="h-3.5 w-3.5" />
-          {showText && <span>{label}</span>}
+          {showText && <span className="hidden xs:inline sm:inline">{label}</span>}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">

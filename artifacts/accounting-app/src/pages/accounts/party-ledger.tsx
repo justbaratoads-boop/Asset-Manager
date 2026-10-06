@@ -70,35 +70,41 @@ export default function PartyView() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-full">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link href={backHref}>
-            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
+            <Button variant="ghost" size="sm" className="px-2 sm:px-3">
+              <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />Back
+            </Button>
           </Link>
-          <div>
-            <h1 className="text-xl font-bold">{p?.name || "Party"}</h1>
-            <p className="text-sm text-muted-foreground">{p?.accountGroup}</p>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold truncate">{p?.name || "Party"}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{p?.accountGroup}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
           {l && (
-            <div className="text-right mr-2">
-              <p className="text-xs text-muted-foreground">Closing Balance</p>
-              <p className={`text-lg font-bold ${l.closingBalance >= 0 ? "text-blue-700" : "text-red-600"}`}>
+            <div className="text-left sm:text-right mr-1 sm:mr-2">
+              <p className="text-[11px] sm:text-xs text-muted-foreground">Closing Balance</p>
+              <p className={`text-base sm:text-lg font-bold ${l.closingBalance >= 0 ? "text-blue-700" : "text-red-600"}`}>
                 {formatCurrency(Math.abs(l.closingBalance))} {l.closingBalance >= 0 ? "Dr" : "Cr"}
               </p>
             </div>
           )}
-          <Link href={`/reports/interest-calculation?partyId=${id}`}>
-            <Button size="sm" variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50">
-              Interest Calculation
-            </Button>
-          </Link>
-          <Link href={`/accounts/parties/${id}/edit`}>
-            <Button size="sm" variant="outline"><Pencil className="h-3.5 w-3.5 mr-1.5" />Edit</Button>
-          </Link>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link href={`/reports/interest-calculation?partyId=${id}`}>
+              <Button size="sm" variant="outline" className="h-8 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                Interest Calc
+              </Button>
+            </Link>
+            <Link href={`/accounts/parties/${id}/edit`}>
+              <Button size="sm" variant="outline" className="h-8 text-xs">
+                <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -196,28 +202,30 @@ export default function PartyView() {
       )}
 
       {/* Transactions */}
-      <div>
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <div className="w-full max-w-full overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
           <h2 className="text-base font-semibold">All Transactions</h2>
-          <ReportActions
-            allColumns={allColumns}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
-            onResetSort={() => { setSortKey(""); setSortDir(null); }}
-            visibleKeys={vis}
-            onToggleColumn={toggle}
-            onSelectAllColumns={() => setAll(true)}
-            onClearAllColumns={() => setAll(false)}
-            data={sortedData}
-            visibleColumns={visibleColumns}
-            filename={`party-ledger-${p?.name || "party"}`}
-            title={`${p?.name || "Party"} Statement`}
-            shareSummary={l ? `Party: ${p?.name}, Closing Balance: ${formatCurrency(Math.abs(l.closingBalance))} ${l.closingBalance >= 0 ? "Dr" : "Cr"}` : undefined}
-          />
+          <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+            <ReportActions
+              allColumns={allColumns}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+              onResetSort={() => { setSortKey(""); setSortDir(null); }}
+              visibleKeys={vis}
+              onToggleColumn={toggle}
+              onSelectAllColumns={() => setAll(true)}
+              onClearAllColumns={() => setAll(false)}
+              data={sortedData}
+              visibleColumns={visibleColumns}
+              filename={`party-ledger-${p?.name || "party"}`}
+              title={`${p?.name || "Party"} Statement`}
+              shareSummary={l ? `Party: ${p?.name}, Closing Balance: ${formatCurrency(Math.abs(l.closingBalance))} ${l.closingBalance >= 0 ? "Dr" : "Cr"}` : undefined}
+            />
+          </div>
         </div>
-        <Card>
-          <CardContent className="p-0">
+        <Card className="w-full max-w-full overflow-hidden">
+          <CardContent className="p-0 overflow-x-auto w-full max-w-full">
             {isLoading ? (
               <p className="text-center text-muted-foreground py-8">Loading...</p>
             ) : !l?.transactions?.length ? (

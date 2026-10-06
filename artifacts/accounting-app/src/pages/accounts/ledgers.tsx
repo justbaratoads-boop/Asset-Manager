@@ -336,31 +336,33 @@ export default function LedgerAccounts() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 max-w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Ledger Accounts</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-lg sm:text-xl font-bold">Ledger Accounts</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Accounts from{" "}
             <Link href="/accounts/chart-of-accounts" className="text-primary underline underline-offset-2">Chart of Accounts</Link>
             {" "}and Ledger — {filtered.length} total
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5">
-            <Upload className="h-4 w-4" /> Import Ledgers
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="h-8 px-2 sm:px-3 text-xs gap-1 sm:gap-1.5">
+            <Upload className="h-3.5 w-3.5" /> <span className="hidden xs:inline sm:inline">Import</span> Ledgers
           </Button>
-          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />New Account</Button>
+          <Button size="sm" onClick={openNew} className="h-8 px-2 sm:px-3 text-xs">
+            <Plus className="h-3.5 w-3.5 mr-1" />New Account
+          </Button>
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-48">
+      <Card className="max-w-full overflow-hidden">
+        <CardContent className="p-3 sm:p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                className="pl-9"
+                className="pl-9 h-8 sm:h-9 text-xs sm:text-sm w-full"
                 placeholder="Search ledgers and parties..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -368,7 +370,7 @@ export default function LedgerAccounts() {
               />
             </div>
             <Select value={sourceFilter} onValueChange={v => setSourceFilter(v as any)}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full h-8 sm:h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Sources</SelectItem>
                 <SelectItem value="ledger">Ledger Accounts</SelectItem>
@@ -376,7 +378,7 @@ export default function LedgerAccounts() {
               </SelectContent>
             </Select>
             <Select value={groupFilter} onValueChange={setGroupFilter}>
-              <SelectTrigger className="w-52"><SelectValue placeholder="All Groups" /></SelectTrigger>
+              <SelectTrigger className="w-full h-8 sm:h-9 text-xs sm:text-sm"><SelectValue placeholder="All Groups" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Groups</SelectItem>
                 {allGroups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}

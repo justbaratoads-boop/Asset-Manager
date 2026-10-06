@@ -83,24 +83,24 @@ export default function PartiesList() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-4 max-w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Ledger</h1>
-          <p className="text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "ledger" : "ledgers"}</p>
+          <h1 className="text-lg sm:text-xl font-bold">Ledger</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "ledger" : "ledgers"}</p>
         </div>
         <Link href="/accounts/parties/new">
-          <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Ledger</Button>
+          <Button size="sm" className="h-8 px-3 text-xs w-full sm:w-auto"><Plus className="h-4 w-4 mr-1" />New Ledger</Button>
         </Link>
       </div>
 
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="relative w-full sm:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search parties..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9 h-8 sm:h-9 text-xs sm:text-sm w-full" placeholder="Search parties..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={type} onValueChange={setType}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full h-8 sm:h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Parties</SelectItem>
             <SelectItem value="customer">Customers</SelectItem>

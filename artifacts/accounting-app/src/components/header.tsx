@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Search, Bell, Menu, X } from "lucide-react";
+import { Search, Bell, Menu, X, Calendar as CalendarIcon } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Sidebar } from "./sidebar";
 import { ThemeToggle } from "./theme-toggle";
 import { useFY } from "@/lib/financial-year";
@@ -10,14 +11,17 @@ import { Badge } from "./ui/badge";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const { fy, globalFrom, globalTo, setGlobalFrom, setGlobalTo, clearGlobalDates } = useFY();
 
+  const hasFilter = Boolean(globalFrom || globalTo);
+
   return (
-    <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-10">
-      <div className="flex items-center gap-4 flex-1">
+    <header className="h-14 border-b bg-card px-3 sm:px-4 flex items-center justify-between sticky top-0 z-10 w-full max-w-full">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="md:hidden">
+            <Button variant="ghost" size="icon" className="md:hidden shrink-0">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
@@ -35,29 +39,94 @@ export function Header() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Mobile Date Filter Button (< sm) */}
+        <div className="sm:hidden">
+          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={hasFilter ? "default" : "outline"}
+                size="sm"
+                className="h-8 px-2 text-xs gap-1.5"
+                title="Date Filter"
+              >
+                <CalendarIcon className="h-3.5 w-3.5" />
+                <span>{hasFilter ? "Filtered" : "Filter"}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Global Date Filter
+                </span>
+                {hasFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      clearGlobalDates();
+                      setDatePopoverOpen(false);
+                    }}
+                    className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1">From Date</label>
+                  <Input 
+                    type="date" 
+                    value={globalFrom} 
+                    onChange={(e) => setGlobalFrom(e.target.value)} 
+                    className="h-8 text-xs w-full" 
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1">To Date</label>
+                  <Input 
+                    type="date" 
+                    value={globalTo} 
+                    onChange={(e) => setGlobalTo(e.target.value)} 
+                    className="h-8 text-xs w-full" 
+                  />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="w-full h-8 text-xs"
+                onClick={() => setDatePopoverOpen(false)}
+              >
+                Done
+              </Button>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Desktop Date Filter (>= sm) */}
+        <div className="hidden sm:flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">
           <Input 
             type="date" 
             value={globalFrom} 
             onChange={(e) => setGlobalFrom(e.target.value)} 
-            className="w-[100px] sm:w-36 h-8 text-[10px] sm:text-xs px-1 sm:px-3" 
+            className="w-32 md:w-36 h-8 text-xs px-2 md:px-3" 
             title="From Date (Saved automatically)"
           />
-          <span className="text-muted-foreground text-[10px] sm:text-xs">to</span>
+          <span className="text-muted-foreground text-xs">to</span>
           <Input 
             type="date" 
             value={globalTo} 
             onChange={(e) => setGlobalTo(e.target.value)} 
-            className="w-[100px] sm:w-36 h-8 text-[10px] sm:text-xs px-1 sm:px-3" 
+            className="w-32 md:w-36 h-8 text-xs px-2 md:px-3" 
             title="To Date (Saved automatically)"
           />
-          {(globalFrom || globalTo) && (
+          {hasFilter && (
             <Button
               variant="outline"
               size="sm"
               onClick={clearGlobalDates}
-              className="h-8 px-2 text-[10px] sm:text-xs text-muted-foreground hover:text-foreground border-dashed"
+              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground border-dashed"
               title="Clear Saved Date Filter"
             >
               <X className="h-3.5 w-3.5 mr-1" />

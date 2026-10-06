@@ -73,14 +73,14 @@ export function ExportButtons({ data, columns, filename = "report", title }: Exp
   };
 
   return (
-    <div className="flex gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={handleCSV} className="gap-1.5">
+    <div className="flex items-center gap-1.5 sm:gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={handleCSV} className="h-8 px-2 sm:px-3 text-xs gap-1 sm:gap-1.5">
         <Download className="h-3.5 w-3.5" />
-        Export Excel
+        <span className="hidden xs:inline sm:inline">Excel</span>
       </Button>
-      <Button type="button" variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
+      <Button type="button" variant="outline" size="sm" onClick={handlePrint} className="h-8 px-2 sm:px-3 text-xs gap-1 sm:gap-1.5">
         <Printer className="h-3.5 w-3.5" />
-        Print PDF
+        <span className="hidden xs:inline sm:inline">PDF</span>
       </Button>
     </div>
   );

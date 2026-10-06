@@ -30,12 +30,12 @@ export function ColumnSelector({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
+        <Button variant="outline" size="sm" className="h-8 px-2 sm:px-3 text-xs gap-1 sm:gap-1.5">
           <Columns3 className="h-3.5 w-3.5" />
-          Columns
+          <span className="hidden xs:inline sm:inline">Columns</span>
           {hiddenCount > 0 && (
             <span className="ml-0.5 rounded-full bg-primary text-primary-foreground text-[10px] px-1.5 py-0 leading-5">
-              {hiddenCount} hidden
+              {hiddenCount}
             </span>
           )}
         </Button>
