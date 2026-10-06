@@ -57,10 +57,12 @@ function PurchaseOrderViewSheet({ id, onClose }: { id: number | null; onClose: (
 
   const items: any[] = data?.items || [];
 
-  const getBatchName = (batchId: number | null) => {
+  const getBatchName = (batchId: number | null | undefined) => {
     if (!batchId) return null;
-    const b = (batches as any[]).find((b: any) => b.id === batchId);
-    return b ? b.name : `Batch #${batchId}`;
+    const b = (batches as any[]).find((b: any) => Number(b.id) === Number(batchId));
+    if (!b) return `Batch #${batchId}`;
+    const name = b.name || b.batchNumber || `Batch #${batchId}`;
+    return name + (b.expiryDate ? ` - exp ${b.expiryDate}` : "");
   };
 
   return (

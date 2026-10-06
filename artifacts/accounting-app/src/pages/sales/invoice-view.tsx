@@ -31,9 +31,12 @@ function loadPrintSettings() {
   catch { return {}; }
 }
 
-function getBatchName(batchId: number, batches: any[]) {
-  const b = batches.find((x: any) => x.id === batchId);
-  return b ? b.batchNumber : `Batch #${batchId}`;
+function getBatchName(batchId: number | null | undefined, batches: any[] = []): string {
+  if (!batchId) return "";
+  const b = (batches || []).find((x: any) => Number(x.id) === Number(batchId));
+  if (!b) return `Batch #${batchId}`;
+  const name = b.name || b.batchNumber || `Batch #${batchId}`;
+  return name + (b.expiryDate ? ` (Exp: ${b.expiryDate})` : "");
 }
 
 const BASE_PAYMENT_MODES = [
@@ -120,10 +123,12 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
       baseSgst += Number(((baseTaxableAmount * (gstPct / 2)) / 100).toFixed(2));
     }
 
+    const batchLabel = item.batchId ? getBatchName(item.batchId, batches) : "";
+
     return `
     <tr>
       <td class="tc">${i + 1}</td>
-      <td class="tl">${item.itemName || ""}${item.batchId ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${getBatchName(item.batchId, batches)}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
+      <td class="tl">${item.itemName || ""}${batchLabel ? `<div style="font-size:0.8em;color:#2563eb;margin-top:2px;">${batchLabel}</div>` : ""}${item.description ? `<div style="font-size:.82em;color:#6b7280;font-style:italic;margin-top:1px">${item.description}</div>` : ""}</td>
       ${showHsn ? `<td class="tc">${item.hsnCode || ""}</td>` : ""}
       <td class="tr">${item.quantity} ${item.unit || ""}</td>
       <td class="tr">${fmtN(itemBaseRate(item))}</td>
@@ -540,7 +545,9 @@ function InvoiceDocument({ invoice, company, copyLabel, batches = [] }: { invoic
                   <td className="py-2 pl-4 sm:pl-0 text-center">{i + 1}</td>
                   <td className="py-2 text-left">
                     <div>{item.itemName}</div>
-                      {item.batchId && <div className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</div>}
+                      {item.batchId && getBatchName(item.batchId, batches) ? (
+                        <div className="text-xs text-blue-600 font-medium">{getBatchName(item.batchId, batches)}</div>
+                      ) : null}
                       {item.description && <div className="text-xs text-gray-500 italic mt-0.5">{item.description}</div>}
                   </td>
                   {showHsnCode && <td className="py-2 text-center text-gray-500 whitespace-nowrap">{item.hsnCode}</td>}
