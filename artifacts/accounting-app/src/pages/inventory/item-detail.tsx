@@ -14,6 +14,7 @@ import { formatCurrency } from "@/lib/format";
 import { ArrowLeft, History, Layers, Package, PackageOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/use-fetch";
+import { cn } from "@/lib/utils";
 
 interface BatchStock {
   id: number;
