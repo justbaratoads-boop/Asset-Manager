@@ -1417,7 +1417,7 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
         value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
       }).from(saleInvoiceItemsTable)
         .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
-        .where(and(dualLedgerCond(saleInvoicesTable), lt(saleInvoiceItemsTable.date, from as string)))
+        .where(and(dualLedgerCond(saleInvoicesTable), lt(saleInvoicesTable.date, from as string)))
         .groupBy(saleInvoiceItemsTable.stockItemId, saleInvoiceItemsTable.batchId),
 
       db.select({
