@@ -259,31 +259,6 @@ router.get("/stock-items", async (req, res) => {
   const conditions: any[] = [eq(stockItemsTable.isDeleted, "false")];
   if (categoryId) conditions.push(eq(stockItemsTable.categoryId, Number(categoryId)));
   if (search) conditions.push(ilike(stockItemsTable.name, `%${search}%`));
-  if (from && to) {
-    conditions.push(sql`(
-      (${stockItemsTable.createdAt}::date >= ${from}::date AND ${stockItemsTable.createdAt}::date <= ${to}::date)
-      OR ${stockItemsTable.id} IN (
-        SELECT ${stockTransactionsTable.itemId} FROM ${stockTransactionsTable}
-        WHERE ${stockTransactionsTable.createdAt}::date >= ${from}::date AND ${stockTransactionsTable.createdAt}::date <= ${to}::date
-      )
-    )`);
-  } else if (from) {
-    conditions.push(sql`(
-      ${stockItemsTable.createdAt}::date >= ${from}::date
-      OR ${stockItemsTable.id} IN (
-        SELECT ${stockTransactionsTable.itemId} FROM ${stockTransactionsTable}
-        WHERE ${stockTransactionsTable.createdAt}::date >= ${from}::date
-      )
-    )`);
-  } else if (to) {
-    conditions.push(sql`(
-      ${stockItemsTable.createdAt}::date <= ${to}::date
-      OR ${stockItemsTable.id} IN (
-        SELECT ${stockTransactionsTable.itemId} FROM ${stockTransactionsTable}
-        WHERE ${stockTransactionsTable.createdAt}::date <= ${to}::date
-      )
-    )`);
-  }
 
   const items = await db.select({
     item: stockItemsTable,
@@ -295,13 +270,78 @@ router.get("/stock-items", async (req, res) => {
     .groupBy(stockItemsTable.id)
     .orderBy(stockItemsTable.name);
 
+  let purchUpToMap: Record<number, number> = {};
+  let saleUpToMap: Record<number, number> = {};
+  let creditUpToMap: Record<number, number> = {};
+  let debitUpToMap: Record<number, number> = {};
+
+  if (to) {
+    const [pRows, sRows, cRows, dRows] = await Promise.all([
+      db.select({
+        stockItemId: purchaseInvoiceItemsTable.stockItemId,
+        qty: sql<string>`SUM(${purchaseInvoiceItemsTable.quantity})`,
+      }).from(purchaseInvoiceItemsTable)
+        .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
+        .where(and(eq(purchaseInvoicesTable.isDeleted, "false"), lte(purchaseInvoicesTable.date, to as string)))
+        .groupBy(purchaseInvoiceItemsTable.stockItemId),
+
+      db.select({
+        stockItemId: saleInvoiceItemsTable.stockItemId,
+        qty: sql<string>`SUM(${saleInvoiceItemsTable.quantity})`,
+      }).from(saleInvoiceItemsTable)
+        .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+        .where(and(eq(saleInvoicesTable.isDeleted, "false"), lte(saleInvoicesTable.date, to as string)))
+        .groupBy(saleInvoiceItemsTable.stockItemId),
+
+      db.select({
+        stockItemId: creditNoteItemsTable.stockItemId,
+        qty: sql<string>`SUM(${creditNoteItemsTable.quantity})`,
+      }).from(creditNoteItemsTable)
+        .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+        .where(and(eq(creditNotesTable.isDeleted, "false"), lte(creditNotesTable.date, to as string)))
+        .groupBy(creditNoteItemsTable.stockItemId),
+
+      db.select({
+        stockItemId: debitNoteItemsTable.stockItemId,
+        qty: sql<string>`SUM(${debitNoteItemsTable.quantity})`,
+      }).from(debitNoteItemsTable)
+        .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+        .where(and(eq(debitNotesTable.isDeleted, "false"), lte(debitNotesTable.date, to as string)))
+        .groupBy(debitNoteItemsTable.stockItemId),
+    ]);
+
+    for (const r of pRows) if (r.stockItemId) purchUpToMap[r.stockItemId] = Number(r.qty);
+    for (const r of sRows) if (r.stockItemId) saleUpToMap[r.stockItemId] = Number(r.qty);
+    for (const r of cRows) if (r.stockItemId) creditUpToMap[r.stockItemId] = Number(r.qty);
+    for (const r of dRows) if (r.stockItemId) debitUpToMap[r.stockItemId] = Number(r.qty);
+  }
+
+  const batchOpenings = await db.select({
+    stockItemId: stockBatchesTable.stockItemId,
+    totalOpening: sql<string>`COALESCE(SUM(${stockBatchesTable.openingStock}::numeric), 0)`,
+  }).from(stockBatchesTable).groupBy(stockBatchesTable.stockItemId);
+  const batchOpenMap: Record<number, number> = {};
+  for (const b of batchOpenings) if (b.stockItemId) batchOpenMap[b.stockItemId] = Number(b.totalOpening);
+
   let result = items.map(({ item: i, batchStock }) => {
     const unbatched = Number(i.physicalStock);
     const batched = Number(batchStock);
+    let totalStock = unbatched + batched;
+
+    if (to) {
+      const initOpen = Number(i.openingStock || 0) + (batchOpenMap[i.id] || 0);
+      const p = purchUpToMap[i.id] || 0;
+      const s = saleUpToMap[i.id] || 0;
+      const c = creditUpToMap[i.id] || 0;
+      const d = debitUpToMap[i.id] || 0;
+      totalStock = initOpen + p + c - s - d;
+    }
+
     return {
       ...i,
+      openingStock: Number(i.openingStock || 0),
       unbatchedStock: unbatched,
-      physicalStock: unbatched + batched,
+      physicalStock: totalStock,
       minStockLevel: Number(i.minStockLevel),
       purchaseRate: Number(i.purchaseRate),
       saleRate: Number(i.saleRate),
@@ -325,6 +365,7 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
   if (existing) {
     return res.status(400).json({ error: `A stock item named "${name}" already exists` });
   }
+  const openQty = Number(d.physicalStock ?? d.openingStock) || 0;
   const [item] = await db.insert(stockItemsTable).values({
     name,
     categoryId: d.categoryId,
@@ -335,13 +376,25 @@ router.post("/stock-items", authMiddleware, async (req, res) => {
     saleRate: String(d.saleRate || 0),
     minStockLevel: String(d.minStockLevel || 0),
     barcode: d.barcode,
-    physicalStock: String(Number(d.physicalStock) || 0),
+    openingStock: String(openQty),
+    physicalStock: String(openQty),
     gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
     gstRate: String(d.gstRate || 0),
     isDecimalApplicable: d.isDecimalApplicable !== undefined ? (d.isDecimalApplicable === true || d.isDecimalApplicable === "true") : true,
     decimalPlaces: d.decimalPlaces !== undefined ? Number(d.decimalPlaces) : 2,
     isTaxLiability: d.isTaxLiability === "false" || d.isTaxLiability === false ? false : true,
   }).returning();
+
+  if (openQty > 0) {
+    await db.insert(stockTransactionsTable).values({
+      itemId: item.id,
+      type: "opening",
+      quantity: String(openQty),
+      balanceAfter: String(openQty),
+      reference: "Opening Stock",
+    });
+  }
+
   res.status(201).json({ ...item, physicalStock: Number(item.physicalStock) });
 });
 
@@ -540,6 +593,20 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
   const gstChanged = Number(newGstRate) !== Number(current.gstRate);
   const effectiveFrom: string | undefined = d.gstEffectiveFrom;
 
+  let newOpening = current.openingStock;
+  let newPhys = current.physicalStock;
+  if (d.openingStock !== undefined) {
+    const desiredOpening = Number(d.openingStock) || 0;
+    const delta = desiredOpening - Number(current.openingStock || 0);
+    newOpening = String(desiredOpening);
+    newPhys = String(Number(current.physicalStock || 0) + delta);
+  } else if (d.physicalStock !== undefined) {
+    const desiredPhys = Number(d.physicalStock) || 0;
+    const delta = desiredPhys - Number(current.physicalStock || 0);
+    newPhys = String(desiredPhys);
+    newOpening = String(Math.max(0, Number(current.openingStock || 0) + delta));
+  }
+
   const [item] = await db.update(stockItemsTable).set({
     name: d.name,
     categoryId: d.categoryId,
@@ -550,7 +617,8 @@ router.put("/stock-items/:id", authMiddleware, async (req, res) => {
     saleRate: String(d.saleRate || 0),
     minStockLevel: String(d.minStockLevel || 0),
     barcode: d.barcode,
-    physicalStock: d.physicalStock !== undefined ? String(Number(d.physicalStock) || 0) : current.physicalStock,
+    openingStock: newOpening,
+    physicalStock: newPhys,
     gstApplicable: d.gstApplicable === true || d.gstApplicable === "true" ? "true" : "false",
     gstRate: newGstRate,
     isDecimalApplicable: d.isDecimalApplicable !== undefined ? (d.isDecimalApplicable === true || d.isDecimalApplicable === "true") : current.isDecimalApplicable,

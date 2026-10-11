@@ -1171,68 +1171,132 @@ router.get("/reports/party-statement", authMiddleware, async (req, res) => {
 });
 
 router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
-    const enableDualLedger = await getEnableDualLedger();
+  const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
 
-  const items = await db.select().from(stockItemsTable).where(eq(stockItemsTable.isDeleted, "false")).orderBy(stockItemsTable.name);
+  const items = await db.select().from(stockItemsTable)
+    .where(eq(stockItemsTable.isDeleted, "false"))
+    .orderBy(stockItemsTable.name);
 
-  // Purchases within period
-  const purchasedItems = await db.select({
-    stockItemId: purchaseInvoiceItemsTable.stockItemId,
-    qty: sql<string>`SUM(${purchaseInvoiceItemsTable.quantity})`,
-    value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
-  }).from(purchaseInvoiceItemsTable)
-    .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
-    .where(and(
-      and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)),
-      ...(from ? [gte(purchaseInvoicesTable.date, from as string)] : []),
-      ...(to ? [lte(purchaseInvoicesTable.date, to as string)] : []),
-    ))
-    .groupBy(purchaseInvoiceItemsTable.stockItemId);
+  // Batches initial opening stock per item
+  const batchOpenings = await db.select({
+    stockItemId: stockBatchesTable.stockItemId,
+    totalOpening: sql<string>`COALESCE(SUM(${stockBatchesTable.openingStock}::numeric), 0)`,
+  }).from(stockBatchesTable)
+    .groupBy(stockBatchesTable.stockItemId);
 
-  // Sales within period
-  const soldItems = await db.select({
-    stockItemId: saleInvoiceItemsTable.stockItemId,
-    qty: sql<string>`SUM(${saleInvoiceItemsTable.quantity})`,
-    value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
-  }).from(saleInvoiceItemsTable)
-    .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
-    .where(and(
-      and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)),
-      ...(from ? [gte(saleInvoicesTable.date, from as string)] : []),
-      ...(to ? [lte(saleInvoicesTable.date, to as string)] : []),
-    ))
-    .groupBy(saleInvoiceItemsTable.stockItemId);
+  const batchOpeningMap: Record<number, number> = {};
+  for (const b of batchOpenings) {
+    if (b.stockItemId) batchOpeningMap[b.stockItemId] = Number(b.totalOpening);
+  }
 
-  // Credit notes = sale returns → stock comes back in
-  const creditNoteItems = await db.select({
-    stockItemId: creditNoteItemsTable.stockItemId,
-    qty: sql<string>`SUM(${creditNoteItemsTable.quantity})`,
-    value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
-  }).from(creditNoteItemsTable)
-    .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
-    .where(and(
-      and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false)),
-      ...(from ? [gte(creditNotesTable.date, from as string)] : []),
-      ...(to ? [lte(creditNotesTable.date, to as string)] : []),
-    ))
-    .groupBy(creditNoteItemsTable.stockItemId);
+  // Dual ledger filter
+  const dualLedgerCond = (table: any) =>
+    and(eq(table.isDeleted, "false"), enableDualLedger ? sql`true` : eq(table.isKaccha, false));
 
-  // Debit notes = purchase returns → stock goes out
-  const debitNoteItems = await db.select({
-    stockItemId: debitNoteItemsTable.stockItemId,
-    qty: sql<string>`SUM(${debitNoteItemsTable.quantity})`,
-    value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
-  }).from(debitNoteItemsTable)
-    .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
-    .where(and(
-      and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false)),
-      ...(from ? [gte(debitNotesTable.date, from as string)] : []),
-      ...(to ? [lte(debitNotesTable.date, to as string)] : []),
-    ))
-    .groupBy(debitNoteItemsTable.stockItemId);
+  // Transactions BEFORE 'from' (used to compute opening balance as of 'from')
+  let purchBeforeMap: Record<number, { qty: number; value: number }> = {};
+  let soldBeforeMap: Record<number, { qty: number; value: number }> = {};
+  let creditBeforeMap: Record<number, { qty: number; value: number }> = {};
+  let debitBeforeMap: Record<number, { qty: number; value: number }> = {};
 
-  const toMap = <T extends { stockItemId: number | null; qty: string; value: string }>(rows: T[]) => {
+  if (from) {
+    const [pb, sb, cb, db_] = await Promise.all([
+      db.select({
+        stockItemId: purchaseInvoiceItemsTable.stockItemId,
+        qty: sql<string>`SUM(${purchaseInvoiceItemsTable.quantity})`,
+        value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
+      }).from(purchaseInvoiceItemsTable)
+        .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
+        .where(and(dualLedgerCond(purchaseInvoicesTable), lt(purchaseInvoicesTable.date, from as string)))
+        .groupBy(purchaseInvoiceItemsTable.stockItemId),
+
+      db.select({
+        stockItemId: saleInvoiceItemsTable.stockItemId,
+        qty: sql<string>`SUM(${saleInvoiceItemsTable.quantity})`,
+        value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
+      }).from(saleInvoiceItemsTable)
+        .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+        .where(and(dualLedgerCond(saleInvoicesTable), lt(saleInvoicesTable.date, from as string)))
+        .groupBy(saleInvoiceItemsTable.stockItemId),
+
+      db.select({
+        stockItemId: creditNoteItemsTable.stockItemId,
+        qty: sql<string>`SUM(${creditNoteItemsTable.quantity})`,
+        value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
+      }).from(creditNoteItemsTable)
+        .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+        .where(and(dualLedgerCond(creditNotesTable), lt(creditNotesTable.date, from as string)))
+        .groupBy(creditNoteItemsTable.stockItemId),
+
+      db.select({
+        stockItemId: debitNoteItemsTable.stockItemId,
+        qty: sql<string>`SUM(${debitNoteItemsTable.quantity})`,
+        value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
+      }).from(debitNoteItemsTable)
+        .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+        .where(and(dualLedgerCond(debitNotesTable), lt(debitNotesTable.date, from as string)))
+        .groupBy(debitNoteItemsTable.stockItemId),
+    ]);
+
+    const toMap = (rows: any[]) => {
+      const m: Record<number, { qty: number; value: number }> = {};
+      for (const r of rows) {
+        if (r.stockItemId) m[r.stockItemId] = { qty: Number(r.qty), value: Number(r.value) };
+      }
+      return m;
+    };
+    purchBeforeMap  = toMap(pb);
+    soldBeforeMap   = toMap(sb);
+    creditBeforeMap = toMap(cb);
+    debitBeforeMap  = toMap(db_);
+  }
+
+  // Transactions WITHIN period [from, to]
+  const dateFilter = (dateCol: any) => and(
+    ...(from ? [gte(dateCol, from as string)] : []),
+    ...(to   ? [lte(dateCol, to   as string)] : []),
+  );
+
+  const [purchRows, saleRows, creditRows, debitRows] = await Promise.all([
+    db.select({
+      stockItemId: purchaseInvoiceItemsTable.stockItemId,
+      qty: sql<string>`SUM(${purchaseInvoiceItemsTable.quantity})`,
+      value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
+    }).from(purchaseInvoiceItemsTable)
+      .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
+      .where(and(dualLedgerCond(purchaseInvoicesTable), dateFilter(purchaseInvoicesTable.date)))
+      .groupBy(purchaseInvoiceItemsTable.stockItemId),
+
+    db.select({
+      stockItemId: saleInvoiceItemsTable.stockItemId,
+      qty: sql<string>`SUM(${saleInvoiceItemsTable.quantity})`,
+      value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
+    }).from(saleInvoiceItemsTable)
+      .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+      .where(and(dualLedgerCond(saleInvoicesTable), dateFilter(saleInvoicesTable.date)))
+      .groupBy(saleInvoiceItemsTable.stockItemId),
+
+    db.select({
+      stockItemId: creditNoteItemsTable.stockItemId,
+      qty: sql<string>`SUM(${creditNoteItemsTable.quantity})`,
+      value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
+    }).from(creditNoteItemsTable)
+      .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+      .where(and(dualLedgerCond(creditNotesTable), dateFilter(creditNotesTable.date)))
+      .groupBy(creditNoteItemsTable.stockItemId),
+
+    db.select({
+      stockItemId: debitNoteItemsTable.stockItemId,
+      qty: sql<string>`SUM(${debitNoteItemsTable.quantity})`,
+      value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
+    }).from(debitNoteItemsTable)
+      .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+      .where(and(dualLedgerCond(debitNotesTable), dateFilter(debitNotesTable.date)))
+      .groupBy(debitNoteItemsTable.stockItemId),
+  ]);
+
+  const toMapPeriod = (rows: any[]) => {
     const map: Record<number, { qty: number; value: number }> = {};
     for (const r of rows) {
       if (r.stockItemId) map[r.stockItemId] = { qty: Number(r.qty), value: Number(r.value) };
@@ -1240,48 +1304,60 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
     return map;
   };
 
-  const purchasedMap = toMap(purchasedItems);
-  const soldMap      = toMap(soldItems);
-  const creditMap    = toMap(creditNoteItems);
-  const debitMap     = toMap(debitNoteItems);
+  const purchasedMap = toMapPeriod(purchRows);
+  const soldMap      = toMapPeriod(saleRows);
+  const creditMap    = toMapPeriod(creditRows);
+  const debitMap     = toMapPeriod(debitRows);
 
   const summary = items.map(item => {
-    const purchased    = purchasedMap[item.id] || { qty: 0, value: 0 };
-    const sold         = soldMap[item.id]      || { qty: 0, value: 0 };
-    const saleReturn   = creditMap[item.id]    || { qty: 0, value: 0 }; // credit note = sale return → stock in
-    const purchReturn  = debitMap[item.id]     || { qty: 0, value: 0 }; // debit note  = purchase return → stock out
+    const baseInitialOpening = Number(item.openingStock || 0) + (batchOpeningMap[item.id] || 0);
 
-    // physicalStock is the CURRENT (closing) stock, kept accurate by all transactions
-    const closingQty = Number(item.physicalStock) || 0;
+    const pb = purchBeforeMap[item.id]  || { qty: 0, value: 0 };
+    const sb = soldBeforeMap[item.id]   || { qty: 0, value: 0 };
+    const cb = creditBeforeMap[item.id] || { qty: 0, value: 0 };
+    const db = debitBeforeMap[item.id]  || { qty: 0, value: 0 };
 
-    // Derive opening by reversing the period's net movement
-    // openingQty = closingQty - purchased - saleReturn + sold + purchReturn
-    const openingQty = closingQty - purchased.qty - saleReturn.qty + sold.qty + purchReturn.qty;
+    // Opening Qty at start of period
+    const openingQty = baseInitialOpening + pb.qty + cb.qty - sb.qty - db.qty;
 
-    const rate = Number(item.purchaseRate) || 0;
-    const openingValue = openingQty * rate;
+    const purchased   = purchasedMap[item.id] || { qty: 0, value: 0 };
+    const sold        = soldMap[item.id]      || { qty: 0, value: 0 };
+    const saleReturn  = creditMap[item.id]    || { qty: 0, value: 0 };
+    const purchReturn = debitMap[item.id]     || { qty: 0, value: 0 };
 
-    // Closing value = openingValue + net purchases (using actual invoice taxable amounts)
-    const closingValue = openingValue
-      + purchased.value + saleReturn.value
-      - sold.value      - purchReturn.value;
+    // Closing Qty = Opening + Inward - Outward
+    const closingQty = openingQty + purchased.qty + saleReturn.qty - sold.qty - purchReturn.qty;
+
+    // Unit valuation rate (cost rate)
+    const baseRate = Number(item.purchaseRate) || 0;
+    let costRate = baseRate;
+    if (purchased.qty > 0 && purchased.value > 0) {
+      costRate = purchased.value / purchased.qty;
+    } else if (pb.qty > 0 && pb.value > 0) {
+      costRate = pb.value / pb.qty;
+    } else if (costRate === 0 && Number(item.saleRate) > 0) {
+      costRate = Number(item.saleRate);
+    }
+
+    const openingValue = openingQty > 0 ? openingQty * costRate : 0;
+    const closingValue = closingQty > 0 ? closingQty * costRate : 0;
 
     return {
       id: item.id,
       name: item.name,
       unit: item.unit,
       hsnCode: item.hsnCode,
-      purchaseRate: rate,
+      purchaseRate: costRate,
       saleRate: Number(item.saleRate) || 0,
       openingQty,
       openingValue,
-      purchasedQty:      purchased.qty,
-      purchasedValue:    purchased.value,
-      soldQty:           sold.qty,
-      soldValue:         sold.value,
-      saleReturnQty:     saleReturn.qty,
-      saleReturnValue:   saleReturn.value,
-      purchaseReturnQty: purchReturn.qty,
+      purchasedQty:        purchased.qty,
+      purchasedValue:      purchased.value,
+      soldQty:             sold.qty,
+      soldValue:           sold.value,
+      saleReturnQty:       saleReturn.qty,
+      saleReturnValue:     saleReturn.value,
+      purchaseReturnQty:   purchReturn.qty,
       purchaseReturnValue: purchReturn.value,
       closingQty,
       closingValue,
@@ -1293,7 +1369,7 @@ router.get("/reports/stock-summary", authMiddleware, async (req, res) => {
 
 // ── Batch-wise Stock Summary ──────────────────────────────────────────────────
 router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
-    const enableDualLedger = await getEnableDualLedger();
+  const enableDualLedger = await getEnableDualLedger();
   const { from, to } = req.query;
 
   const [items, batches] = await Promise.all([
@@ -1313,12 +1389,76 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
     }
   }
 
+  const dualLedgerCond = (table: any) =>
+    and(eq(table.isDeleted, "false"), enableDualLedger ? sql`true` : eq(table.isKaccha, false));
+
+  // Transactions BEFORE 'from'
+  const purchBeforeMap: Record<string, { qty: number; value: number }> = {};
+  const saleBeforeMap: Record<string, { qty: number; value: number }> = {};
+  const creditBeforeMap: Record<number, { qty: number; value: number }> = {};
+  const debitBeforeMap: Record<number, { qty: number; value: number }> = {};
+
+  if (from) {
+    const [pb, sb, cb, db_] = await Promise.all([
+      db.select({
+        stockItemId: purchaseInvoiceItemsTable.stockItemId,
+        batchId:     purchaseInvoiceItemsTable.batchId,
+        qty:   sql<string>`SUM(${purchaseInvoiceItemsTable.quantity})`,
+        value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
+      }).from(purchaseInvoiceItemsTable)
+        .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
+        .where(and(dualLedgerCond(purchaseInvoicesTable), lt(purchaseInvoicesTable.date, from as string)))
+        .groupBy(purchaseInvoiceItemsTable.stockItemId, purchaseInvoiceItemsTable.batchId),
+
+      db.select({
+        stockItemId: saleInvoiceItemsTable.stockItemId,
+        batchId:     saleInvoiceItemsTable.batchId,
+        qty:   sql<string>`SUM(${saleInvoiceItemsTable.quantity})`,
+        value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
+      }).from(saleInvoiceItemsTable)
+        .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
+        .where(and(dualLedgerCond(saleInvoicesTable), lt(saleInvoiceItemsTable.date, from as string)))
+        .groupBy(saleInvoiceItemsTable.stockItemId, saleInvoiceItemsTable.batchId),
+
+      db.select({
+        stockItemId: creditNoteItemsTable.stockItemId,
+        qty:   sql<string>`SUM(${creditNoteItemsTable.quantity})`,
+        value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
+      }).from(creditNoteItemsTable)
+        .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
+        .where(and(dualLedgerCond(creditNotesTable), lt(creditNotesTable.date, from as string)))
+        .groupBy(creditNoteItemsTable.stockItemId),
+
+      db.select({
+        stockItemId: debitNoteItemsTable.stockItemId,
+        qty:   sql<string>`SUM(${debitNoteItemsTable.quantity})`,
+        value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
+      }).from(debitNoteItemsTable)
+        .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
+        .where(and(dualLedgerCond(debitNotesTable), lt(debitNotesTable.date, from as string)))
+        .groupBy(debitNoteItemsTable.stockItemId),
+    ]);
+
+    for (const r of pb) {
+      purchBeforeMap[`${r.stockItemId}-${r.batchId ?? "null"}`] = { qty: Number(r.qty), value: Number(r.value) };
+    }
+    for (const r of sb) {
+      saleBeforeMap[`${r.stockItemId}-${r.batchId ?? "null"}`] = { qty: Number(r.qty), value: Number(r.value) };
+    }
+    for (const r of cb) {
+      if (r.stockItemId) creditBeforeMap[r.stockItemId] = { qty: Number(r.qty), value: Number(r.value) };
+    }
+    for (const r of db_) {
+      if (r.stockItemId) debitBeforeMap[r.stockItemId] = { qty: Number(r.qty), value: Number(r.value) };
+    }
+  }
+
+  // Transactions WITHIN period [from, to]
   const dateFilter = (dateCol: any) => and(
     ...(from ? [gte(dateCol, from as string)] : []),
     ...(to   ? [lte(dateCol, to   as string)] : []),
   );
 
-  // Purchases (inward) grouped by itemId + batchId
   const [purchRows, saleRows, creditRows, debitRows] = await Promise.all([
     db.select({
       stockItemId: purchaseInvoiceItemsTable.stockItemId,
@@ -1327,10 +1467,9 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
       value: sql<string>`SUM(${purchaseInvoiceItemsTable.taxableAmount})`,
     }).from(purchaseInvoiceItemsTable)
       .innerJoin(purchaseInvoicesTable, eq(purchaseInvoiceItemsTable.invoiceId, purchaseInvoicesTable.id))
-      .where(and(and(eq(purchaseInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(purchaseInvoicesTable.isKaccha, false)), dateFilter(purchaseInvoicesTable.date)))
+      .where(and(dualLedgerCond(purchaseInvoicesTable), dateFilter(purchaseInvoicesTable.date)))
       .groupBy(purchaseInvoiceItemsTable.stockItemId, purchaseInvoiceItemsTable.batchId),
 
-    // Sales (outward) grouped by itemId + batchId
     db.select({
       stockItemId: saleInvoiceItemsTable.stockItemId,
       batchId:     saleInvoiceItemsTable.batchId,
@@ -1338,40 +1477,35 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
       value: sql<string>`SUM(${saleInvoiceItemsTable.taxableAmount})`,
     }).from(saleInvoiceItemsTable)
       .innerJoin(saleInvoicesTable, eq(saleInvoiceItemsTable.invoiceId, saleInvoicesTable.id))
-      .where(and(and(eq(saleInvoicesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(saleInvoicesTable.isKaccha, false)), dateFilter(saleInvoicesTable.date)))
+      .where(and(dualLedgerCond(saleInvoicesTable), dateFilter(saleInvoicesTable.date)))
       .groupBy(saleInvoiceItemsTable.stockItemId, saleInvoiceItemsTable.batchId),
 
-    // Credit notes (sale returns → inward, no batch) grouped by itemId
     db.select({
       stockItemId: creditNoteItemsTable.stockItemId,
       qty:   sql<string>`SUM(${creditNoteItemsTable.quantity})`,
       value: sql<string>`SUM(${creditNoteItemsTable.taxableAmount})`,
     }).from(creditNoteItemsTable)
       .innerJoin(creditNotesTable, eq(creditNoteItemsTable.noteId, creditNotesTable.id))
-      .where(and(and(eq(creditNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(creditNotesTable.isKaccha, false)), dateFilter(creditNotesTable.date)))
+      .where(and(dualLedgerCond(creditNotesTable), dateFilter(creditNotesTable.date)))
       .groupBy(creditNoteItemsTable.stockItemId),
 
-    // Debit notes (purchase returns → outward, no batch) grouped by itemId
     db.select({
       stockItemId: debitNoteItemsTable.stockItemId,
       qty:   sql<string>`SUM(${debitNoteItemsTable.quantity})`,
       value: sql<string>`SUM(${debitNoteItemsTable.taxableAmount})`,
     }).from(debitNoteItemsTable)
       .innerJoin(debitNotesTable, eq(debitNoteItemsTable.noteId, debitNotesTable.id))
-      .where(and(and(eq(debitNotesTable.isDeleted, "false"), enableDualLedger ? sql`true` : eq(debitNotesTable.isKaccha, false)), dateFilter(debitNotesTable.date)))
+      .where(and(dualLedgerCond(debitNotesTable), dateFilter(debitNotesTable.date)))
       .groupBy(debitNoteItemsTable.stockItemId),
   ]);
 
-  // Build lookup maps keyed by "itemId-batchId"
   const purchMap: Record<string, { qty: number; value: number }> = {};
   for (const r of purchRows) {
-    const k = `${r.stockItemId}-${r.batchId ?? "null"}`;
-    purchMap[k] = { qty: Number(r.qty), value: Number(r.value) };
+    purchMap[`${r.stockItemId}-${r.batchId ?? "null"}`] = { qty: Number(r.qty), value: Number(r.value) };
   }
   const saleMap: Record<string, { qty: number; value: number }> = {};
   for (const r of saleRows) {
-    const k = `${r.stockItemId}-${r.batchId ?? "null"}`;
-    saleMap[k] = { qty: Number(r.qty), value: Number(r.value) };
+    saleMap[`${r.stockItemId}-${r.batchId ?? "null"}`] = { qty: Number(r.qty), value: Number(r.value) };
   }
   const creditMap: Record<number, { qty: number; value: number }> = {};
   for (const r of creditRows) {
@@ -1385,14 +1519,23 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
   function buildRow(
     itemId: number,
     batchId: number | null,
-    closingQty: number,
+    initialOpening: number,
     baseRate: number,
     inclCreditDebit: boolean,
   ) {
     const k = `${itemId}-${batchId ?? "null"}`;
+    const pb = purchBeforeMap[k] || { qty: 0, value: 0 };
+    const sb = saleBeforeMap[k]  || { qty: 0, value: 0 };
+    const cb = inclCreditDebit ? (creditBeforeMap[itemId] || { qty: 0, value: 0 }) : { qty: 0, value: 0 };
+    const db_ = inclCreditDebit ? (debitBeforeMap[itemId] || { qty: 0, value: 0 }) : { qty: 0, value: 0 };
+
+    // Opening Qty = initial opening + inward before from - outward before from
+    const openingQty = initialOpening + pb.qty + cb.qty - sb.qty - db_.qty;
+    const openingRate = baseRate;
+    const openingValue = openingQty > 0 ? openingQty * openingRate : 0;
+
     const purch  = purchMap[k]  || { qty: 0, value: 0 };
     const sale   = saleMap[k]   || { qty: 0, value: 0 };
-    // Credit/debit notes are item-level (no batch), only added to the null-batch row
     const credit = inclCreditDebit ? (creditMap[itemId] || { qty: 0, value: 0 }) : { qty: 0, value: 0 };
     const debit  = inclCreditDebit ? (debitMap[itemId]  || { qty: 0, value: 0 }) : { qty: 0, value: 0 };
 
@@ -1401,43 +1544,40 @@ router.get("/reports/stock-summary-batch", authMiddleware, async (req, res) => {
     const outwardQty  = sale.qty   + debit.qty;
     const outwardValue = sale.value + debit.value;
 
-    // Derive opening from closing by reversing period movement
-    const openingQty   = closingQty - inwardQty + outwardQty;
-    const openingRate  = baseRate;
-    const openingValue = openingQty * openingRate;
+    const closingQty = openingQty + inwardQty - outwardQty;
 
     const inwardRate  = inwardQty  > 0 ? inwardValue  / inwardQty  : 0;
     const outwardRate = outwardQty > 0 ? outwardValue / outwardQty : 0;
 
-    // Weighted average cost for closing
     const avgDenom    = openingQty + inwardQty;
     const closingRate = avgDenom > 0 ? (openingValue + inwardValue) / avgDenom : baseRate;
-    const closingValue = closingQty * closingRate;
+    const closingValue = closingQty > 0 ? closingQty * (closingRate || baseRate) : 0;
 
     return {
       batchId, batchName: null as string | null, expiryDate: null as string | null,
       openingQty, openingRate, openingValue,
       inwardQty, inwardRate, inwardValue,
       outwardQty, outwardRate, outwardValue,
-      closingQty, closingRate, closingValue,
+      closingQty, closingRate: closingRate || baseRate, closingValue,
     };
   }
 
   const result = items.map(item => {
     const itemBatches = batchesByItem[item.id] || [];
-    const baseRate    = Number(item.purchaseRate) || 0;
+    const baseRate    = Number(item.purchaseRate) || Number(item.saleRate) || 0;
     const rows = [];
 
+    const unbatchedInitialOpening = Number(item.openingStock || 0);
+
     if (itemBatches.length === 0) {
-      // No batches — single main stock row
-      rows.push({ ...buildRow(item.id, null, Number(item.physicalStock) || 0, baseRate, true), batchName: null });
+      rows.push({ ...buildRow(item.id, null, unbatchedInitialOpening, baseRate, true), batchName: null });
     } else {
-      // Has batches: main (unbatched) row + each batch row
-      const mainRow = buildRow(item.id, null, Number(item.physicalStock) || 0, baseRate, true);
+      const mainRow = buildRow(item.id, null, unbatchedInitialOpening, baseRate, true);
       rows.push({ ...mainRow, batchName: null });
 
       for (const b of itemBatches) {
-        const br = buildRow(item.id, b.id, Number(b.physicalStock) || 0, baseRate, false);
+        const batchInitialOpening = Number(b.openingStock || 0);
+        const br = buildRow(item.id, b.id, batchInitialOpening, baseRate, false);
         rows.push({ ...br, batchId: b.id, batchName: b.name, expiryDate: b.expiryDate ?? null });
       }
     }

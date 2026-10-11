@@ -369,7 +369,14 @@ router.post("/purchase-invoices/:id/payment", authMiddleware, async (req, res) =
 });
 
 router.delete("/purchase-invoices/:id", authMiddleware, async (req, res) => {
-  await db.update(purchaseInvoicesTable).set({ isDeleted: "true" }).where(eq(purchaseInvoicesTable.id, Number(req.params.id)));
+  const id = Number(req.params.id);
+  const items = await db.select().from(purchaseInvoiceItemsTable).where(eq(purchaseInvoiceItemsTable.invoiceId, id));
+  for (const item of items) {
+    if (item.stockItemId) {
+      await adjustStock(item.stockItemId, item.batchId || null, -Number(item.quantity));
+    }
+  }
+  await db.update(purchaseInvoicesTable).set({ isDeleted: "true" }).where(eq(purchaseInvoicesTable.id, id));
   res.json({ ok: true });
 });
 
@@ -438,17 +445,6 @@ router.post("/purchase-orders", authMiddleware, async (req, res) => {
       batchId: item.batchId || null,
       total: String(Number(item.total) || 0),
     });
-    if (item.stockItemId) {
-      const newBalance = await adjustStock(item.stockItemId, item.batchId || null, Number(item.quantity));
-      await db.insert(stockTransactionsTable).values({
-        itemId: item.stockItemId,
-        batchId: item.batchId || null,
-        type: "purchase-order",
-        quantity: String(Number(item.quantity) || 0),
-        balanceAfter: String(newBalance),
-        reference: poNumber,
-      });
-    }
   }
   res.status(201).json({ ...order, deliveryDate: order.deliveryDate });
 });
@@ -514,15 +510,6 @@ router.put("/purchase-orders/:id", authMiddleware, async (req, res) => {
 
 router.delete("/purchase-orders/:id", authMiddleware, async (req, res) => {
   const orderId = Number(req.params.id);
-  const [order] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, orderId)).limit(1);
-  if (order && order.status !== "cancelled") {
-    const items = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.orderId, orderId));
-    for (const item of items) {
-      if (item.stockItemId) {
-        await adjustStock(item.stockItemId, (item as any).batchId || null, -Number(item.quantity));
-      }
-    }
-  }
   await db.update(purchaseOrdersTable).set({ isDeleted: "true" }).where(eq(purchaseOrdersTable.id, orderId));
   res.json({ ok: true });
 });
@@ -531,12 +518,6 @@ router.post("/purchase-orders/:id/cancel", authMiddleware, async (req, res) => {
   const [order] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Not found" });
   if (order.status === "cancelled") return res.status(400).json({ error: "Already cancelled" });
-  const items = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.orderId, order.id));
-  for (const item of items) {
-    if (item.stockItemId) {
-      await adjustStock(item.stockItemId, (item as any).batchId || null, -Number(item.quantity));
-    }
-  }
   await db.update(purchaseOrdersTable).set({ status: "cancelled" }).where(eq(purchaseOrdersTable.id, Number(req.params.id)));
   res.json({ ok: true, status: "cancelled" });
 });
@@ -545,12 +526,6 @@ router.post("/purchase-orders/:id/uncancel", authMiddleware, async (req, res) =>
   const [order] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Not found" });
   if (order.status !== "cancelled") return res.status(400).json({ error: "Order is not cancelled" });
-  const items = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.orderId, order.id));
-  for (const item of items) {
-    if (item.stockItemId) {
-      await adjustStock(item.stockItemId, (item as any).batchId || null, Number(item.quantity));
-    }
-  }
   await db.update(purchaseOrdersTable).set({ status: "open" }).where(eq(purchaseOrdersTable.id, Number(req.params.id)));
   res.json({ ok: true, status: "open" });
 });

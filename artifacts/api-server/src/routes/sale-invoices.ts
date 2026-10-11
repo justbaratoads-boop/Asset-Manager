@@ -500,7 +500,14 @@ router.post("/sale-invoices/:id/payments", authMiddleware, async (req, res) => {
 });
 
 router.delete("/sale-invoices/:id", authMiddleware, async (req, res) => {
-  await db.update(saleInvoicesTable).set({ isDeleted: "true" }).where(eq(saleInvoicesTable.id, Number(req.params.id)));
+  const id = Number(req.params.id);
+  const items = await db.select().from(saleInvoiceItemsTable).where(eq(saleInvoiceItemsTable.invoiceId, id));
+  for (const item of items) {
+    if (item.stockItemId) {
+      await adjustStock(item.stockItemId, item.batchId || null, Number(item.quantity));
+    }
+  }
+  await db.update(saleInvoicesTable).set({ isDeleted: "true" }).where(eq(saleInvoicesTable.id, id));
   res.json({ ok: true });
 });
 

@@ -498,7 +498,14 @@ router.put("/credit-notes/:id", authMiddleware, async (req, res) => {
 });
 
 router.delete("/credit-notes/:id", authMiddleware, async (req, res) => {
-  await db.update(creditNotesTable).set({ isDeleted: "true" }).where(eq(creditNotesTable.id, Number(req.params.id)));
+  const id = Number(req.params.id);
+  const items = await db.select().from(creditNoteItemsTable).where(eq(creditNoteItemsTable.noteId, id));
+  for (const item of items) {
+    if (item.stockItemId) {
+      await adjustStock(item.stockItemId, (item as any).batchId || null, -Number(item.quantity));
+    }
+  }
+  await db.update(creditNotesTable).set({ isDeleted: "true" }).where(eq(creditNotesTable.id, id));
   res.json({ ok: true });
 });
 
@@ -641,7 +648,14 @@ router.put("/debit-notes/:id", authMiddleware, async (req, res) => {
 });
 
 router.delete("/debit-notes/:id", authMiddleware, async (req, res) => {
-  await db.update(debitNotesTable).set({ isDeleted: "true" }).where(eq(debitNotesTable.id, Number(req.params.id)));
+  const id = Number(req.params.id);
+  const items = await db.select().from(debitNoteItemsTable).where(eq(debitNoteItemsTable.noteId, id));
+  for (const item of items) {
+    if (item.stockItemId) {
+      await adjustStock(item.stockItemId, (item as any).batchId || null, Number(item.quantity));
+    }
+  }
+  await db.update(debitNotesTable).set({ isDeleted: "true" }).where(eq(debitNotesTable.id, id));
   res.json({ ok: true });
 });
 

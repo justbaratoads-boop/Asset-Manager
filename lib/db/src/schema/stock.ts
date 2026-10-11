@@ -39,6 +39,7 @@ export const stockItemsTable = pgTable("stock_items", {
   saleRate: numeric("sale_rate", { precision: 15, scale: 2 }).notNull().default("0"),
   minStockLevel: numeric("min_stock_level", { precision: 15, scale: 2 }).notNull().default("0"),
   barcode: text("barcode"),
+  openingStock: numeric("opening_stock", { precision: 15, scale: 2 }).notNull().default("0"),
   physicalStock: numeric("physical_stock", { precision: 15, scale: 2 }).notNull().default("0"),
   isTaxLiability: boolean("is_tax_liability").notNull().default(true),
   gstApplicable: text("gst_applicable").notNull().default("false"),
