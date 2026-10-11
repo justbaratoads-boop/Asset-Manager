@@ -146,15 +146,41 @@ export default function OrderForm() {
         const grossAmount = (qty * rate) * (1 - discPct / 100);
         const taxable = Number(i.taxableAmount) || 0;
         const wasInclusive = taxable < grossAmount - 0.01 && Number(i.gstPct) > 0;
+        const matchedStock = (stockItems as any[])?.find(s => s.id === i.stockItemId);
+        const isDec = matchedStock ? (matchedStock.isDecimalApplicable !== false && matchedStock.isDecimalApplicable !== "false" && matchedStock.isDecimalApplicable !== 0) : true;
+        const decPlaces = matchedStock ? (Number(matchedStock.decimalPlaces) || 2) : 2;
         return calcItem({
-        stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
-        quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
-        discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: wasInclusive, isTaxLiability: i.isTaxLiability,
+          stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, description: i.description || "", hsnCode: i.hsnCode || "",
+          quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
+          discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
+          gstLocked: !!i.stockItemId, gstInclusive: wasInclusive, isTaxLiability: i.isTaxLiability,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
         });
       }));
     }
-  }, [existing]);
+  }, [existing, stockItems]);
+
+  useEffect(() => {
+    if (!stockItems || !(stockItems as any[]).length) return;
+    setItems(prev => {
+      let changed = false;
+      const updated = prev.map(item => {
+        if (!item.stockItemId) return item;
+        const matched = (stockItems as any[]).find((s: any) => s.id === item.stockItemId);
+        if (matched) {
+          const isDec = matched.isDecimalApplicable !== false && matched.isDecimalApplicable !== "false" && matched.isDecimalApplicable !== 0;
+          const decPlaces = Number(matched.decimalPlaces) || 2;
+          if (item.isDecimalApplicable !== isDec || item.decimalPlaces !== decPlaces) {
+            changed = true;
+            return { ...item, isDecimalApplicable: isDec, decimalPlaces: decPlaces };
+          }
+        }
+        return item;
+      });
+      return changed ? updated : prev;
+    });
+  }, [stockItems]);
 
   const grandTotal = items.reduce((s, i) => s + i.total, 0);
 
@@ -171,7 +197,9 @@ export default function OrderForm() {
     setItems(prev => {
       const u = [...prev];
       if (field === 'quantity' && typeof value === 'string') {
-        if (!validateDecimalInput(value, u[index].isDecimalApplicable ?? true, u[index].decimalPlaces ?? 2)) return prev;
+        const isDec = u[index].isDecimalApplicable !== false && u[index].isDecimalApplicable !== "false" && u[index].isDecimalApplicable !== 0;
+        const decPlaces = Number(u[index].decimalPlaces) || 2;
+        if (!validateDecimalInput(value, isDec, decPlaces)) return prev;
       }
       u[index] = calcItem({ ...u[index], [field]: value });
       return u;
@@ -182,7 +210,30 @@ export default function OrderForm() {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 }); return u; });
+      const isDec = si.isDecimalApplicable !== false && si.isDecimalApplicable !== "false" && si.isDecimalApplicable !== 0;
+      const decPlaces = Number(si.decimalPlaces) || 2;
+      let currentQty = si.unit === "n/a" ? 1 : items[index].quantity;
+      if (!isDec && Number(currentQty) % 1 !== 0) {
+        currentQty = Math.round(Number(currentQty));
+      }
+      setItems(prev => {
+        const u = [...prev];
+        u[index] = calcItem({
+          ...u[index],
+          stockItemId: si.id,
+          batchId: si.batchId ? Number(si.batchId) : undefined,
+          itemName: si.name,
+          hsnCode: si.hsnCode || "",
+          unit: si.unit,
+          rate: si.saleRate,
+          gstPct,
+          quantity: currentQty,
+          gstLocked: true,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        });
+        return u;
+      });
     }
   };
 
@@ -194,7 +245,29 @@ export default function OrderForm() {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
       const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calcItem({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true, isDecimalApplicable: newItem.isDecimalApplicable ?? true, decimalPlaces: newItem.decimalPlaces ?? 2 }); return u; });
+      const isDec = newItem.isDecimalApplicable !== false && newItem.isDecimalApplicable !== "false" && newItem.isDecimalApplicable !== 0;
+      const decPlaces = Number(newItem.decimalPlaces) || 2;
+      let currentQty = newItem.unit === "n/a" ? 1 : items[quickAddForIndex].quantity;
+      if (!isDec && Number(currentQty) % 1 !== 0) {
+        currentQty = Math.round(Number(currentQty));
+      }
+      setItems(prev => {
+        const u = [...prev];
+        u[quickAddForIndex] = calcItem({
+          ...u[quickAddForIndex],
+          stockItemId: newItem.id,
+          batchId: newItem.batchId ? Number(newItem.batchId) : undefined,
+          itemName: newItem.name,
+          unit: newItem.unit,
+          rate: newItem.saleRate,
+          gstPct,
+          quantity: currentQty,
+          gstLocked: true,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        });
+        return u;
+      });
     }
   };
 
@@ -204,6 +277,10 @@ export default function OrderForm() {
     if (!date) e.date = "Date is required";
     if (items.length === 0) e.items = "At least one item is required";
     if (items.some(i => !i.itemName)) e.items = "All items must have a name";
+    const nonDecItem = items.find(i => i.isDecimalApplicable === false && Number(i.quantity) % 1 !== 0);
+    if (nonDecItem) {
+      e.items = `Item "${nonDecItem.itemName || 'Selected item'}" does not allow decimal quantities. Please enter a whole number.`;
+    }
     return e;
   };
 
@@ -333,7 +410,7 @@ export default function OrderForm() {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} min="0" step={item.isDecimalApplicable === false ? "1" : "any"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
                     {item.stockItemId ? (
                       <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
@@ -457,7 +534,7 @@ export default function OrderForm() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell><Input className="h-9 text-sm" type="number" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
+                    <TableCell><Input className="h-9 text-sm" type="number" min="0" step={item.isDecimalApplicable === false ? "1" : "any"} inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                     <TableCell>{item.stockItemId ? (
                       <div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                     ) : (

@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Printer, Lock, AlertTriangle } from "lucide-react";
 import { getGstRateForDate, computeInvoice } from "../../lib/gst";
+import { validateDecimalInput } from "@/lib/utils";
 
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +63,11 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
   const igst = isInterstate ? gstAmount : 0;
   const total = taxable + gstAmount;
 
+  const isDec = item.isDecimalApplicable !== undefined
+    ? (item.isDecimalApplicable === true || (item.isDecimalApplicable as any) === "true" || (item.isDecimalApplicable as any) === 1)
+    : true;
+  const decPlaces = item.decimalPlaces !== undefined ? Number(item.decimalPlaces) : 2;
+
   return {
     stockItemId: item.stockItemId,
     batchId: item.batchId,
@@ -81,6 +87,8 @@ function calcItem(item: Partial<NoteItem>, isInterstate: boolean): NoteItem {
     sgst,
     igst,
     total,
+    isDecimalApplicable: isDec,
+    decimalPlaces: decPlaces,
   };
 }
 
@@ -162,22 +170,61 @@ export default function DebitNoteForm() {
     const interstate = n.isInterstate === "true" || n.isInterstate === true;
     setIsInterstate(interstate);
     if (n.items?.length) {
-      setItems(n.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId,
-        batchId: i.batchId ? Number(i.batchId) : undefined,
-        itemName: i.itemName,
-        hsnCode: i.hsnCode || "",
-        quantity: Number(i.quantity),
-        unit: i.unit,
-        rate: Number(i.rate),
-        discountPct: Number(i.discountPct) || 0,
-        gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: i.gstInclusive === true || i.gstInclusive === "true", isTaxLiability: i.isTaxLiability, }, interstate)));
+      setItems(n.items.map((i: any) => {
+        const si = (stockItems as any[]).find((s: any) => s.id === Number(i.stockItemId));
+        const isDec = si?.isDecimalApplicable !== undefined
+          ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+          : (i.isDecimalApplicable !== undefined ? (i.isDecimalApplicable === true || i.isDecimalApplicable === "true" || i.isDecimalApplicable === 1) : true);
+        const decPlaces = Number(si?.decimalPlaces ?? i.decimalPlaces ?? 2);
+        return calcItem({
+          stockItemId: i.stockItemId,
+          batchId: i.batchId ? Number(i.batchId) : undefined,
+          itemName: i.itemName,
+          hsnCode: i.hsnCode || "",
+          quantity: Number(i.quantity),
+          unit: i.unit,
+          rate: Number(i.rate),
+          discountPct: Number(i.discountPct) || 0,
+          gstPct: Number(i.gstPct) || 0,
+          gstLocked: !!i.stockItemId,
+          gstInclusive: i.gstInclusive === true || i.gstInclusive === "true",
+          isTaxLiability: i.isTaxLiability,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        }, interstate);
+      }));
     }
     if (n.otherCharges) {
       try { setCharges(JSON.parse(n.otherCharges)); } catch { setCharges([]); }
     }
   }, [existing]);
+
+  useEffect(() => {
+    if (!stockItems || (stockItems as any[]).length === 0) return;
+    setItems(prev => {
+      let changed = false;
+      const updated = prev.map(item => {
+        if (!item.stockItemId) return item;
+        const si = (stockItems as any[]).find((s: any) => s.id === item.stockItemId);
+        if (si) {
+          const isDec = si.isDecimalApplicable !== undefined
+            ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+            : true;
+          const decPlaces = Number(si.decimalPlaces ?? 2);
+          if (item.isDecimalApplicable !== isDec || item.decimalPlaces !== decPlaces) {
+            changed = true;
+            let qty = item.quantity;
+            if (!isDec && Number(qty) % 1 !== 0) {
+              qty = Math.round(Number(qty)) || 1;
+            }
+            return { ...item, quantity: qty, isDecimalApplicable: isDec, decimalPlaces: decPlaces };
+          }
+        }
+        return item;
+      });
+      return changed ? updated : prev;
+    });
+  }, [stockItems]);
 
   useEffect(() => {
     if (selectedParty) {
@@ -213,14 +260,50 @@ export default function DebitNoteForm() {
   const grandTotal = totals.grand + chargesTotal;
 
   const updateItem = (index: number, field: keyof NoteItem, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }, isInterstate); return u; });
+    setItems(prev => {
+      const u = [...prev];
+      const isDec = u[index].isDecimalApplicable !== undefined
+        ? (u[index].isDecimalApplicable === true || (u[index].isDecimalApplicable as any) === "true" || (u[index].isDecimalApplicable as any) === 1)
+        : true;
+      const decPlaces = Number(u[index].decimalPlaces ?? 2);
+      if (field === 'quantity' && typeof value === 'string') {
+        if (!validateDecimalInput(value, isDec, decPlaces)) return prev;
+      }
+      u[index] = calcItem({ ...u[index], [field]: value }, isInterstate);
+      return u;
+    });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
       const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? getGstRateForDate(si, date) : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }, isInterstate); return u; });
+      const isDec = si.isDecimalApplicable !== undefined
+        ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+        : true;
+      const decPlaces = Number(si.decimalPlaces ?? 2);
+      setItems(prev => {
+        const u = [...prev];
+        let currentQty = u[index].quantity;
+        if (!isDec && Number(currentQty) % 1 !== 0) {
+          currentQty = Math.round(Number(currentQty)) || 1;
+        }
+        u[index] = calcItem({
+          ...u[index],
+          stockItemId: si.id,
+          batchId: si.batchId ? Number(si.batchId) : undefined,
+          itemName: si.name,
+          hsnCode: si.hsnCode || "",
+          unit: si.unit,
+          rate: si.purchaseRate,
+          gstPct,
+          quantity: si.unit === "n/a" ? 1 : currentQty,
+          gstLocked: true,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        }, isInterstate);
+        return u;
+      });
     }
   };
 
@@ -229,6 +312,12 @@ export default function DebitNoteForm() {
     if (!partyId) e.party = "Supplier is required";
     if (items.length === 0) e.items = "Add at least one item";
     if (items.some(i => !i.itemName)) e.items = "All items must have a name";
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].isDecimalApplicable === false && Number(items[i].quantity) % 1 !== 0) {
+        e.items = `Row ${i + 1}: Decimal quantity is not allowed for "${items[i].itemName}"`;
+        break;
+      }
+    }
     return e;
   };
 
@@ -397,7 +486,7 @@ export default function DebitNoteForm() {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Qty</Label>
-                      <Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" />
+                      <Input className="h-10 text-base" type="number" inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} min="0" step={item.isDecimalApplicable === false ? "1" : "any"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Unit</Label>
@@ -511,7 +600,7 @@ export default function DebitNoteForm() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell><Input className="h-7 text-xs" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
+                      <TableCell><Input className="h-7 text-xs" type="number" inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} min="0" step={item.isDecimalApplicable === false ? "1" : "any"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                       <TableCell>{item.stockItemId ? (
                         <div className="h-7 flex items-center gap-1 px-2 bg-muted rounded border text-xs text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                       ) : (

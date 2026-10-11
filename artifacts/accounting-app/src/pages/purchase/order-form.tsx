@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency, today, GST_RATES } from "@/lib/format";
 import { Plus, Trash2, ArrowLeft, Lock } from "lucide-react";
 import { getGstRateForDate } from "../../lib/gst";
+import { validateDecimalInput } from "@/lib/utils";
 
 import { UnitSelect } from "@/components/unit-select";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +43,8 @@ interface POItem {
   sgst: number;
   igst: number;
   total: number;
+  isDecimalApplicable?: boolean;
+  decimalPlaces?: number;
 }
 
 function calcItem(item: Partial<POItem>): POItem {
@@ -56,6 +59,12 @@ function calcItem(item: Partial<POItem>): POItem {
   const taxable = (gstInclusive && gstPct > 0) ? grossAmount / (1 + gstPct / 100) : grossAmount;
   const gstAmount = (gstInclusive && gstPct > 0) ? grossAmount - taxable : taxable * (gstPct / 100);
   const total = gstInclusive ? grossAmount : grossAmount + gstAmount;
+
+  const isDec = item.isDecimalApplicable !== undefined
+    ? (item.isDecimalApplicable === true || (item.isDecimalApplicable as any) === "true" || (item.isDecimalApplicable as any) === 1)
+    : true;
+  const decPlaces = item.decimalPlaces !== undefined ? Number(item.decimalPlaces) : 2;
+
   return {
     stockItemId: item.stockItemId,
     batchId: item.batchId,
@@ -69,6 +78,8 @@ function calcItem(item: Partial<POItem>): POItem {
     gstAmount,
     cgst: gstAmount / 2, sgst: gstAmount / 2, igst: 0,
     total,
+    isDecimalApplicable: isDec,
+    decimalPlaces: decPlaces,
   };
 }
 
@@ -109,14 +120,49 @@ export default function PurchaseOrderForm() {
     setDeliveryDate(o.deliveryDate || "");
     setNotes(o.notes || "");
     if (o.items?.length) {
-      setItems(o.items.map((i: any) => calcItem({
-        stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, hsnCode: i.hsnCode || "",
-        quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
-        discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
-        gstLocked: !!i.stockItemId, gstInclusive: i.gstInclusive === true || i.gstInclusive === "true", isTaxLiability: i.isTaxLiability,
-      })));
+      setItems(o.items.map((i: any) => {
+        const si = (stockItems as any[]).find((s: any) => s.id === Number(i.stockItemId));
+        const isDec = si?.isDecimalApplicable !== undefined
+          ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+          : (i.isDecimalApplicable !== undefined ? (i.isDecimalApplicable === true || i.isDecimalApplicable === "true" || i.isDecimalApplicable === 1) : true);
+        const decPlaces = Number(si?.decimalPlaces ?? i.decimalPlaces ?? 2);
+        return calcItem({
+          stockItemId: i.stockItemId, batchId: i.batchId || undefined, itemName: i.itemName, hsnCode: i.hsnCode || "",
+          quantity: Number(i.quantity), unit: i.unit, rate: Number(i.rate),
+          discountPct: Number(i.discountPct) || 0, gstPct: Number(i.gstPct) || 0,
+          gstLocked: !!i.stockItemId, gstInclusive: i.gstInclusive === true || i.gstInclusive === "true", isTaxLiability: i.isTaxLiability,
+          isDecimalApplicable: isDec, decimalPlaces: decPlaces,
+        });
+      }));
     }
   }, [existing]);
+
+  useEffect(() => {
+    if (!stockItems || (stockItems as any[]).length === 0) return;
+    setItems(prev => {
+      let changed = false;
+      const updated = prev.map(item => {
+        if (!item.stockItemId) return item;
+        const si = (stockItems as any[]).find((s: any) => s.id === item.stockItemId);
+        if (si) {
+          const isDec = si.isDecimalApplicable !== undefined
+            ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+            : true;
+          const decPlaces = Number(si.decimalPlaces ?? 2);
+          if (item.isDecimalApplicable !== isDec || item.decimalPlaces !== decPlaces) {
+            changed = true;
+            let qty = item.quantity;
+            if (!isDec && Number(qty) % 1 !== 0) {
+              qty = Math.round(Number(qty)) || 1;
+            }
+            return { ...item, quantity: qty, isDecimalApplicable: isDec, decimalPlaces: decPlaces };
+          }
+        }
+        return item;
+      });
+      return changed ? updated : prev;
+    });
+  }, [stockItems]);
 
   const grandTotal = items.reduce((s, i) => s + i.total, 0);
 
@@ -126,26 +172,86 @@ export default function PurchaseOrderForm() {
   };
 
   const updateItem = (index: number, field: keyof POItem, value: any) => {
-    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], [field]: value }); return u; });
+    setItems(prev => {
+      const u = [...prev];
+      const isDec = u[index].isDecimalApplicable !== undefined
+        ? (u[index].isDecimalApplicable === true || (u[index].isDecimalApplicable as any) === "true" || (u[index].isDecimalApplicable as any) === 1)
+        : true;
+      const decPlaces = Number(u[index].decimalPlaces ?? 2);
+      if (field === 'quantity' && typeof value === 'string') {
+        if (!validateDecimalInput(value, isDec, decPlaces)) return prev;
+      }
+      u[index] = calcItem({ ...u[index], [field]: value });
+      return u;
+    });
   };
 
   const selectStock = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
-      const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
-      setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.purchaseRate, gstPct, quantity: si.unit === "n/a" ? 1 : u[index].quantity, gstLocked: true }); return u; });
+      const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? getGstRateForDate(si, date) : 0;
+      const isDec = si.isDecimalApplicable !== undefined
+        ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+        : true;
+      const decPlaces = Number(si.decimalPlaces ?? 2);
+      setItems(prev => {
+        const u = [...prev];
+        let currentQty = u[index].quantity;
+        if (!isDec && Number(currentQty) % 1 !== 0) {
+          currentQty = Math.round(Number(currentQty)) || 1;
+        }
+        u[index] = calcItem({
+          ...u[index],
+          stockItemId: si.id,
+          batchId: si.batchId ? Number(si.batchId) : undefined,
+          itemName: si.name,
+          hsnCode: si.hsnCode || "",
+          unit: si.unit,
+          rate: si.purchaseRate,
+          gstPct,
+          quantity: si.unit === "n/a" ? 1 : currentQty,
+          gstLocked: true,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        });
+        return u;
+      });
     }
   };
 
   const clearItem = (index: number) => {
-    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false }); return u; });
+    setItems(prev => { const u = [...prev]; u[index] = calcItem({ ...u[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false, isDecimalApplicable: true, decimalPlaces: 2 }); return u; });
   };
 
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
-      const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
-      setItems(prev => { const u = [...prev]; u[quickAddForIndex] = calcItem({ ...u[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.purchaseRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : u[quickAddForIndex].quantity, gstLocked: true }); return u; });
+      const gstPct = newItem.gstApplicable === "true" || newItem.gstApplicable === true ? getGstRateForDate(newItem, date) : 0;
+      const isDec = newItem.isDecimalApplicable !== undefined
+        ? (newItem.isDecimalApplicable === true || newItem.isDecimalApplicable === "true" || newItem.isDecimalApplicable === 1)
+        : true;
+      const decPlaces = Number(newItem.decimalPlaces ?? 2);
+      setItems(prev => {
+        const u = [...prev];
+        let currentQty = u[quickAddForIndex].quantity;
+        if (!isDec && Number(currentQty) % 1 !== 0) {
+          currentQty = Math.round(Number(currentQty)) || 1;
+        }
+        u[quickAddForIndex] = calcItem({
+          ...u[quickAddForIndex],
+          stockItemId: newItem.id,
+          batchId: newItem.batchId ? Number(newItem.batchId) : undefined,
+          itemName: newItem.name,
+          unit: newItem.unit,
+          rate: newItem.purchaseRate,
+          gstPct,
+          quantity: newItem.unit === "n/a" ? 1 : currentQty,
+          gstLocked: true,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        });
+        return u;
+      });
     }
   };
 
@@ -155,6 +261,12 @@ export default function PurchaseOrderForm() {
     if (!date) e.date = "Date is required";
     if (items.length === 0) e.items = "At least one item is required";
     if (items.some(i => !i.itemName)) e.items = "All items must have a name";
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].isDecimalApplicable === false && Number(items[i].quantity) % 1 !== 0) {
+        e.items = `Row ${i + 1}: Decimal quantity is not allowed for "${items[i].itemName}"`;
+        break;
+      }
+    }
     return e;
   };
 
@@ -265,7 +377,7 @@ export default function PurchaseOrderForm() {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
+                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty</Label><Input className="h-10 text-base" type="number" inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} min="0" step={item.isDecimalApplicable === false ? "1" : "any"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} placeholder="0" /></div>
                   <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
                     {item.stockItemId ? (
                       <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
@@ -384,7 +496,7 @@ export default function PurchaseOrderForm() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell><Input className="h-7 text-xs" type="number" min="0" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
+                    <TableCell><Input className="h-7 text-xs" type="number" inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} min="0" step={item.isDecimalApplicable === false ? "1" : "any"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(i, "quantity", e.target.value)} /></TableCell>
                     <TableCell>{item.stockItemId ? (
                       <div className="h-7 flex items-center gap-1 px-2 bg-muted rounded border text-xs text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                     ) : (

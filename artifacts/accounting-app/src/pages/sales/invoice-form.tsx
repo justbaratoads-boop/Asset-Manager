@@ -293,12 +293,43 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
     }).catch(() => {});
   }, [fromOrderId, stockItems]);
 
+  useEffect(() => {
+    if (!stockItems || (stockItems as any[]).length === 0) return;
+    setItems(prev => {
+      let changed = false;
+      const updated = prev.map(item => {
+        if (!item.stockItemId) return item;
+        const si = (stockItems as any[]).find((s: any) => s.id === item.stockItemId);
+        if (si) {
+          const isDec = si.isDecimalApplicable !== undefined
+            ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+            : true;
+          const decPlaces = Number(si.decimalPlaces ?? 2);
+          if (item.isDecimalApplicable !== isDec || item.decimalPlaces !== decPlaces) {
+            changed = true;
+            let qty = item.quantity;
+            if (!isDec && Number(qty) % 1 !== 0) {
+              qty = Math.round(Number(qty)) || 1;
+            }
+            return { ...item, quantity: qty, isDecimalApplicable: isDec, decimalPlaces: decPlaces };
+          }
+        }
+        return item;
+      });
+      return changed ? updated : prev;
+    });
+  }, [stockItems]);
+
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     setItems(prev => {
       const updated = [...prev];
-        if (field === 'quantity' && typeof value === 'string') {
-          if (!validateDecimalInput(value, updated[index].isDecimalApplicable ?? true, updated[index].decimalPlaces ?? 2)) return prev;
-        }
+      const isDec = updated[index].isDecimalApplicable !== undefined
+        ? (updated[index].isDecimalApplicable === true || (updated[index].isDecimalApplicable as any) === "true" || (updated[index].isDecimalApplicable as any) === 1)
+        : true;
+      const decPlaces = Number(updated[index].decimalPlaces ?? 2);
+      if (field === 'quantity' && typeof value === 'string') {
+        if (!validateDecimalInput(value, isDec, decPlaces)) return prev;
+      }
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
@@ -307,10 +338,32 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   const selectStockItem = (index: number, id: string) => {
     const si = (stockItems as any[]).find((s: any) => s.id === Number(id));
     if (si) {
-      const gstPct = si.gstApplicable === "true" ? getGstRateForDate(si, date) : 0;
+      const gstPct = si.gstApplicable === "true" || si.gstApplicable === true ? getGstRateForDate(si, date) : 0;
+      const isDec = si.isDecimalApplicable !== undefined
+        ? (si.isDecimalApplicable === true || si.isDecimalApplicable === "true" || si.isDecimalApplicable === 1)
+        : true;
+      const decPlaces = Number(si.decimalPlaces ?? 2);
       setItems(prev => {
         const updated = [...prev];
-        updated[index] = { ...updated[index], stockItemId: si.id, batchId: si.batchId ? Number(si.batchId) : undefined, itemName: si.name, hsnCode: si.hsnCode || "", unit: si.unit, rate: si.saleRate, gstPct, quantity: si.unit === "n/a" ? 1 : updated[index].quantity, gstLocked: true, isTaxLiability: si.isTaxLiability ?? true, isDecimalApplicable: si.isDecimalApplicable ?? true, decimalPlaces: si.decimalPlaces ?? 2 };
+        let currentQty = updated[index].quantity;
+        if (!isDec && Number(currentQty) % 1 !== 0) {
+          currentQty = Math.round(Number(currentQty)) || 1;
+        }
+        updated[index] = {
+          ...updated[index],
+          stockItemId: si.id,
+          batchId: si.batchId ? Number(si.batchId) : undefined,
+          itemName: si.name,
+          hsnCode: si.hsnCode || "",
+          unit: si.unit,
+          rate: si.saleRate,
+          gstPct,
+          quantity: si.unit === "n/a" ? 1 : currentQty,
+          gstLocked: true,
+          isTaxLiability: si.isTaxLiability ?? true,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        };
         return updated;
       });
     }
@@ -319,7 +372,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   const clearItem = (index: number) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false, isTaxLiability: true };
+      updated[index] = { ...updated[index], stockItemId: undefined, batchId: undefined, itemName: "", hsnCode: "", gstLocked: false, isTaxLiability: true, isDecimalApplicable: true, decimalPlaces: 2 };
       return updated;
     });
   };
@@ -327,10 +380,30 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
   const handleQuickAdded = (newItem: any) => {
     queryClient.invalidateQueries({ queryKey: getListStockItemsQueryKey({}) });
     if (quickAddForIndex !== null) {
-      const gstPct = newItem.gstApplicable === "true" ? getGstRateForDate(newItem, date) : 0;
+      const gstPct = newItem.gstApplicable === "true" || newItem.gstApplicable === true ? getGstRateForDate(newItem, date) : 0;
+      const isDec = newItem.isDecimalApplicable !== undefined
+        ? (newItem.isDecimalApplicable === true || newItem.isDecimalApplicable === "true" || newItem.isDecimalApplicable === 1)
+        : true;
+      const decPlaces = Number(newItem.decimalPlaces ?? 2);
       setItems(prev => {
         const updated = [...prev];
-        updated[quickAddForIndex] = calcItem({ ...updated[quickAddForIndex], stockItemId: newItem.id, batchId: newItem.batchId ? Number(newItem.batchId) : undefined, itemName: newItem.name, unit: newItem.unit, rate: newItem.saleRate, gstPct, quantity: newItem.unit === "n/a" ? 1 : updated[quickAddForIndex].quantity, gstLocked: true }, isInterstate);
+        let currentQty = updated[quickAddForIndex].quantity;
+        if (!isDec && Number(currentQty) % 1 !== 0) {
+          currentQty = Math.round(Number(currentQty)) || 1;
+        }
+        updated[quickAddForIndex] = calcItem({
+          ...updated[quickAddForIndex],
+          stockItemId: newItem.id,
+          batchId: newItem.batchId ? Number(newItem.batchId) : undefined,
+          itemName: newItem.name,
+          unit: newItem.unit,
+          rate: newItem.saleRate,
+          gstPct,
+          quantity: newItem.unit === "n/a" ? 1 : currentQty,
+          gstLocked: true,
+          isDecimalApplicable: isDec,
+          decimalPlaces: decPlaces,
+        }, isInterstate);
         return updated;
       });
     }
@@ -343,6 +416,10 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
     for (let i = 0; i < items.length; i++) {
       if (!items[i].itemName) { e.items = `Row ${i + 1}: Item name is required`; break; }
       if (!items[i].quantity || items[i].quantity <= 0) { e.items = `Row ${i + 1}: Quantity must be > 0`; break; }
+      if (items[i].isDecimalApplicable === false && Number(items[i].quantity) % 1 !== 0) {
+        e.items = `Row ${i + 1}: Decimal quantity is not allowed for "${items[i].itemName}"`;
+        break;
+      }
       if (!items[i].rate || items[i].rate <= 0) { e.items = `Row ${i + 1}: Rate must be > 0`; break; }
     }
     if (items.length === 0) e.items = "Add at least one item";
@@ -595,7 +672,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                     onChange={e => updateItem(index, "description", e.target.value)}
                   />
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode="decimal" min="0.001" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" /></div>
+                    <div className="space-y-1"><Label className="text-xs text-muted-foreground">Qty *</Label><Input className="h-10 text-base" type="number" inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} min="0.001" step={item.isDecimalApplicable === false ? "1" : "any"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="0" /></div>
                     <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit</Label>
                       {item.stockItemId ? (
                         <div className="h-10 flex items-center gap-1.5 px-2 bg-muted rounded-md border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
@@ -771,7 +848,7 @@ const [payRows, setPayRows] = useState<{ mode: string; amount: string; reference
                           onChange={e => updateItem(index, "description", e.target.value)}
                         />
                       </TableCell>
-                      <TableCell><Input className="h-9 text-sm" type="number" min="0.001" step="any" value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
+                      <TableCell><Input className="h-9 text-sm" type="number" inputMode={item.isDecimalApplicable === false ? "numeric" : "decimal"} min="0.001" step={item.isDecimalApplicable === false ? "1" : "any"} value={item.quantity || ""} disabled={item.unit === "n/a"} onChange={e => updateItem(index, "quantity", e.target.value)} placeholder="Qty" /></TableCell>
                       <TableCell>{item.stockItemId ? (
                         <div className="h-9 flex items-center gap-1 px-2 bg-muted rounded border text-sm text-muted-foreground"><Lock className="h-3 w-3 shrink-0" />{item.unit}</div>
                       ) : (
