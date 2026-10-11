@@ -44,10 +44,6 @@ function getStatus(item: any): string {
 export default function StockAvailabilityReport() {
   const [page, setPage] = useState(1);
   const [ledgerItem, setLedgerItem] = useState<{ id: number; name: string } | null>(null);
-  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-availability", ALL_COLUMNS);
-  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(exportData, "itemName", "asc");
-  const vis = visibleKeys;
-
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["stock-availability"],
     queryFn: () => customFetch<any[]>("/api/stock-availability"),
@@ -56,7 +52,6 @@ export default function StockAvailabilityReport() {
   const batchByItemId = new Map<number, any>((batches as any[]).flatMap((b: any) => (b.items || []).map((i: any) => [i.id, b])));
 
   const list = items as any[];
-  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const totalPhysical = list.reduce((s: number, i: any) => s + i.physicalStock, 0);
   const totalReserved = list.reduce((s: number, i: any) => s + i.reservedQty, 0);
@@ -72,6 +67,12 @@ export default function StockAvailabilityReport() {
       batchAvail: batch ? Number(batch.physicalStock) - Number(batch.reservedStock) : "",
     };
   });
+
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-availability", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(exportData, "name", "asc");
+  const vis = visibleKeys;
+
+  const paginated = (sortedData || []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
