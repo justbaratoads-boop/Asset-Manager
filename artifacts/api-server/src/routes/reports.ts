@@ -7,7 +7,7 @@ import {
   ledgersTable, stockItemsTable, stockBatchesTable, ordersTable,
   creditNotesTable, debitNotesTable, creditNoteItemsTable, debitNoteItemsTable
 , partiesTable } from "@workspace/db/schema";
-import { eq, and, gte, lte, sql, inArray, isNull, ilike } from "drizzle-orm";
+import { eq, and, gte, lte, lt, sql, inArray, isNull, ilike } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth";
 
 const router = Router();

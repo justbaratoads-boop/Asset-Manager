@@ -32,10 +32,6 @@ export default function StockReportItemWise() {
   const { data: items = [] } = useListStockItems();
   const { data: itemData, isLoading } = useGetStockItem(Number(itemId), { query: { enabled: !!itemId } });
 
-  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-item-wise", ALL_COLUMNS);
-  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(transactions, "date", "desc");
-  const vis = visibleKeys;
-
   // Filter transactions by date range on the client side since the API returns all for this item
   const allTransactions = itemData?.transactions || [];
   const transactions = allTransactions.filter(t => {
@@ -43,6 +39,10 @@ export default function StockReportItemWise() {
     if (to && t.createdAt.slice(0, 10) > to) return false;
     return true;
   });
+
+  const { visibleKeys, visibleColumns, toggle, setAll, allColumns } = useColumnVisibility("stock-item-wise", ALL_COLUMNS);
+  const { sortedData, sortKey, sortDir, setSortKey, setSortDir, toggleSort } = useReportSort(transactions, "date", "desc");
+  const vis = visibleKeys;
 
   return (
     <div className="space-y-4">
