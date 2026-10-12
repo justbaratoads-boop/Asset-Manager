@@ -242,19 +242,14 @@ export default function PartyView() {
                       <MobileReportRow
                         key={i}
                         onClick={() => handleRowClick(t)}
-                        primaryTitle={p?.name || "Party"}
-                        subtitle={
-                          <span>
-                            <span>{formatDate(t.date)}</span>
-                            {t.description ? <span className="truncate max-w-[150px]"> • {t.description}</span> : null}
-                          </span>
-                        }
+                        primaryTitle={formatDate(t.date)}
+                        subtitle={t.description ? <span className="truncate block max-w-[170px]">{t.description}</span> : undefined}
                         middlePrimary={`${shortType}${t.ref ? ` : ${t.ref}` : ""}`}
                         amount={totalAmt}
                         amountLabel="Total"
                         secondaryAmount={t.balance}
                         secondaryLabel="Balance"
-                        secondaryColorClass={t.balance < 0 ? "text-red-600 font-semibold" : "text-blue-700 font-semibold"}
+                        secondaryColorClass={t.balance < 0 ? "text-red-600 font-medium" : "text-slate-600 dark:text-slate-400 font-medium"}
                       />
                     );
                   })}

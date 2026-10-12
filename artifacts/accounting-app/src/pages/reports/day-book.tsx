@@ -84,13 +84,13 @@ export default function DayBook() {
                       key={i}
                       onClick={() => handleRowClick(e)}
                       primaryTitle={e.party || "—"}
-                      subtitle={<span>{formatDate(date)}</span>}
+                      subtitle={formatDate(date)}
                       middlePrimary={`${e.type}${e.number ? ` : ${e.number}` : ""}`}
                       amount={amt}
                       amountLabel="Total"
                       secondaryAmount={e.dr > 0 ? e.dr : e.cr > 0 ? -e.cr : undefined}
                       secondaryLabel={e.dr > 0 ? "Debit" : e.cr > 0 ? "Credit" : undefined}
-                      secondaryColorClass={e.dr > 0 ? "text-red-600" : "text-green-600"}
+                      secondaryColorClass={e.dr > 0 ? "text-red-600 font-medium" : "text-emerald-600 font-medium"}
                     />
                   );
                 })}

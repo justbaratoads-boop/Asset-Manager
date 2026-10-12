@@ -173,13 +173,13 @@ export default function AllTransactions() {
                     key={i}
                     onClick={() => handleRowClick(t)}
                     primaryTitle={t.party || t.narration || "—"}
-                    subtitle={<span>{formatDate(t.date)}</span>}
+                    subtitle={formatDate(t.date)}
                     middlePrimary={`${shortType}${t.number ? ` : ${t.number}` : ""}`}
                     amount={t.amount}
                     amountLabel="Total"
                     secondaryAmount={t.debit > 0 ? t.debit : t.credit > 0 ? -t.credit : undefined}
                     secondaryLabel={t.debit > 0 ? "Debit" : t.credit > 0 ? "Credit" : undefined}
-                    secondaryColorClass={t.debit > 0 ? "text-red-600" : "text-green-600"}
+                    secondaryColorClass={t.debit > 0 ? "text-red-600 font-medium" : "text-emerald-600 font-medium"}
                   />
                 );
               })

@@ -189,19 +189,14 @@ export default function PartyStatement() {
                       <MobileReportRow
                         key={i}
                         onClick={() => handleRowClick(t)}
-                        primaryTitle={selectedAccount?.name || "Account"}
-                        subtitle={
-                          <span>
-                            <span>{formatDate(t.date)}</span>
-                            {t.narration ? <span className="truncate max-w-[150px]"> • {t.narration}</span> : null}
-                          </span>
-                        }
-                        middlePrimary={`${shortType}${t.number ? ` : ${t.number}` : ""}`}
+                        primaryTitle={formatDate(t.date)}
+                        subtitle={t.narration ? <span className="truncate block max-w-[170px]">{t.narration}</span> : undefined}
+                        middlePrimary={`${shortType}${t.number && t.number !== "-" ? ` : ${t.number}` : ""}`}
                         amount={totalAmt}
                         amountLabel="Total"
                         secondaryAmount={t.balance}
                         secondaryLabel="Balance"
-                        secondaryColorClass={t.balance < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}
+                        secondaryColorClass={t.balance < 0 ? "text-red-600 font-medium" : "text-slate-600 dark:text-slate-400 font-medium"}
                       />
                     );
                   })}

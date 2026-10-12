@@ -119,11 +119,13 @@ export default function CashBook() {
                   <MobileReportRow
                     key={i}
                     onClick={() => { if (destPath) setLocation(destPath); }}
-                    primaryTitle={e.party || e.description || "—"}
+                    primaryTitle={e.party || e.description || "Cash Transaction"}
                     subtitle={
                       <span>
                         <span>{formatDate(e.date)}</span>
-                        {e.description && e.party ? <span className="truncate max-w-[150px]"> • {e.description}</span> : null}
+                        {e.description && e.party && e.description !== e.party ? (
+                          <span className="truncate max-w-[140px] ml-1.5">• {e.description}</span>
+                        ) : null}
                       </span>
                     }
                     middlePrimary={e.ref ? `${e.type ? e.type : "Ref"} : ${e.ref}` : e.type}
@@ -131,7 +133,7 @@ export default function CashBook() {
                     amountLabel="Total"
                     secondaryAmount={e.balance}
                     secondaryLabel="Balance"
-                    secondaryColorClass={e.balance < 0 ? "text-red-600 font-semibold" : "text-foreground font-semibold"}
+                    secondaryColorClass={e.balance < 0 ? "text-red-600 font-medium" : "text-slate-600 dark:text-slate-400 font-medium"}
                   />
                 );
               })
