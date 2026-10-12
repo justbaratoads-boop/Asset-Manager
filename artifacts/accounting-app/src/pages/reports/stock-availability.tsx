@@ -12,6 +12,7 @@ import { useReportSort } from "@/hooks/use-report-sort";
 import { cn } from "@/lib/utils";
 import { formatQty } from "@/lib/format";
 import { StockLedgerDialog } from "@/components/stock-ledger-dialog";
+import { MobileReportRow } from "@/components/mobile-report-row";
 
 const PAGE_SIZE = 20;
 
@@ -106,71 +107,118 @@ export default function StockAvailabilityReport() {
       </div>
 
       <Card>
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {vis.has("idx") && <TableHead>#</TableHead>}
-                {vis.has("name") && <TableHead>Item</TableHead>}
-                {vis.has("unit") && <TableHead>Unit</TableHead>}
-                {vis.has("physicalStock") && <TableHead className="text-right">Physical Stock</TableHead>}
-                {vis.has("reservedQty") && <TableHead className="text-right">Reserved (Orders)</TableHead>}
-                {vis.has("availableStock") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("availableStock")}>Available Stock {sortKey === "availableStock" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("batchName") && <TableHead>Batch</TableHead>}
-                {vis.has("batchAvail") && <TableHead className="text-right">Batch Avail</TableHead>}
-                {vis.has("status") && <TableHead>Status</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
-              ) : list.length === 0 ? (
-                <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-8">No stock items found</TableCell></TableRow>
-              ) : paginated.map((item: any, idx: number) => (
-                <TableRow
-                  key={item.id}
-                  className={cn("cursor-pointer hover:bg-muted/50", item.availableStock < 0 && "bg-red-50", item.availableStock === 0 && "bg-amber-50")}
-                  onClick={() => setLedgerItem({ id: item.id, name: item.name })}
-                >
-                  {vis.has("idx") && <TableCell className="text-xs text-muted-foreground">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>}
-                  {vis.has("name") && <TableCell className="font-medium">{item.name}</TableCell>}
-                  {vis.has("unit") && <TableCell className="text-sm">{item.unit}</TableCell>}
-                  {vis.has("physicalStock") && <TableCell className="text-right font-medium">{formatQty(item.physicalStock, item.unit)}</TableCell>}
-                  {vis.has("reservedQty") && (
-                    <TableCell className="text-right">
-                      {item.reservedQty > 0 ? <span className="text-amber-700 font-medium">{formatQty(item.reservedQty, item.unit)}</span> : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                  )}
-                  {vis.has("availableStock") && (
-                    <TableCell className="text-right font-bold">
-                      <span className={cn(item.availableStock < 0 ? "text-red-600" : item.availableStock === 0 ? "text-amber-600" : "text-green-700")}>
-                        {formatQty(item.availableStock, item.unit)}
+        <CardContent className="p-0">
+          {/* Mobile view (< md): Zero horizontal scroll cards */}
+          <div className="md:hidden divide-y divide-border/60">
+            {isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+            ) : list.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">No stock items found</div>
+            ) : (
+              paginated.map((item: any) => {
+                const batch = batchByItemId.get(item.id);
+                return (
+                  <MobileReportRow
+                    key={item.id}
+                    onClick={() => setLedgerItem({ id: item.id, name: item.name })}
+                    primaryTitle={item.name}
+                    subtitle={
+                      <span>
+                        {item.unit && <span>Unit: {item.unit}</span>}
+                        {batch && <span className="ml-1.5">• Batch: {batch.name}</span>}
                       </span>
-                    </TableCell>
-                  )}
-                  {vis.has("batchName") && (() => {
-                    const batch = batchByItemId.get(item.id);
-                    return (
-                      <TableCell className="text-xs">
-                        {batch ? <span className="font-medium">{batch.name}</span> : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                    );
-                  })()}
-                  {vis.has("batchAvail") && (() => {
-                    const batch = batchByItemId.get(item.id);
-                    if (!batch) return <TableCell className="text-right text-muted-foreground">—</TableCell>;
-                    const avail = Number(batch.physicalStock) - Number(batch.reservedStock);
-                    return (
-                      <TableCell className="text-right font-medium">
-                        <span className={cn(avail <= 0 ? "text-amber-600" : "text-green-700")}>{formatQty(avail, item.unit)}</span>
-                      </TableCell>
-                    );
-                  })()}
-                  {vis.has("status") && <TableCell>{availBadge(item.availableStock, item.minStockLevel)}</TableCell>}
+                    }
+                    middlePrimary={
+                      <div className="text-[11px] space-y-0.5">
+                        <span className="text-foreground block">Phys: {formatQty(item.physicalStock, item.unit)}</span>
+                        {item.reservedQty > 0 && <span className="text-amber-700 block">Res: {formatQty(item.reservedQty, item.unit)}</span>}
+                      </div>
+                    }
+                    customRight={
+                      <div>
+                        <div className="text-right">
+                          <span className={cn("font-bold text-sm", item.availableStock < 0 ? "text-red-600" : item.availableStock === 0 ? "text-amber-600" : "text-green-700")}>
+                            {formatQty(item.availableStock, item.unit)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex justify-end">
+                          {availBadge(item.availableStock, item.minStockLevel)}
+                        </div>
+                      </div>
+                    }
+                  />
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop view (>= md): Full Table */}
+          <div className="hidden md:block overflow-x-auto p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {vis.has("idx") && <TableHead>#</TableHead>}
+                  {vis.has("name") && <TableHead>Item</TableHead>}
+                  {vis.has("unit") && <TableHead>Unit</TableHead>}
+                  {vis.has("physicalStock") && <TableHead className="text-right">Physical Stock</TableHead>}
+                  {vis.has("reservedQty") && <TableHead className="text-right">Reserved (Orders)</TableHead>}
+                  {vis.has("availableStock") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("availableStock")}>Available Stock {sortKey === "availableStock" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("batchName") && <TableHead>Batch</TableHead>}
+                  {vis.has("batchAvail") && <TableHead className="text-right">Batch Avail</TableHead>}
+                  {vis.has("status") && <TableHead>Status</TableHead>}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                ) : list.length === 0 ? (
+                  <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-8">No stock items found</TableCell></TableRow>
+                ) : paginated.map((item: any, idx: number) => (
+                  <TableRow
+                    key={item.id}
+                    className={cn("cursor-pointer hover:bg-muted/50", item.availableStock < 0 && "bg-red-50", item.availableStock === 0 && "bg-amber-50")}
+                    onClick={() => setLedgerItem({ id: item.id, name: item.name })}
+                  >
+                    {vis.has("idx") && <TableCell className="text-xs text-muted-foreground">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>}
+                    {vis.has("name") && <TableCell className="font-medium">{item.name}</TableCell>}
+                    {vis.has("unit") && <TableCell className="text-sm">{item.unit}</TableCell>}
+                    {vis.has("physicalStock") && <TableCell className="text-right font-medium">{formatQty(item.physicalStock, item.unit)}</TableCell>}
+                    {vis.has("reservedQty") && (
+                      <TableCell className="text-right">
+                        {item.reservedQty > 0 ? <span className="text-amber-700 font-medium">{formatQty(item.reservedQty, item.unit)}</span> : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    )}
+                    {vis.has("availableStock") && (
+                      <TableCell className="text-right font-bold">
+                        <span className={cn(item.availableStock < 0 ? "text-red-600" : item.availableStock === 0 ? "text-amber-600" : "text-green-700")}>
+                          {formatQty(item.availableStock, item.unit)}
+                        </span>
+                      </TableCell>
+                    )}
+                    {vis.has("batchName") && (() => {
+                      const batch = batchByItemId.get(item.id);
+                      return (
+                        <TableCell className="text-xs">
+                          {batch ? <span className="font-medium">{batch.name}</span> : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      );
+                    })()}
+                    {vis.has("batchAvail") && (() => {
+                      const batch = batchByItemId.get(item.id);
+                      if (!batch) return <TableCell className="text-right text-muted-foreground">—</TableCell>;
+                      const avail = Number(batch.physicalStock) - Number(batch.reservedStock);
+                      return (
+                        <TableCell className="text-right font-medium">
+                          <span className={cn(avail <= 0 ? "text-amber-600" : "text-green-700")}>{formatQty(avail, item.unit)}</span>
+                        </TableCell>
+                      );
+                    })()}
+                    {vis.has("status") && <TableCell>{availBadge(item.availableStock, item.minStockLevel)}</TableCell>}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           <Pagination total={list.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </CardContent>
       </Card>

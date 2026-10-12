@@ -11,6 +11,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
+import { MobileReportRow } from "@/components/mobile-report-row";
 
 function DateFilters({ from, to, setFrom, setTo }: any) {
   return (
@@ -84,51 +85,90 @@ function SaleRegister() {
           />
         </div>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {vis.has("date") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("date")}>Date {sortKey === "date" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-            {vis.has("invoiceNumber") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("invoiceNumber")}>Invoice# {sortKey === "invoiceNumber" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-            {vis.has("partyName") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("partyName")}>Party {sortKey === "partyName" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-            {vis.has("partyGstin") && <TableHead>GSTIN</TableHead>}
-            {vis.has("totalTaxable") && <TableHead className="text-right">Taxable</TableHead>}
-            {vis.has("totalCgst") && <TableHead className="text-right">CGST</TableHead>}
-            {vis.has("totalSgst") && <TableHead className="text-right">SGST</TableHead>}
-            {vis.has("totalIgst") && <TableHead className="text-right">IGST</TableHead>}
-            {vis.has("grandTotal") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("grandTotal")}>Total {sortKey === "grandTotal" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading
-            ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-            : !sortedData.length
-              ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No data for selected period</TableCell></TableRow>
-              : sortedData.map((inv: any) => (
-                <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/sales/invoices/${inv.id}`)}>
-                  {vis.has("date") && <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>}
-                  {vis.has("invoiceNumber") && <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>}
-                  {vis.has("partyName") && <TableCell>{inv.partyName}</TableCell>}
-                  {vis.has("partyGstin") && <TableCell className="text-xs text-muted-foreground">{inv.partyGstin || "-"}</TableCell>}
-                  {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(inv.totalTaxable)}</TableCell>}
-                  {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(inv.totalCgst)}</TableCell>}
-                  {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(inv.totalSgst)}</TableCell>}
-                  {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(inv.totalIgst)}</TableCell>}
-                  {vis.has("grandTotal") && <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>}
-                </TableRow>
-              ))
-          }
-          {invoices.length > 0 && (
-            <TableRow className="font-bold bg-muted/30">
-              <TableCell colSpan={labelCols.length}>Total ({invoices.length} invoices)</TableCell>
-              {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(totals.taxable)}</TableCell>}
-              {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(totals.cgst)}</TableCell>}
-              {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(totals.sgst)}</TableCell>}
-              {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(totals.igst)}</TableCell>}
-              {vis.has("grandTotal") && <TableCell className="text-right">{formatCurrency(totals.grandTotal)}</TableCell>}
+      {/* Mobile view (< md): Zero horizontal scroll cards */}
+      <div className="md:hidden divide-y divide-border/60">
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+        ) : !sortedData.length ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">No data for selected period</div>
+        ) : (
+          <>
+            {sortedData.map((inv: any) => (
+              <MobileReportRow
+                key={inv.id}
+                onClick={() => setLocation(`/sales/invoices/${inv.id}`)}
+                primaryTitle={inv.partyName || "Party"}
+                subtitle={
+                  <span>
+                    <span>{formatDate(inv.date)}</span>
+                    {inv.partyGstin && <span className="ml-1.5">• {inv.partyGstin}</span>}
+                  </span>
+                }
+                middlePrimary={`Sale : ${inv.invoiceNumber}`}
+                amount={inv.grandTotal}
+                amountLabel="Total"
+                secondaryAmount={inv.totalTaxable}
+                secondaryLabel="Taxable"
+              />
+            ))}
+            {invoices.length > 0 && (
+              <div className="p-3 bg-muted/30 flex items-center justify-between text-sm font-semibold">
+                <span>Total ({invoices.length} invoices)</span>
+                <span className="font-bold text-foreground">{formatCurrency(totals.grandTotal)}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Desktop view (>= md): Full Table */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {vis.has("date") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("date")}>Date {sortKey === "date" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+              {vis.has("invoiceNumber") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("invoiceNumber")}>Invoice# {sortKey === "invoiceNumber" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+              {vis.has("partyName") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("partyName")}>Party {sortKey === "partyName" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+              {vis.has("partyGstin") && <TableHead>GSTIN</TableHead>}
+              {vis.has("totalTaxable") && <TableHead className="text-right">Taxable</TableHead>}
+              {vis.has("totalCgst") && <TableHead className="text-right">CGST</TableHead>}
+              {vis.has("totalSgst") && <TableHead className="text-right">SGST</TableHead>}
+              {vis.has("totalIgst") && <TableHead className="text-right">IGST</TableHead>}
+              {vis.has("grandTotal") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("grandTotal")}>Total {sortKey === "grandTotal" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {isLoading
+              ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              : !sortedData.length
+                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No data for selected period</TableCell></TableRow>
+                : sortedData.map((inv: any) => (
+                  <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/sales/invoices/${inv.id}`)}>
+                    {vis.has("date") && <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>}
+                    {vis.has("invoiceNumber") && <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>}
+                    {vis.has("partyName") && <TableCell>{inv.partyName}</TableCell>}
+                    {vis.has("partyGstin") && <TableCell className="text-xs text-muted-foreground">{inv.partyGstin || "-"}</TableCell>}
+                    {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(inv.totalTaxable)}</TableCell>}
+                    {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(inv.totalCgst)}</TableCell>}
+                    {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(inv.totalSgst)}</TableCell>}
+                    {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(inv.totalIgst)}</TableCell>}
+                    {vis.has("grandTotal") && <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>}
+                  </TableRow>
+                ))
+            }
+            {invoices.length > 0 && (
+              <TableRow className="font-bold bg-muted/30">
+                <TableCell colSpan={labelCols.length}>Total ({invoices.length} invoices)</TableCell>
+                {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(totals.taxable)}</TableCell>}
+                {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(totals.cgst)}</TableCell>}
+                {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(totals.sgst)}</TableCell>}
+                {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(totals.igst)}</TableCell>}
+                {vis.has("grandTotal") && <TableCell className="text-right">{formatCurrency(totals.grandTotal)}</TableCell>}
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </>
   );
 }
@@ -155,51 +195,91 @@ function PurchaseRegister() {
           <ExportButtons data={invoices} columns={visibleColumns} filename={`purchase-register-${from}-${to}`} title="Purchase Register" />
         </div>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {vis.has("date") && <TableHead>Date</TableHead>}
-            {vis.has("invoiceNumber") && <TableHead>Invoice#</TableHead>}
-            {vis.has("supplierInvoiceNumber") && <TableHead>Supplier Inv#</TableHead>}
-            {vis.has("partyName") && <TableHead>Supplier</TableHead>}
-            {vis.has("totalTaxable") && <TableHead className="text-right">Taxable</TableHead>}
-            {vis.has("totalCgst") && <TableHead className="text-right">CGST</TableHead>}
-            {vis.has("totalSgst") && <TableHead className="text-right">SGST</TableHead>}
-            {vis.has("totalIgst") && <TableHead className="text-right">IGST</TableHead>}
-            {vis.has("grandTotal") && <TableHead className="text-right">Total</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading
-            ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-            : !invoices.length
-              ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No data for selected period</TableCell></TableRow>
-              : invoices.map((inv: any) => (
-                <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/purchase/invoices/${inv.id}/edit`)}>
-                  {vis.has("date") && <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>}
-                  {vis.has("invoiceNumber") && <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>}
-                  {vis.has("supplierInvoiceNumber") && <TableCell className="font-mono text-xs">{inv.supplierInvoiceNumber || "-"}</TableCell>}
-                  {vis.has("partyName") && <TableCell>{inv.partyName}</TableCell>}
-                  {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(inv.totalTaxable)}</TableCell>}
-                  {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(inv.totalCgst)}</TableCell>}
-                  {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(inv.totalSgst)}</TableCell>}
-                  {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(inv.totalIgst)}</TableCell>}
-                  {vis.has("grandTotal") && <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>}
-                </TableRow>
-              ))
-          }
-          {invoices.length > 0 && (
-            <TableRow className="font-bold bg-muted/30">
-              <TableCell colSpan={labelCols.length}>Total ({invoices.length} invoices)</TableCell>
-              {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(totals.taxable)}</TableCell>}
-              {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(totals.cgst)}</TableCell>}
-              {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(totals.sgst)}</TableCell>}
-              {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(totals.igst)}</TableCell>}
-              {vis.has("grandTotal") && <TableCell className="text-right">{formatCurrency(totals.grandTotal)}</TableCell>}
+      
+      {/* Mobile view (< md): Zero horizontal scroll cards */}
+      <div className="md:hidden divide-y divide-border/60">
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+        ) : !invoices.length ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">No data for selected period</div>
+        ) : (
+          <>
+            {invoices.map((inv: any) => (
+              <MobileReportRow
+                key={inv.id}
+                onClick={() => setLocation(`/purchase/invoices/${inv.id}/edit`)}
+                primaryTitle={inv.partyName || "Supplier"}
+                subtitle={
+                  <span>
+                    <span>{formatDate(inv.date)}</span>
+                    {inv.supplierInvoiceNumber && <span className="ml-1.5">• Supp Inv: {inv.supplierInvoiceNumber}</span>}
+                  </span>
+                }
+                middlePrimary={`Purchase : ${inv.invoiceNumber}`}
+                amount={inv.grandTotal}
+                amountLabel="Total"
+                secondaryAmount={inv.totalTaxable}
+                secondaryLabel="Taxable"
+              />
+            ))}
+            {invoices.length > 0 && (
+              <div className="p-3 bg-muted/30 flex items-center justify-between text-sm font-semibold">
+                <span>Total ({invoices.length} invoices)</span>
+                <span className="font-bold text-foreground">{formatCurrency(totals.grandTotal)}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Desktop view (>= md): Full Table */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {vis.has("date") && <TableHead>Date</TableHead>}
+              {vis.has("invoiceNumber") && <TableHead>Invoice#</TableHead>}
+              {vis.has("supplierInvoiceNumber") && <TableHead>Supplier Inv#</TableHead>}
+              {vis.has("partyName") && <TableHead>Supplier</TableHead>}
+              {vis.has("totalTaxable") && <TableHead className="text-right">Taxable</TableHead>}
+              {vis.has("totalCgst") && <TableHead className="text-right">CGST</TableHead>}
+              {vis.has("totalSgst") && <TableHead className="text-right">SGST</TableHead>}
+              {vis.has("totalIgst") && <TableHead className="text-right">IGST</TableHead>}
+              {vis.has("grandTotal") && <TableHead className="text-right">Total</TableHead>}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {isLoading
+              ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              : !invoices.length
+                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No data for selected period</TableCell></TableRow>
+                : invoices.map((inv: any) => (
+                  <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/purchase/invoices/${inv.id}/edit`)}>
+                    {vis.has("date") && <TableCell className="text-sm">{formatDate(inv.date)}</TableCell>}
+                    {vis.has("invoiceNumber") && <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>}
+                    {vis.has("supplierInvoiceNumber") && <TableCell className="font-mono text-xs">{inv.supplierInvoiceNumber || "-"}</TableCell>}
+                    {vis.has("partyName") && <TableCell>{inv.partyName}</TableCell>}
+                    {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(inv.totalTaxable)}</TableCell>}
+                    {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(inv.totalCgst)}</TableCell>}
+                    {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(inv.totalSgst)}</TableCell>}
+                    {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(inv.totalIgst)}</TableCell>}
+                    {vis.has("grandTotal") && <TableCell className="text-right font-medium">{formatCurrency(inv.grandTotal)}</TableCell>}
+                  </TableRow>
+                ))
+            }
+            {invoices.length > 0 && (
+              <TableRow className="font-bold bg-muted/30">
+                <TableCell colSpan={labelCols.length}>Total ({invoices.length} invoices)</TableCell>
+                {vis.has("totalTaxable") && <TableCell className="text-right">{formatCurrency(totals.taxable)}</TableCell>}
+                {vis.has("totalCgst") && <TableCell className="text-right">{formatCurrency(totals.cgst)}</TableCell>}
+                {vis.has("totalSgst") && <TableCell className="text-right">{formatCurrency(totals.sgst)}</TableCell>}
+                {vis.has("totalIgst") && <TableCell className="text-right">{formatCurrency(totals.igst)}</TableCell>}
+                {vis.has("grandTotal") && <TableCell className="text-right">{formatCurrency(totals.grandTotal)}</TableCell>}
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </>
   );
 }

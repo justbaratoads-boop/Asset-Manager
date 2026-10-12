@@ -13,6 +13,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
+import { MobileReportRow } from "@/components/mobile-report-row";
 import { Search, X } from "lucide-react";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -158,41 +159,71 @@ export default function AllTransactions() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {vis.has("date") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("date")}>Date {sortKey === "date" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("type") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")}>Type {sortKey === "type" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("number") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("number")}>Reference# {sortKey === "number" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("party") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("party")}>Party / Narration {sortKey === "party" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("amount") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("amount")}>Amount {sortKey === "amount" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("debit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("debit")}>Debit {sortKey === "debit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("credit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("credit")}>Credit {sortKey === "credit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading
-                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
-                : !sortedData.length
-                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
-                  : sortedData.map((t: any, i: number) => (
-                      <TableRow
-                        key={i}
-                        className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
-                        onClick={() => handleRowClick(t)}
-                      >
-                        {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
-                        {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
-                        {vis.has("number") && <TableCell className="font-mono text-xs text-primary">{t.number}</TableCell>}
-                        {vis.has("party") && <TableCell className="max-w-xs truncate text-sm">{t.party || "-"}</TableCell>}
-                        {vis.has("amount") && <TableCell className="text-right font-medium">{formatCurrency(t.amount)}</TableCell>}
-                        {vis.has("debit") && <TableCell className="text-right">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
-                        {vis.has("credit") && <TableCell className="text-right">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
-                      </TableRow>
-                    ))
-              }
-            </TableBody>
-          </Table>
+          {/* Mobile view (< md): Zero horizontal scroll cards matching reference design */}
+          <div className="md:hidden divide-y divide-border/60">
+            {isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+            ) : !sortedData.length ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">No transactions for selected period</div>
+            ) : (
+              sortedData.map((t: any, i: number) => {
+                const shortType = t.type ? t.type.replace(" Invoice", "") : "";
+                return (
+                  <MobileReportRow
+                    key={i}
+                    onClick={() => handleRowClick(t)}
+                    primaryTitle={t.party || t.narration || "—"}
+                    subtitle={<span>{formatDate(t.date)}</span>}
+                    middlePrimary={`${shortType}${t.number ? ` : ${t.number}` : ""}`}
+                    amount={t.amount}
+                    amountLabel="Total"
+                    secondaryAmount={t.debit > 0 ? t.debit : t.credit > 0 ? -t.credit : undefined}
+                    secondaryLabel={t.debit > 0 ? "Debit" : t.credit > 0 ? "Credit" : undefined}
+                    secondaryColorClass={t.debit > 0 ? "text-red-600" : "text-green-600"}
+                  />
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop/Tablet view (>= md): Full table */}
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {vis.has("date") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("date")}>Date {sortKey === "date" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("type") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")}>Type {sortKey === "type" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("number") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("number")}>Reference# {sortKey === "number" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("party") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("party")}>Party / Narration {sortKey === "party" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("amount") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("amount")}>Amount {sortKey === "amount" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("debit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("debit")}>Debit {sortKey === "debit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("credit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("credit")}>Credit {sortKey === "credit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                  : !sortedData.length
+                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions for selected period</TableCell></TableRow>
+                    : sortedData.map((t: any, i: number) => (
+                        <TableRow
+                          key={i}
+                          className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                          onClick={() => handleRowClick(t)}
+                        >
+                          {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
+                          {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
+                          {vis.has("number") && <TableCell className="font-mono text-xs text-primary">{t.number}</TableCell>}
+                          {vis.has("party") && <TableCell className="max-w-xs truncate text-sm">{t.party || "-"}</TableCell>}
+                          {vis.has("amount") && <TableCell className="text-right font-medium">{formatCurrency(t.amount)}</TableCell>}
+                          {vis.has("debit") && <TableCell className="text-right">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
+                          {vis.has("credit") && <TableCell className="text-right">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
+                        </TableRow>
+                      ))
+                }
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

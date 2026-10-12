@@ -12,6 +12,7 @@ import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { MobileReportRow } from "@/components/mobile-report-row";
 
 const ALL_COLUMNS = [
   { header: "Date", key: "date", format: formatDate },
@@ -93,51 +94,96 @@ export default function StockReportItemWise() {
       )}
 
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-0">
           {!itemId ? (
             <div className="py-10 text-center text-muted-foreground">
               Please select a stock item to view its report.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {vis.has("date") && <TableHead>Date</TableHead>}
-                  {vis.has("type") && <TableHead>Type</TableHead>}
-                  {vis.has("ref") && <TableHead>Ref#</TableHead>}
-                  {vis.has("batchId") && <TableHead>Batch ID</TableHead>}
-                  {vis.has("inQty") && <TableHead className="text-right">In</TableHead>}
-                  {vis.has("outQty") && <TableHead className="text-right">Out</TableHead>}
-                  {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading
-                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                  : !sortedData.length
-                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No transactions found</TableCell></TableRow>
-                    : transactions.map((t: any, i: number) => {
-                      const qty = Number(t.quantity);
-                      const isSale = t.type === "sale" || t.type === "production-out" || t.type === "delivery" || t.type === "credit-note"; // wait, credit note is in.
-                      const isPurchase = t.type === "purchase" || t.type === "opening" || t.type === "production-in" || t.type === "purchase-order"; // purchase order is not actual stock?
-                      const outVal = (t.type === "sale" || t.type === "delivery" || t.type === "purchase-return") ? Math.abs(qty) : "";
-                      const inVal = (t.type === "purchase" || t.type === "opening" || t.type === "sale-return") ? Math.abs(qty) : "";
+            <>
+              {/* Mobile view (< md): Zero horizontal scroll cards */}
+              <div className="md:hidden divide-y divide-border/60">
+                {isLoading ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+                ) : !sortedData.length ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">No transactions found</div>
+                ) : (
+                  transactions.map((t: any, i: number) => {
+                    const qty = Number(t.quantity);
+                    const outVal = (t.type === "sale" || t.type === "delivery" || t.type === "purchase-return") ? Math.abs(qty) : 0;
+                    const inVal = (t.type === "purchase" || t.type === "opening" || t.type === "sale-return") ? Math.abs(qty) : 0;
+                    const typeLabel = t.type ? t.type.replace("-", " ").toUpperCase() : "STOCK";
+                    return (
+                      <MobileReportRow
+                        key={t.id || i}
+                        primaryTitle={item?.name || "Stock Item"}
+                        subtitle={
+                          <span>
+                            <span>{formatDate(t.createdAt)}</span>
+                            {t.batchId && <span className="ml-1.5">• Batch: {t.batchId}</span>}
+                          </span>
+                        }
+                        middlePrimary={`${typeLabel}${t.reference ? ` : ${t.reference}` : ""}`}
+                        amount={inVal > 0 ? inVal : outVal > 0 ? outVal : undefined}
+                        amountLabel={inVal > 0 ? "In" : outVal > 0 ? "Out" : "Qty"}
+                        amountColorClass={inVal > 0 ? "text-green-600 font-bold" : outVal > 0 ? "text-red-600 font-bold" : undefined}
+                        customRight={
+                          <div className="text-right">
+                            {inVal > 0 && <span className="font-bold text-sm text-green-600 block">+{inVal} {item?.unit || ""}</span>}
+                            {outVal > 0 && <span className="font-bold text-sm text-red-600 block">-{outVal} {item?.unit || ""}</span>}
+                            {inVal === 0 && outVal === 0 && <span className="font-bold text-sm text-foreground block">{qty} {item?.unit || ""}</span>}
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Bal: <strong className="text-foreground">{t.balanceAfter}</strong>
+                            </p>
+                          </div>
+                        }
+                      />
+                    );
+                  })
+                )}
+              </div>
 
-                      return (
-                        <TableRow key={t.id || i}>
-                          {vis.has("date") && <TableCell className="text-sm">{formatDate(t.createdAt)}</TableCell>}
-                          {vis.has("type") && <TableCell><Badge variant="outline" className="uppercase text-[10px]">{t.type.replace("-", " ")}</Badge></TableCell>}
-                          {vis.has("ref") && <TableCell className="font-mono text-xs">{t.reference || "-"}</TableCell>}
-                          {vis.has("batchId") && <TableCell className="text-sm">{t.batchId || "-"}</TableCell>}
-                          {vis.has("inQty") && <TableCell className="text-right text-green-600 font-medium">{inVal}</TableCell>}
-                          {vis.has("outQty") && <TableCell className="text-right text-red-600 font-medium">{outVal}</TableCell>}
-                          {vis.has("balance") && <TableCell className="text-right font-bold">{t.balanceAfter}</TableCell>}
-                        </TableRow>
-                      );
-                    })
-                }
-              </TableBody>
-            </Table>
+              {/* Desktop view (>= md): Full Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {vis.has("date") && <TableHead>Date</TableHead>}
+                      {vis.has("type") && <TableHead>Type</TableHead>}
+                      {vis.has("ref") && <TableHead>Ref#</TableHead>}
+                      {vis.has("batchId") && <TableHead>Batch ID</TableHead>}
+                      {vis.has("inQty") && <TableHead className="text-right">In</TableHead>}
+                      {vis.has("outQty") && <TableHead className="text-right">Out</TableHead>}
+                      {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading
+                      ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                      : !sortedData.length
+                        ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No transactions found</TableCell></TableRow>
+                        : transactions.map((t: any, i: number) => {
+                          const qty = Number(t.quantity);
+                          const outVal = (t.type === "sale" || t.type === "delivery" || t.type === "purchase-return") ? Math.abs(qty) : "";
+                          const inVal = (t.type === "purchase" || t.type === "opening" || t.type === "sale-return") ? Math.abs(qty) : "";
+
+                          return (
+                            <TableRow key={t.id || i}>
+                              {vis.has("date") && <TableCell className="text-sm">{formatDate(t.createdAt)}</TableCell>}
+                              {vis.has("type") && <TableCell><Badge variant="outline" className="uppercase text-[10px]">{t.type.replace("-", " ")}</Badge></TableCell>}
+                              {vis.has("ref") && <TableCell className="font-mono text-xs">{t.reference || "-"}</TableCell>}
+                              {vis.has("batchId") && <TableCell className="text-sm">{t.batchId || "-"}</TableCell>}
+                              {vis.has("inQty") && <TableCell className="text-right text-green-600 font-medium">{inVal}</TableCell>}
+                              {vis.has("outQty") && <TableCell className="text-right text-red-600 font-medium">{outVal}</TableCell>}
+                              {vis.has("balance") && <TableCell className="text-right font-bold">{t.balanceAfter}</TableCell>}
+                            </TableRow>
+                          );
+                        })
+                    }
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

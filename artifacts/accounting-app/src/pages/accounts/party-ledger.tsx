@@ -11,6 +11,7 @@ import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
+import { MobileReportRow } from "@/components/mobile-report-row";
 import { useState } from "react";
 
 const gstBadge: Record<string, { label: string; cls: string }> = {
@@ -225,44 +226,84 @@ export default function PartyView() {
           </div>
         </div>
         <Card className="w-full max-w-full overflow-hidden">
-          <CardContent className="p-0 overflow-x-auto w-full max-w-full">
+          <CardContent className="p-0 w-full max-w-full">
             {isLoading ? (
               <p className="text-center text-muted-foreground py-8">Loading...</p>
             ) : !l?.transactions?.length ? (
               <p className="text-center text-muted-foreground py-8">No transactions yet</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Ref</TableHead>
-                    <TableHead className="text-right">Dr</TableHead>
-                    <TableHead className="text-right">Cr</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedData.map((t: any, i: number) => (
-                    <TableRow key={i} className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""} onClick={() => handleRowClick(t)}>
-                      <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs whitespace-nowrap">
-                          {txTypeLabel[t.type] || t.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">{t.description}</TableCell>
-                      <TableCell className="font-mono text-xs">{t.ref}</TableCell>
-                      <TableCell className="text-right text-sm">{t.dr > 0 ? formatCurrency(t.dr) : ""}</TableCell>
-                      <TableCell className="text-right text-sm">{t.cr > 0 ? formatCurrency(t.cr) : ""}</TableCell>
-                      <TableCell className={`text-right font-medium text-sm ${t.balance >= 0 ? "" : "text-red-600"}`}>
-                        {formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <>
+                {/* Mobile view (< md): Zero horizontal scroll cards */}
+                <div className="md:hidden divide-y divide-border/60">
+                  {sortedData.map((t: any, i: number) => {
+                    const shortType = txTypeLabel[t.type] || t.type;
+                    const totalAmt = t.dr > 0 ? t.dr : t.cr > 0 ? t.cr : 0;
+                    return (
+                      <MobileReportRow
+                        key={i}
+                        onClick={() => handleRowClick(t)}
+                        primaryTitle={p?.name || "Party"}
+                        subtitle={
+                          <span>
+                            <span>{formatDate(t.date)}</span>
+                            {t.description ? <span className="truncate max-w-[150px]"> • {t.description}</span> : null}
+                          </span>
+                        }
+                        middlePrimary={`${shortType}${t.ref ? ` : ${t.ref}` : ""}`}
+                        amount={totalAmt}
+                        amountLabel="Total"
+                        secondaryAmount={t.balance}
+                        secondaryLabel="Balance"
+                        secondaryColorClass={t.balance < 0 ? "text-red-600 font-semibold" : "text-blue-700 font-semibold"}
+                      />
+                    );
+                  })}
+                  {l && (
+                    <div className="p-3 bg-muted/30 flex items-center justify-between text-sm font-semibold">
+                      <span>Closing Balance</span>
+                      <span className={l.closingBalance >= 0 ? "text-blue-700 font-bold" : "text-red-600 font-bold"}>
+                        {formatCurrency(Math.abs(l.closingBalance))} {l.closingBalance >= 0 ? "Dr" : "Cr"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop view (>= md): Full Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Ref</TableHead>
+                        <TableHead className="text-right">Dr</TableHead>
+                        <TableHead className="text-right">Cr</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedData.map((t: any, i: number) => (
+                        <TableRow key={i} className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""} onClick={() => handleRowClick(t)}>
+                          <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs whitespace-nowrap">
+                              {txTypeLabel[t.type] || t.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{t.description}</TableCell>
+                          <TableCell className="font-mono text-xs">{t.ref}</TableCell>
+                          <TableCell className="text-right text-sm">{t.dr > 0 ? formatCurrency(t.dr) : ""}</TableCell>
+                          <TableCell className="text-right text-sm">{t.cr > 0 ? formatCurrency(t.cr) : ""}</TableCell>
+                          <TableCell className={`text-right font-medium text-sm ${t.balance >= 0 ? "" : "text-red-600"}`}>
+                            {formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

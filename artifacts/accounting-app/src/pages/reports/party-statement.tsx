@@ -17,6 +17,7 @@ import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
+import { MobileReportRow } from "@/components/mobile-report-row";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
 
@@ -173,55 +174,101 @@ export default function PartyStatement() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {vis.has("date") && <TableHead>Date</TableHead>}
-                  {vis.has("type") && <TableHead>Type</TableHead>}
-                  {vis.has("number") && <TableHead>Reference#</TableHead>}
-                  {vis.has("narration") && <TableHead>Narration</TableHead>}
-                  {vis.has("debit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("debit")}>Debit {sortKey === "debit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                  {vis.has("credit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("credit")}>Credit {sortKey === "credit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                  {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading
-                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
-                  : !sortedData.length
-                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions found in selected period</TableCell></TableRow>
-                    : sortedData.map((t: any, i: number) => {
-                      return (
-                        <TableRow
-                          key={i}
-                          className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
-                          onClick={() => handleRowClick(t)}
-                        >
-                          {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
-                          {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
-                          {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
-                          {vis.has("narration") && <TableCell className="text-sm text-muted-foreground">{t.narration || ""}</TableCell>}
-                          {vis.has("debit") && <TableCell className="text-right text-red-600">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
-                          {vis.has("credit") && <TableCell className="text-right text-green-600">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
-                          {vis.has("balance") && <TableCell className={`text-right font-medium ${t.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}</TableCell>}
-                        </TableRow>
-                      );
-                    })
-                }
-                {transactions.length > 0 && (
-                  <TableRow className="font-bold bg-muted/30">
-                    <TableCell colSpan={visibleColumns.filter(c => !["debit","credit","balance"].includes(c.key)).length}>Closing Balance</TableCell>
-                    {vis.has("debit") && <TableCell />}
-                    {vis.has("credit") && <TableCell />}
-                    {vis.has("balance") && (
-                      <TableCell className={`text-right ${closingBalance < 0 ? "text-red-600" : "text-green-600"}`}>
+            {/* Mobile view (< md): Zero horizontal scroll cards */}
+            <div className="md:hidden divide-y divide-border/60">
+              {isLoading ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+              ) : !sortedData.length ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">No transactions found in selected period</div>
+              ) : (
+                <>
+                  {sortedData.map((t: any, i: number) => {
+                    const shortType = t.type ? t.type.replace(" Invoice", "") : "";
+                    const totalAmt = t.debit > 0 ? t.debit : t.credit > 0 ? t.credit : 0;
+                    return (
+                      <MobileReportRow
+                        key={i}
+                        onClick={() => handleRowClick(t)}
+                        primaryTitle={selectedAccount?.name || "Account"}
+                        subtitle={
+                          <span>
+                            <span>{formatDate(t.date)}</span>
+                            {t.narration ? <span className="truncate max-w-[150px]"> • {t.narration}</span> : null}
+                          </span>
+                        }
+                        middlePrimary={`${shortType}${t.number ? ` : ${t.number}` : ""}`}
+                        amount={totalAmt}
+                        amountLabel="Total"
+                        secondaryAmount={t.balance}
+                        secondaryLabel="Balance"
+                        secondaryColorClass={t.balance < 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}
+                      />
+                    );
+                  })}
+                  {transactions.length > 0 && (
+                    <div className="p-3 bg-muted/30 flex items-center justify-between text-sm font-semibold">
+                      <span>Closing Balance</span>
+                      <span className={closingBalance < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
                         {formatCurrency(Math.abs(closingBalance))} {closingBalance >= 0 ? "Dr" : "Cr"}
-                      </TableCell>
-                    )}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Desktop view (>= md): Full Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {vis.has("date") && <TableHead>Date</TableHead>}
+                    {vis.has("type") && <TableHead>Type</TableHead>}
+                    {vis.has("number") && <TableHead>Reference#</TableHead>}
+                    {vis.has("narration") && <TableHead>Narration</TableHead>}
+                    {vis.has("debit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("debit")}>Debit {sortKey === "debit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                    {vis.has("credit") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("credit")}>Credit {sortKey === "credit" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                    {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {isLoading
+                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                    : !sortedData.length
+                      ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">No transactions found in selected period</TableCell></TableRow>
+                      : sortedData.map((t: any, i: number) => {
+                        return (
+                          <TableRow
+                            key={i}
+                            className={t.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                            onClick={() => handleRowClick(t)}
+                          >
+                            {vis.has("date") && <TableCell className="text-sm">{formatDate(t.date)}</TableCell>}
+                            {vis.has("type") && <TableCell><Badge variant="outline" className={`text-xs ${TYPE_COLORS[t.type] || ""}`}>{t.type}</Badge></TableCell>}
+                            {vis.has("number") && <TableCell className="font-mono text-xs">{t.number}</TableCell>}
+                            {vis.has("narration") && <TableCell className="text-sm text-muted-foreground">{t.narration || ""}</TableCell>}
+                            {vis.has("debit") && <TableCell className="text-right text-red-600">{t.debit > 0 ? formatCurrency(t.debit) : ""}</TableCell>}
+                            {vis.has("credit") && <TableCell className="text-right text-green-600">{t.credit > 0 ? formatCurrency(t.credit) : ""}</TableCell>}
+                            {vis.has("balance") && <TableCell className={`text-right font-medium ${t.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(Math.abs(t.balance))} {t.balance >= 0 ? "Dr" : "Cr"}</TableCell>}
+                          </TableRow>
+                        );
+                      })
+                  }
+                  {transactions.length > 0 && (
+                    <TableRow className="font-bold bg-muted/30">
+                      <TableCell colSpan={visibleColumns.filter(c => !["debit","credit","balance"].includes(c.key)).length}>Closing Balance</TableCell>
+                      {vis.has("debit") && <TableCell />}
+                      {vis.has("credit") && <TableCell />}
+                      {vis.has("balance") && (
+                        <TableCell className={`text-right ${closingBalance < 0 ? "text-red-600" : "text-green-600"}`}>
+                          {formatCurrency(Math.abs(closingBalance))} {closingBalance >= 0 ? "Dr" : "Cr"}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

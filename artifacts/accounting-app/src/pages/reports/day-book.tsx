@@ -9,6 +9,7 @@ import { ReportActions } from "@/components/report-actions";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { TransactionDetailSheet, TransactionTarget } from "@/components/transaction-detail-sheet";
+import { MobileReportRow } from "@/components/mobile-report-row";
 
 const ALL_COLUMNS = [
   { header: "Type", key: "type" },
@@ -67,45 +68,86 @@ export default function DayBook() {
       </div>
 
       <Card>
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {vis.has("type") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")}>Type {sortKey === "type" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("number") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("number")}>Ref# {sortKey === "number" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("party") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("party")}>Party / Narration {sortKey === "party" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("dr") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("dr")}>Debit {sortKey === "dr" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-                {vis.has("cr") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("cr")}>Credit {sortKey === "cr" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading
-                ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                : !sortedData.length
-                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No entries for {formatDate(date)}</TableCell></TableRow>
-                  : entries.map((e: any, i: number) => (
-                      <TableRow
-                        key={i}
-                        className={e.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
-                        onClick={() => handleRowClick(e)}
-                      >
-                        {vis.has("type") && <TableCell className="text-sm font-medium">{e.type}</TableCell>}
-                        {vis.has("number") && <TableCell className="font-mono text-xs text-primary">{e.number}</TableCell>}
-                        {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
-                        {vis.has("dr") && <TableCell className="text-right">{e.dr > 0 ? formatCurrency(e.dr) : ""}</TableCell>}
-                        {vis.has("cr") && <TableCell className="text-right">{e.cr > 0 ? formatCurrency(e.cr) : ""}</TableCell>}
-                      </TableRow>
-                    ))
-              }
-              {entries.length > 0 && (
-                <TableRow className="font-bold bg-muted/30">
-                  <TableCell colSpan={visibleColumns.filter(c => c.key !== "dr" && c.key !== "cr").length}>Total</TableCell>
-                  {vis.has("dr") && <TableCell className="text-right">{formatCurrency((data as any)?.totalDr)}</TableCell>}
-                  {vis.has("cr") && <TableCell className="text-right">{formatCurrency((data as any)?.totalCr)}</TableCell>}
+        <CardContent className="p-0">
+          {/* Mobile view (< md): Zero horizontal scroll cards */}
+          <div className="md:hidden divide-y divide-border/60">
+            {isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+            ) : !sortedData.length ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">No entries for {formatDate(date)}</div>
+            ) : (
+              <>
+                {entries.map((e: any, i: number) => {
+                  const amt = e.dr > 0 ? e.dr : e.cr > 0 ? e.cr : 0;
+                  return (
+                    <MobileReportRow
+                      key={i}
+                      onClick={() => handleRowClick(e)}
+                      primaryTitle={e.party || "—"}
+                      subtitle={<span>{formatDate(date)}</span>}
+                      middlePrimary={`${e.type}${e.number ? ` : ${e.number}` : ""}`}
+                      amount={amt}
+                      amountLabel="Total"
+                      secondaryAmount={e.dr > 0 ? e.dr : e.cr > 0 ? -e.cr : undefined}
+                      secondaryLabel={e.dr > 0 ? "Debit" : e.cr > 0 ? "Credit" : undefined}
+                      secondaryColorClass={e.dr > 0 ? "text-red-600" : "text-green-600"}
+                    />
+                  );
+                })}
+                {entries.length > 0 && (
+                  <div className="p-3 bg-muted/30 flex items-center justify-between text-sm font-semibold">
+                    <span>Total Debit / Credit</span>
+                    <div className="text-right">
+                      <span className="text-red-600 mr-2">Dr: {formatCurrency((data as any)?.totalDr || 0)}</span>
+                      <span className="text-green-600">Cr: {formatCurrency((data as any)?.totalCr || 0)}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Desktop view (>= md): Full Table */}
+          <div className="hidden md:block overflow-x-auto p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {vis.has("type") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")}>Type {sortKey === "type" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("number") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("number")}>Ref# {sortKey === "number" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("party") && <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("party")}>Party / Narration {sortKey === "party" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("dr") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("dr")}>Debit {sortKey === "dr" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                  {vis.has("cr") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("cr")}>Credit {sortKey === "cr" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {isLoading
+                  ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                  : !sortedData.length
+                    ? <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No entries for {formatDate(date)}</TableCell></TableRow>
+                    : entries.map((e: any, i: number) => (
+                        <TableRow
+                          key={i}
+                          className={e.id ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                          onClick={() => handleRowClick(e)}
+                        >
+                          {vis.has("type") && <TableCell className="text-sm font-medium">{e.type}</TableCell>}
+                          {vis.has("number") && <TableCell className="font-mono text-xs text-primary">{e.number}</TableCell>}
+                          {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
+                          {vis.has("dr") && <TableCell className="text-right">{e.dr > 0 ? formatCurrency(e.dr) : ""}</TableCell>}
+                          {vis.has("cr") && <TableCell className="text-right">{e.cr > 0 ? formatCurrency(e.cr) : ""}</TableCell>}
+                        </TableRow>
+                      ))
+                }
+                {entries.length > 0 && (
+                  <TableRow className="font-bold bg-muted/30">
+                    <TableCell colSpan={visibleColumns.filter(c => c.key !== "dr" && c.key !== "cr").length}>Total</TableCell>
+                    {vis.has("dr") && <TableCell className="text-right">{formatCurrency((data as any)?.totalDr)}</TableCell>}
+                    {vis.has("cr") && <TableCell className="text-right">{formatCurrency((data as any)?.totalCr)}</TableCell>}
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

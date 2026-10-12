@@ -14,6 +14,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
+import { MobileReportRow } from "@/components/mobile-report-row";
 import { Building2, CreditCard, ArrowDownRight, ArrowUpRight, Search, X, ExternalLink, RefreshCw } from "lucide-react";
 
 const ALL_COLUMNS = [
@@ -220,100 +221,136 @@ export default function BankBook() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="w-[220px]">Bank / Ledger Name</TableHead>
-                <TableHead>Account Details</TableHead>
-                <TableHead className="text-right">Opening Balance</TableHead>
-                <TableHead className="text-right text-green-600">Total Money In</TableHead>
-                <TableHead className="text-right text-red-600">Total Money Out</TableHead>
-                <TableHead className="text-right font-bold">Closing Balance</TableHead>
-                <TableHead className="text-center w-[120px]">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Loading bank accounts...
-                  </TableCell>
+          {/* Mobile view (< md): Zero horizontal scroll cards for Bank Overview */}
+          <div className="md:hidden divide-y divide-border/60">
+            {isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading bank accounts...</div>
+            ) : !filteredBanks.length ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">No bank accounts found</div>
+            ) : (
+              filteredBanks.map((bank) => (
+                <MobileReportRow
+                  key={bank.id}
+                  onClick={() => handleBankClick(bank)}
+                  primaryTitle={bank.name}
+                  subtitle={
+                    <span>
+                      {bank.accountNumber && <span>A/C: {bank.accountNumber}</span>}
+                      {bank.bankBranch && <span className="ml-1.5">• {bank.bankBranch}</span>}
+                    </span>
+                  }
+                  middlePrimary={
+                    <div className="text-[11px] space-y-0.5">
+                      {bank.totalIn > 0 && <span className="text-green-600 block">In: {formatCurrency(bank.totalIn)}</span>}
+                      {bank.totalOut > 0 && <span className="text-red-600 block">Out: {formatCurrency(bank.totalOut)}</span>}
+                    </div>
+                  }
+                  amount={bank.closingBalance}
+                  amountLabel="Close"
+                  secondaryAmount={bank.openingBalance}
+                  secondaryLabel="Open"
+                />
+              ))
+            )}
+          </div>
+
+          {/* Desktop view (>= md): Full Table */}
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="w-[220px]">Bank / Ledger Name</TableHead>
+                  <TableHead>Account Details</TableHead>
+                  <TableHead className="text-right">Opening Balance</TableHead>
+                  <TableHead className="text-right text-green-600">Total Money In</TableHead>
+                  <TableHead className="text-right text-red-600">Total Money Out</TableHead>
+                  <TableHead className="text-right font-bold">Closing Balance</TableHead>
+                  <TableHead className="text-center w-[120px]">Action</TableHead>
                 </TableRow>
-              ) : !filteredBanks.length ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No bank accounts found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredBanks.map((bank) => (
-                  <TableRow
-                    key={bank.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleBankClick(bank)}
-                  >
-                    <TableCell className="font-semibold text-sm">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-primary shrink-0" />
-                        <div>
-                          <div>{bank.name}</div>
-                          <div className="text-[10px] text-muted-foreground font-normal">{bank.group}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-xs">
-                      {bank.accountNumber ? (
-                        <div>
-                          <span className="font-mono">{bank.accountNumber}</span>
-                          {bank.ifscCode && (
-                            <span className="text-muted-foreground ml-2">IFSC: {bank.ifscCode}</span>
-                          )}
-                          {bank.bankBranch && (
-                            <div className="text-[10px] text-muted-foreground">{bank.bankBranch}</div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-right text-xs">
-                      {formatCurrency(bank.openingBalance)}
-                    </TableCell>
-
-                    <TableCell className="text-right text-xs text-green-600 font-medium">
-                      {bank.totalIn > 0 ? formatCurrency(bank.totalIn) : "-"}
-                    </TableCell>
-
-                    <TableCell className="text-right text-xs text-red-600 font-medium">
-                      {bank.totalOut > 0 ? formatCurrency(bank.totalOut) : "-"}
-                    </TableCell>
-
-                    <TableCell className="text-right font-bold text-sm">
-                      <span className={bank.closingBalance < 0 ? "text-red-600" : "text-green-600"}>
-                        {formatCurrency(bank.closingBalance)}
-                      </span>
-                      <Badge variant="outline" className="ml-1.5 text-[10px] py-0 px-1 font-mono">
-                        {bank.balanceType}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleBankClick(bank)}
-                        className="h-7 text-xs px-2.5"
-                      >
-                        <ExternalLink className="h-3 w-3 mr-1" /> View Txns
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Loading bank accounts...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : !filteredBanks.length ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No bank accounts found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredBanks.map((bank) => (
+                    <TableRow
+                      key={bank.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleBankClick(bank)}
+                    >
+                      <TableCell className="font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-primary shrink-0" />
+                          <div>
+                            <div>{bank.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{bank.group}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-xs">
+                        {bank.accountNumber ? (
+                          <div>
+                            <span className="font-mono">{bank.accountNumber}</span>
+                            {bank.ifscCode && (
+                              <span className="text-muted-foreground ml-2">IFSC: {bank.ifscCode}</span>
+                            )}
+                            {bank.bankBranch && (
+                              <div className="text-[10px] text-muted-foreground">{bank.bankBranch}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-right text-xs">
+                        {formatCurrency(bank.openingBalance)}
+                      </TableCell>
+
+                      <TableCell className="text-right text-xs text-green-600 font-medium">
+                        {bank.totalIn > 0 ? formatCurrency(bank.totalIn) : "-"}
+                      </TableCell>
+
+                      <TableCell className="text-right text-xs text-red-600 font-medium">
+                        {bank.totalOut > 0 ? formatCurrency(bank.totalOut) : "-"}
+                      </TableCell>
+
+                      <TableCell className="text-right font-bold text-sm">
+                        <span className={bank.closingBalance < 0 ? "text-red-600" : "text-green-600"}>
+                          {formatCurrency(bank.closingBalance)}
+                        </span>
+                        <Badge variant="outline" className="ml-1.5 text-[10px] py-0 px-1 font-mono">
+                          {bank.balanceType}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBankClick(bank)}
+                          className="h-7 text-xs px-2.5"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" /> View Txns
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -402,82 +439,134 @@ export default function BankBook() {
 
               {/* Modal Transaction Table */}
               <div className="flex-1 overflow-y-auto border rounded-md">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
-                    <TableRow className="bg-muted/40">
-                      {vis.has("date") && <TableHead className="w-[100px]">Date</TableHead>}
-                      {vis.has("description") && <TableHead>Description</TableHead>}
-                      {vis.has("ref") && <TableHead className="w-[110px]">Ref#</TableHead>}
-                      {vis.has("party") && <TableHead>Party</TableHead>}
-                      {vis.has("cashIn") && <TableHead className="text-right text-green-600">Money In</TableHead>}
-                      {vis.has("cashOut") && <TableHead className="text-right text-red-600">Money Out</TableHead>}
-                      {vis.has("balance") && <TableHead className="text-right">Balance</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!modalEntries.length ? (
-                      <TableRow>
-                        <TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">
-                          No transactions found for this bank account in the selected period.
-                        </TableCell>
+                {/* Mobile view (< md): Zero horizontal scroll cards */}
+                <div className="md:hidden divide-y divide-border/60">
+                  {!modalEntries.length ? (
+                    <div className="p-8 text-center text-sm text-muted-foreground">
+                      No transactions found for this bank account in the selected period.
+                    </div>
+                  ) : (
+                    modalEntries.map((e: any, i: number) => {
+                      const destPath = e.id
+                        ? e.type === "payment"
+                          ? `/accounts/payments/${e.id}/edit`
+                          : e.type === "receipt"
+                          ? `/accounts/receipts/${e.id}/edit`
+                          : e.type === "sale-invoice"
+                          ? `/sales/invoices/${e.id}`
+                          : e.type === "purchase-invoice"
+                          ? `/purchase/invoices/${e.id}/edit`
+                          : null
+                        : null;
+                      const amt = e.cashIn > 0 ? e.cashIn : e.cashOut > 0 ? e.cashOut : 0;
+                      return (
+                        <MobileReportRow
+                          key={i}
+                          onClick={() => {
+                            if (destPath) {
+                              setModalOpen(false);
+                              setLocation(destPath);
+                            }
+                          }}
+                          primaryTitle={e.party || e.description || "—"}
+                          subtitle={
+                            <span>
+                              <span>{formatDate(e.date)}</span>
+                              {e.description && e.party ? <span className="truncate max-w-[150px]"> • {e.description}</span> : null}
+                            </span>
+                          }
+                          middlePrimary={e.ref ? `${e.type ? e.type : "Ref"} : ${e.ref}` : e.type}
+                          amount={amt}
+                          amountLabel={e.cashIn > 0 ? "In" : "Out"}
+                          amountColorClass={e.cashIn > 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}
+                          secondaryAmount={e.balance}
+                          secondaryLabel="Balance"
+                          secondaryColorClass={e.balance < 0 ? "text-red-600 font-semibold" : "text-foreground font-semibold"}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Desktop view (>= md): Full Table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+                      <TableRow className="bg-muted/40">
+                        {vis.has("date") && <TableHead className="w-[100px]">Date</TableHead>}
+                        {vis.has("description") && <TableHead>Description</TableHead>}
+                        {vis.has("ref") && <TableHead className="w-[110px]">Ref#</TableHead>}
+                        {vis.has("party") && <TableHead>Party</TableHead>}
+                        {vis.has("cashIn") && <TableHead className="text-right text-green-600">Money In</TableHead>}
+                        {vis.has("cashOut") && <TableHead className="text-right text-red-600">Money Out</TableHead>}
+                        {vis.has("balance") && <TableHead className="text-right">Balance</TableHead>}
                       </TableRow>
-                    ) : (
-                      modalEntries.map((e: any, i: number) => {
-                        const destPath = e.id
-                          ? e.type === "payment"
-                            ? `/accounts/payments/${e.id}/edit`
-                            : e.type === "receipt"
-                            ? `/accounts/receipts/${e.id}/edit`
-                            : e.type === "sale-invoice"
-                            ? `/sales/invoices/${e.id}`
-                            : e.type === "purchase-invoice"
-                            ? `/purchase/invoices/${e.id}/edit`
-                            : null
-                          : null;
-                        return (
-                          <TableRow
-                            key={i}
-                            className={destPath ? "cursor-pointer hover:bg-muted/60 transition-colors" : ""}
-                            onClick={() => {
-                              if (destPath) {
-                                setModalOpen(false);
-                                setLocation(destPath);
-                              }
-                            }}
-                          >
-                            {vis.has("date") && <TableCell className="text-xs font-medium">{formatDate(e.date)}</TableCell>}
-                            {vis.has("description") && (
-                              <TableCell className="max-w-xs truncate text-xs">
-                                {e.description || "-"}
-                              </TableCell>
-                            )}
-                            {vis.has("ref") && (
-                              <TableCell className="font-mono text-xs text-primary font-medium">
-                                {e.ref}
-                              </TableCell>
-                            )}
-                            {vis.has("party") && <TableCell className="text-xs">{e.party || "-"}</TableCell>}
-                            {vis.has("cashIn") && (
-                              <TableCell className="text-right text-xs text-green-600 font-medium">
-                                {e.cashIn > 0 ? formatCurrency(e.cashIn) : ""}
-                              </TableCell>
-                            )}
-                            {vis.has("cashOut") && (
-                              <TableCell className="text-right text-xs text-red-600 font-medium">
-                                {e.cashOut > 0 ? formatCurrency(e.cashOut) : ""}
-                              </TableCell>
-                            )}
-                            {vis.has("balance") && (
-                              <TableCell className={`text-right text-xs font-semibold ${e.balance < 0 ? "text-red-600" : ""}`}>
-                                {formatCurrency(e.balance)}
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {!modalEntries.length ? (
+                        <TableRow>
+                          <TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">
+                            No transactions found for this bank account in the selected period.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        modalEntries.map((e: any, i: number) => {
+                          const destPath = e.id
+                            ? e.type === "payment"
+                              ? `/accounts/payments/${e.id}/edit`
+                              : e.type === "receipt"
+                              ? `/accounts/receipts/${e.id}/edit`
+                              : e.type === "sale-invoice"
+                              ? `/sales/invoices/${e.id}`
+                              : e.type === "purchase-invoice"
+                              ? `/purchase/invoices/${e.id}/edit`
+                              : null
+                            : null;
+                          return (
+                            <TableRow
+                              key={i}
+                              className={destPath ? "cursor-pointer hover:bg-muted/60 transition-colors" : ""}
+                              onClick={() => {
+                                if (destPath) {
+                                  setModalOpen(false);
+                                  setLocation(destPath);
+                                }
+                              }}
+                            >
+                              {vis.has("date") && <TableCell className="text-xs font-medium">{formatDate(e.date)}</TableCell>}
+                              {vis.has("description") && (
+                                <TableCell className="max-w-xs truncate text-xs">
+                                  {e.description || "-"}
+                                </TableCell>
+                              )}
+                              {vis.has("ref") && (
+                                <TableCell className="font-mono text-xs text-primary font-medium">
+                                  {e.ref}
+                                </TableCell>
+                              )}
+                              {vis.has("party") && <TableCell className="text-xs">{e.party || "-"}</TableCell>}
+                              {vis.has("cashIn") && (
+                                <TableCell className="text-right text-xs text-green-600 font-medium">
+                                  {e.cashIn > 0 ? formatCurrency(e.cashIn) : ""}
+                                </TableCell>
+                              )}
+                              {vis.has("cashOut") && (
+                                <TableCell className="text-right text-xs text-red-600 font-medium">
+                                  {e.cashOut > 0 ? formatCurrency(e.cashOut) : ""}
+                                </TableCell>
+                              )}
+                              {vis.has("balance") && (
+                                <TableCell className={`text-right text-xs font-semibold ${e.balance < 0 ? "text-red-600" : ""}`}>
+                                  {formatCurrency(e.balance)}
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </>
           )}

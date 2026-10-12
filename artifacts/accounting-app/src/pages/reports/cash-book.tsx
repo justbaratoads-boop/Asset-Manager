@@ -10,6 +10,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useReportSort } from "@/hooks/use-report-sort";
 import { useFY } from "@/lib/financial-year";
 import { useLocation } from "wouter";
+import { MobileReportRow } from "@/components/mobile-report-row";
 import { X, Wallet } from "lucide-react";
 
 const ALL_COLUMNS = [
@@ -97,52 +98,94 @@ export default function CashBook() {
       </div>
 
       <Card>
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {vis.has("date") && <TableHead>Date</TableHead>}
-                {vis.has("description") && <TableHead>Description</TableHead>}
-                {vis.has("ref") && <TableHead>Ref#</TableHead>}
-                {vis.has("party") && <TableHead>Party</TableHead>}
-                {vis.has("cashIn") && <TableHead className="text-right">Cash In</TableHead>}
-                {vis.has("cashOut") && <TableHead className="text-right">Cash Out</TableHead>}
-                {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-              ) : !sortedData.length ? (
-                <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No cash entries for selected period</TableCell></TableRow>
-              ) : (
-                entries.map((e: any, i: number) => {
-                  const destPath = e.id
-                    ? e.type === "payment" ? `/accounts/payments/${e.id}/edit`
-                    : e.type === "receipt" ? `/accounts/receipts/${e.id}/edit`
-                    : e.type === "sale-invoice" ? `/sales/invoices/${e.id}`
-                    : e.type === "purchase-invoice" ? `/purchase/invoices/${e.id}/edit`
-                    : null
-                    : null;
-                  return (
-                    <TableRow
-                      key={i}
-                      className={destPath ? "cursor-pointer hover:bg-muted/50" : ""}
-                      onClick={() => { if (destPath) setLocation(destPath); }}
-                    >
-                      {vis.has("date") && <TableCell className="text-sm">{formatDate(e.date)}</TableCell>}
-                      {vis.has("description") && <TableCell className="max-w-xs truncate">{e.description || "-"}</TableCell>}
-                      {vis.has("ref") && <TableCell className="font-mono text-xs">{e.ref}</TableCell>}
-                      {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
-                      {vis.has("cashIn") && <TableCell className="text-right text-green-600">{e.cashIn > 0 ? formatCurrency(e.cashIn) : ""}</TableCell>}
-                      {vis.has("cashOut") && <TableCell className="text-right text-red-600">{e.cashOut > 0 ? formatCurrency(e.cashOut) : ""}</TableCell>}
-                      {vis.has("balance") && <TableCell className={`text-right font-medium ${e.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(e.balance)}</TableCell>}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+        <CardContent className="p-0">
+          {/* Mobile view (< md): Zero horizontal scroll cards */}
+          <div className="md:hidden divide-y divide-border/60">
+            {isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+            ) : !sortedData.length ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">No cash entries for selected period</div>
+            ) : (
+              entries.map((e: any, i: number) => {
+                const destPath = e.id
+                  ? e.type === "payment" ? `/accounts/payments/${e.id}/edit`
+                  : e.type === "receipt" ? `/accounts/receipts/${e.id}/edit`
+                  : e.type === "sale-invoice" ? `/sales/invoices/${e.id}`
+                  : e.type === "purchase-invoice" ? `/purchase/invoices/${e.id}/edit`
+                  : null
+                  : null;
+                const amt = e.cashIn > 0 ? e.cashIn : e.cashOut > 0 ? e.cashOut : 0;
+                return (
+                  <MobileReportRow
+                    key={i}
+                    onClick={() => { if (destPath) setLocation(destPath); }}
+                    primaryTitle={e.party || e.description || "—"}
+                    subtitle={
+                      <span>
+                        <span>{formatDate(e.date)}</span>
+                        {e.description && e.party ? <span className="truncate max-w-[150px]"> • {e.description}</span> : null}
+                      </span>
+                    }
+                    middlePrimary={e.ref ? `${e.type ? e.type : "Ref"} : ${e.ref}` : e.type}
+                    amount={amt}
+                    amountLabel="Total"
+                    secondaryAmount={e.balance}
+                    secondaryLabel="Balance"
+                    secondaryColorClass={e.balance < 0 ? "text-red-600 font-semibold" : "text-foreground font-semibold"}
+                  />
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop view (>= md): Full Table */}
+          <div className="hidden md:block overflow-x-auto p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {vis.has("date") && <TableHead>Date</TableHead>}
+                  {vis.has("description") && <TableHead>Description</TableHead>}
+                  {vis.has("ref") && <TableHead>Ref#</TableHead>}
+                  {vis.has("party") && <TableHead>Party</TableHead>}
+                  {vis.has("cashIn") && <TableHead className="text-right">Cash In</TableHead>}
+                  {vis.has("cashOut") && <TableHead className="text-right">Cash Out</TableHead>}
+                  {vis.has("balance") && <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("balance")}>Balance {sortKey === "balance" ? (sortDir === "asc" ? "↑" : "↓") : ""}</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                ) : !sortedData.length ? (
+                  <TableRow><TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground">No cash entries for selected period</TableCell></TableRow>
+                ) : (
+                  entries.map((e: any, i: number) => {
+                    const destPath = e.id
+                      ? e.type === "payment" ? `/accounts/payments/${e.id}/edit`
+                      : e.type === "receipt" ? `/accounts/receipts/${e.id}/edit`
+                      : e.type === "sale-invoice" ? `/sales/invoices/${e.id}`
+                      : e.type === "purchase-invoice" ? `/purchase/invoices/${e.id}/edit`
+                      : null
+                      : null;
+                    return (
+                      <TableRow
+                        key={i}
+                        className={destPath ? "cursor-pointer hover:bg-muted/50" : ""}
+                        onClick={() => { if (destPath) setLocation(destPath); }}
+                      >
+                        {vis.has("date") && <TableCell className="text-sm">{formatDate(e.date)}</TableCell>}
+                        {vis.has("description") && <TableCell className="max-w-xs truncate">{e.description || "-"}</TableCell>}
+                        {vis.has("ref") && <TableCell className="font-mono text-xs">{e.ref}</TableCell>}
+                        {vis.has("party") && <TableCell className="text-sm">{e.party || "-"}</TableCell>}
+                        {vis.has("cashIn") && <TableCell className="text-right text-green-600">{e.cashIn > 0 ? formatCurrency(e.cashIn) : ""}</TableCell>}
+                        {vis.has("cashOut") && <TableCell className="text-right text-red-600">{e.cashOut > 0 ? formatCurrency(e.cashOut) : ""}</TableCell>}
+                        {vis.has("balance") && <TableCell className={`text-right font-medium ${e.balance < 0 ? "text-red-600" : ""}`}>{formatCurrency(e.balance)}</TableCell>}
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
