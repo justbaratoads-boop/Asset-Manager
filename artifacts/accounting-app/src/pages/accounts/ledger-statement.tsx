@@ -95,27 +95,27 @@ export default function LedgerStatement() {
           </div>
         </div>
         {s && (
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Opening Balance</p>
+          <div className="w-full lg:w-auto grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-3 sm:gap-6 bg-card/60 p-3 sm:p-0 rounded-lg border sm:border-0">
+            <div className="text-left sm:text-right">
+              <p className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wider">Opening Balance</p>
               <p className="text-sm font-semibold">
                 {formatCurrency(Math.abs(s.openingBalance))}
                 <span className="text-xs text-muted-foreground ml-1">{(s.openingNature || s.nature) === "cr" ? "Cr" : "Dr"}</span>
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Total Dr</p>
+            <div className="text-left sm:text-right">
+              <p className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wider">Total Dr</p>
               <p className="text-sm font-semibold text-blue-700">{formatCurrency(s.totalDr)}</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Total Cr</p>
+            <div className="text-left sm:text-right">
+              <p className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wider">Total Cr</p>
               <p className="text-sm font-semibold text-rose-600">{formatCurrency(s.totalCr)}</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Closing Balance</p>
-              <p className={`text-lg font-bold ${s.closingBalance >= 0 ? "text-blue-700" : "text-red-600"}`}>
+            <div className="text-left sm:text-right">
+              <p className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wider">Closing Balance</p>
+              <p className={`text-base sm:text-lg font-bold ${s.closingBalance >= 0 ? "text-blue-700" : "text-red-600"}`}>
                 {formatCurrency(Math.abs(s.closingBalance))}
-                <span className="text-sm ml-1">{s.closingBalance >= 0 ? "Dr" : "Cr"}</span>
+                <span className="text-xs sm:text-sm ml-1">{s.closingBalance >= 0 ? "Dr" : "Cr"}</span>
               </p>
             </div>
           </div>

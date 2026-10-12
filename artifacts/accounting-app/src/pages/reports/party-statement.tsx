@@ -156,12 +156,14 @@ export default function PartyStatement() {
       </div>
 
       {selectedAccount && (
-        <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg text-sm">
-          <div><span className="text-muted-foreground">Account: </span><span className="font-semibold">{selectedAccount.name}</span> <Badge variant="secondary" className="ml-2 text-[10px]">{selectedAccount.group}</Badge></div>
-          {selectedAccount.gstin && <div><span className="text-muted-foreground ml-4">GSTIN: </span><span>{selectedAccount.gstin}</span></div>}
-          {selectedAccount.phone && <div><span className="text-muted-foreground ml-4">Ph: </span><span>{selectedAccount.phone}</span></div>}
-          <div className="ml-auto">
-            <span className="text-muted-foreground mr-2">Closing Balance:</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg text-sm border sm:border-0">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <div><span className="text-muted-foreground">Account: </span><span className="font-semibold">{selectedAccount.name}</span> <Badge variant="secondary" className="ml-2 text-[10px]">{selectedAccount.group}</Badge></div>
+            {selectedAccount.gstin && <div><span className="text-muted-foreground">GSTIN: </span><span>{selectedAccount.gstin}</span></div>}
+            {selectedAccount.phone && <div><span className="text-muted-foreground">Ph: </span><span>{selectedAccount.phone}</span></div>}
+          </div>
+          <div className="pt-2 sm:pt-0 border-t sm:border-t-0 flex items-center justify-between sm:justify-end gap-2">
+            <span className="text-muted-foreground">Closing Balance:</span>
             <span className={`font-bold text-base ${closingBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
               {formatCurrency(Math.abs(closingBalance))} {closingBalance >= 0 ? "Dr" : "Cr"}
             </span>

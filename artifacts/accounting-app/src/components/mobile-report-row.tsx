@@ -41,9 +41,9 @@ export function MobileReportRow({
       }`}
     >
       {/* Col 1: Left (Party / Title & Date) */}
-      <div className="flex-1 min-w-0 pr-1">
+      <div className="shrink-0 max-w-[40%] pr-1">
         {primaryTitle && (
-          <div className="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate leading-snug">
+          <div className="text-sm font-semibold text-slate-900 dark:text-slate-50 whitespace-nowrap leading-snug">
             {primaryTitle}
           </div>
         )}
@@ -56,14 +56,14 @@ export function MobileReportRow({
 
       {/* Col 2: Middle (Type : Ref Number) */}
       {(middlePrimary || middleSecondary) && (
-        <div className="shrink-0 px-2 text-center self-center">
+        <div className="flex-1 min-w-0 px-1 text-center self-center overflow-hidden">
           {middlePrimary && (
-            <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap leading-tight">
+            <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate leading-tight">
               {middlePrimary}
             </div>
           )}
           {middleSecondary && (
-            <div className="text-[11px] text-muted-foreground mt-1 whitespace-nowrap leading-tight">
+            <div className="text-[11px] text-muted-foreground mt-1 truncate leading-tight">
               {middleSecondary}
             </div>
           )}
