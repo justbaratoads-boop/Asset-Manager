@@ -451,44 +451,17 @@ export function buildVoucherHtml({ type, voucher, company, ledgers = [] }: Vouch
 </html>`;
 }
 
-export function printVoucher(options: VoucherPrintOptions) {
+export async function printVoucher(options: VoucherPrintOptions) {
   const html = buildVoucherHtml(options);
+  const { printOrShareDocument } = await import("@/lib/mobile-print");
+  const filename = `${options.type}-voucher-${options.voucher?.voucherNumber || "doc"}.pdf`;
+  const title = `${options.type.toUpperCase()} Voucher #${options.voucher?.voucherNumber || ""}`;
 
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "none";
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentWindow?.document;
-  if (!doc) {
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      win.print();
-    }
-    return;
-  }
-
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  iframe.contentWindow?.focus();
-  setTimeout(() => {
-    try {
-      iframe.contentWindow?.print();
-    } catch {}
-    setTimeout(() => {
-      try {
-        document.body.removeChild(iframe);
-      } catch {}
-    }, 1500);
-  }, 350);
+  await printOrShareDocument({
+    html,
+    filename,
+    title,
+  });
 }
 
 export function formatVoucherShareText({ type, voucher, company, ledgers = [] }: VoucherPrintOptions): { title: string; text: string } {

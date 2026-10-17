@@ -254,6 +254,50 @@ function RouterContent() {
 }
 
 function App() {
+  useEffect(() => {
+    let removeListener: (() => void) | undefined;
+
+    const setupBackButton = async () => {
+      try {
+        const { Capacitor } = await import("@capacitor/core");
+        if (!Capacitor.isNativePlatform()) return;
+
+        const { App: CapApp } = await import("@capacitor/app");
+        const listener = await CapApp.addListener("backButton", ({ canGoBack }) => {
+          // Check if any modal or sheet is open
+          const closeButtons = document.querySelectorAll<HTMLButtonElement>(
+            "[data-state='open'] button[aria-label='Close'], [role='dialog'] button[aria-label='Close']"
+          );
+          if (closeButtons.length > 0) {
+            closeButtons[closeButtons.length - 1].click();
+            return;
+          }
+
+          // Check current hash location
+          const hash = window.location.hash || "";
+          const isAtRoot = hash === "" || hash === "#/" || hash === "#/login" || hash === "#/dashboard";
+
+          if (isAtRoot) {
+            CapApp.exitApp();
+          } else if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.hash = "#/";
+          }
+        });
+        removeListener = () => listener.remove();
+      } catch (e) {
+        console.warn("Back button setup error:", e);
+      }
+    };
+
+    setupBackButton();
+
+    return () => {
+      if (removeListener) removeListener();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="accounting-theme">

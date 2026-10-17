@@ -989,8 +989,19 @@ export default function SaleInvoiceView() {
     setPreviewOpen(true);
   };
 
-  const handlePrintFromPreview = () => {
-    const win = window.open(previewBlobUrl, "_blank"); if(win) { win.onload = () => win.print(); } else { iframeRef.current?.contentWindow?.print(); }
+  const handlePrintFromPreview = async () => {
+    const { printOrShareDocument } = await import("@/lib/mobile-print");
+    const filename = `invoice-${inv?.invoiceNumber || id}.pdf`;
+    const title = `Invoice #${inv?.invoiceNumber || id}`;
+    const invoiceEl = document.getElementById("invoice-print");
+    const html = buildPrintHtml(Number(copies));
+
+    await printOrShareDocument({
+      element: invoiceEl,
+      html,
+      filename,
+      title,
+    });
   };
 
   const handleClosePreview = () => {
@@ -1030,6 +1041,8 @@ export default function SaleInvoiceView() {
             title={`Sale Invoice #${inv.invoiceNumber}`}
             customText={formatSaleInvoiceShareText(inv, company)}
             url={typeof window !== "undefined" ? window.location.href : undefined}
+            pdfElementId="invoice-print"
+            pdfFilename={`invoice-${inv.invoiceNumber || id}.pdf`}
           />
           <Button variant="outline" size="sm" onClick={() => { setCopies("2"); setPrintDialogOpen(true); }}>
             <Copy className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Print 2nd Copy</span>
@@ -1100,9 +1113,9 @@ export default function SaleInvoiceView() {
 
       {/* Print preview dialog */}
       <Dialog open={previewOpen} onOpenChange={v => { if (!v) handleClosePreview(); }}>
-        <DialogContent className="max-w-5xl h-[90vh] flex flex-col gap-3 p-4">
+        <DialogContent className="max-w-5xl w-[96vw] sm:w-full h-[94vh] sm:h-[90vh] flex flex-col gap-3 p-3 sm:p-5">
           <DialogHeader className="pb-0">
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Printer className="h-4 w-4 text-muted-foreground" />
               Print Preview — {inv?.invoiceNumber}
             </DialogTitle>
@@ -1110,24 +1123,25 @@ export default function SaleInvoiceView() {
               {ps.printerType?.toUpperCase() || "A4"} · Layout {ps.layoutStyle || "1"} · {copies} {Number(copies) === 1 ? "copy" : "copies"}
             </p>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden rounded-lg border bg-gray-100 min-h-0">
+          <div className="flex-1 overflow-auto rounded-lg border bg-slate-100 dark:bg-slate-900 p-2 sm:p-4 min-h-0 flex items-start justify-center">
             {previewBlobUrl && (
               <iframe
                 ref={iframeRef}
                 src={previewBlobUrl}
-                className="w-full h-full"
+                className="w-full h-full bg-white shadow-md rounded border-0"
+                style={{ minHeight: "100%", width: "100%" }}
                 title="Print Preview"
               />
             )}
           </div>
-          <div className="flex justify-between items-center pt-1">
-            <Button variant="outline" onClick={handleClosePreview}>Cancel</Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { handleClosePreview(); setPrintDialogOpen(true); }}>
-                Change Settings
+          <div className="flex flex-wrap justify-between items-center gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={handleClosePreview}>Cancel</Button>
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" size="sm" onClick={() => { handleClosePreview(); setPrintDialogOpen(true); }}>
+                Settings
               </Button>
-              <Button onClick={handlePrintFromPreview}>
-                <Printer className="h-4 w-4 mr-2" />Print Now
+              <Button size="sm" onClick={handlePrintFromPreview} className="gap-1.5 bg-primary text-primary-foreground">
+                <Printer className="h-4 w-4" />Print / Share
               </Button>
             </div>
           </div>

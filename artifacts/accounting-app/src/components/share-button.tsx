@@ -24,6 +24,8 @@ interface ShareButtonProps {
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   showText?: boolean;
   label?: string;
+  pdfElementId?: string;
+  pdfFilename?: string;
 }
 
 export function ShareButton({
@@ -36,17 +38,45 @@ export function ShareButton({
   variant = "outline",
   showText = true,
   label = "Share",
+  pdfElementId,
+  pdfFilename,
 }: ShareButtonProps) {
   const { data: companySettings } = useGetCompanySettings();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const businessName = (companySettings as any)?.companyName || (companySettings as any)?.name || "Business";
   const shareUrl = url || (typeof window !== "undefined" ? window.location.href : "");
 
   const fullText = customText || `*${title}*\n${businessName}${summaryText ? `\n${summaryText}` : ""}\n\nLink: ${shareUrl}`;
 
-  const handleWhatsApp = () => {
+  const sharePdfIfAvailable = async (): Promise<boolean> => {
+    if (!pdfElementId) return false;
+    const el = document.getElementById(pdfElementId);
+    if (!el) return false;
+
+    setIsGeneratingPdf(true);
+    toast({ title: "Preparing PDF for sharing..." });
+    try {
+      const { generatePdfBlob, sharePdfFile } = await import("@/lib/mobile-print");
+      const filename = pdfFilename || `${title.toLowerCase().replace(/[^a-z0-9]/g, "-")}.pdf`;
+      const blob = await generatePdfBlob(el, filename);
+      await sharePdfFile({ blob, filename, title });
+      return true;
+    } catch (err: any) {
+      console.warn("PDF generation/sharing error:", err);
+      return false;
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleWhatsApp = async () => {
+    if (pdfElementId) {
+      const shared = await sharePdfIfAvailable();
+      if (shared) return;
+    }
     const encoded = encodeURIComponent(fullText);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, "_blank");
   };
@@ -69,6 +99,10 @@ export function ShareButton({
   };
 
   const handleNativeShare = async () => {
+    if (pdfElementId) {
+      const shared = await sharePdfIfAvailable();
+      if (shared) return;
+    }
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
