@@ -79,6 +79,7 @@
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.5",
     "@capacitor/share": "^8.0.3",
     "@types/html2pdf.js": "^0.10.0",
     "html2pdf.js": "^0.14.0",

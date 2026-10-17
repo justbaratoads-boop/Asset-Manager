@@ -218,12 +218,13 @@ function buildInvoiceHtml(inv: any, company: any, ps: any, batches: any[] = []):
 
 const BASE_CSS = `
   *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .invoice{width:100%;max-width:100%;overflow-x:auto;}
   .tr{text-align:right !important;white-space:nowrap;}
   .tl{text-align:left !important;}
   .tc{text-align:center !important;white-space:nowrap;}
   .co-info{display:flex;align-items:flex-start;gap:10px}
   .co-logo{height:52px;width:auto;object-fit:contain;flex-shrink:0}
-  .inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+  .inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:12px;}
   .inv-meta{text-align:right}
   .inv-num{font-family:monospace;font-size:.9em;margin-top:3px}
   .inv-date{font-size:.88em;color:#555;margin-top:2px}
@@ -245,17 +246,25 @@ const BASE_CSS = `
   .tot-row.paid{color:#16a34a}
   .tot-row.due{color:#dc2626;font-weight:600}
   .tot-row.disc{color:#dc2626}
-  .sigs{display:flex;justify-content:space-between;margin-top:36px}
+  .sigs{display:flex;justify-content:space-between;margin-top:36px;flex-wrap:wrap;gap:16px;}
   .sig-blk{text-align:center}
   .sig-line{border-bottom:1px solid #9ca3af;width:150px;height:44px;margin-bottom:5px}
   .sig-lbl{font-size:.78em;color:#6b7280}
   .terms{margin-top:12px;font-size:.8em;color:#6b7280;padding-top:8px;border-top:1px solid #e5e7eb}
   .bill-ftr{margin-top:14px;text-align:center;font-size:.83em;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:8px}
+
+  @media screen and (max-width: 640px) {
+    .inv-template-wrapper { padding: 12px !important; }
+    .inv-header { flex-direction: column; align-items: flex-start; }
+    .inv-meta { text-align: left; margin-top: 8px; }
+    .items-tbl { min-width: 480px; }
+  }
 `;
 
 const PRINT_CSS: Record<string, string> = {
   a4_1: `${BASE_CSS}
     body{font-family:Arial,sans-serif;font-size:13px;padding:16mm;max-width:210mm;color:#000}
+    .inv-template-wrapper{padding:16mm;background:#fff;}
     .co-name{font-size:1.2em;font-weight:700}
     .co-addr,.co-gstin,.co-phone{font-size:.85em;color:#444;margin-top:1px}
     .inv-title{font-size:1.6em;font-weight:700;color:#4f46e5}
@@ -1004,6 +1013,22 @@ export default function SaleInvoiceView() {
     });
   };
 
+  const handleDirectPrint = async () => {
+    const { printOrShareDocument } = await import("@/lib/mobile-print");
+    const filename = `invoice-${inv?.invoiceNumber || id}.pdf`;
+    const title = `Invoice #${inv?.invoiceNumber || id}`;
+    const invoiceEl = document.getElementById("invoice-print");
+    const html = buildPrintHtml(1);
+
+    toast({ title: "Opening print / share options..." });
+    await printOrShareDocument({
+      element: invoiceEl,
+      html,
+      filename,
+      title,
+    });
+  };
+
   const handleClosePreview = () => {
     setPreviewOpen(false);
     if (previewBlobUrl) {
@@ -1052,8 +1077,8 @@ export default function SaleInvoiceView() {
               <FileCheck className="h-4 w-4" /><span className="hidden sm:inline">Print Acknowledgment</span>
             </Button>
           )}
-          <Button size="sm" onClick={() => { setCopies(defaultCopies); setPrintDialogOpen(true); }}>
-            <Printer className="h-4 w-4 mr-1" />Print
+          <Button size="sm" onClick={handleDirectPrint} className="gap-1.5 bg-primary text-primary-foreground">
+            <Printer className="h-4 w-4" />Print
           </Button>
         </div>
       </div>

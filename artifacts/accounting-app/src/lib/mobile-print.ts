@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import { Filesystem, Directory } from "@capacitor/filesystem";
 
 /**
  * Generate a PDF blob from an HTML element
@@ -7,7 +8,7 @@ import { Share } from "@capacitor/share";
 export async function generatePdfBlob(element: HTMLElement, filename = "document.pdf"): Promise<Blob> {
   const html2pdf = (await import("html2pdf.js")).default;
   const opt = {
-    margin: [6, 6, 6, 6],
+    margin: [4, 4, 4, 4],
     filename,
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false },
@@ -18,7 +19,8 @@ export async function generatePdfBlob(element: HTMLElement, filename = "document
 }
 
 /**
- * Share a PDF file via native Android share sheet (Capacitor) or Web Share API
+ * Share a PDF file via native Android share sheet (Capacitor) or Web Share API.
+ * Uses native Filesystem to write to disk and get a file:// or content:// URI so WhatsApp and Printer apps receive a genuine file!
  */
 export async function sharePdfFile({
   blob,
@@ -29,9 +31,44 @@ export async function sharePdfFile({
   filename: string;
   title: string;
 }) {
-  const file = new File([blob], filename, { type: "application/pdf" });
+  // 1. If running natively in Capacitor (Android)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const res = reader.result as string;
+          // Extract purely base64 data without prefix
+          const base64 = res.includes(",") ? res.split(",")[1] : res;
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      const base64Data = await base64Promise;
 
-  // 1. Try Web Share API with files support
+      // Save file to Cache directory
+      const savedFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Cache,
+      });
+
+      // Share using native files array so WhatsApp / Printer apps receive the PDF attachment
+      await Share.share({
+        title,
+        text: title,
+        files: [savedFile.uri],
+        dialogTitle: title,
+      });
+      return true;
+    } catch (err: any) {
+      console.warn("Native Filesystem + Share failed, falling back:", err);
+    }
+  }
+
+  // 2. Web Share API with files support
+  const file = new File([blob], filename, { type: "application/pdf" });
   if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
@@ -41,30 +78,7 @@ export async function sharePdfFile({
       });
       return true;
     } catch (err: any) {
-      if (err.name === "AbortError") return true; // user cancelled
-    }
-  }
-
-  // 2. Try native Capacitor Share if running in native app
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      const base64Data = await base64Promise;
-
-      await Share.share({
-        title,
-        text: title,
-        url: base64Data,
-        dialogTitle: title,
-      });
-      return true;
-    } catch (err: any) {
-      console.warn("Capacitor Share failed:", err);
+      if (err.name === "AbortError") return true;
     }
   }
 
@@ -97,10 +111,11 @@ export async function printOrShareDocument({
   filename?: string;
   title?: string;
 }) {
+  // If native platform, generate PDF and share via Android system share sheet
   if (Capacitor.isNativePlatform()) {
-    // Inside Android/Capacitor app: convert to PDF and open Android system share sheet
     let targetEl = element;
     let cleanup = false;
+
     if (!targetEl && html) {
       targetEl = document.createElement("div");
       targetEl.innerHTML = html;
@@ -108,6 +123,7 @@ export async function printOrShareDocument({
       targetEl.style.left = "-9999px";
       targetEl.style.top = "0";
       targetEl.style.width = "750px";
+      targetEl.style.background = "#ffffff";
       document.body.appendChild(targetEl);
       cleanup = true;
     }
@@ -129,7 +145,7 @@ export async function printOrShareDocument({
     }
   }
 
-  // Desktop or browser print
+  // Desktop or web browser: print via hidden iframe
   if (html) {
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
